@@ -1,129 +1,140 @@
+import { createClient } from '@supabase/supabase-js';
 import type { Attendee } from '../types';
-import { PaymentStatus, DocumentType, PackageType, PaymentType } from '../types';
+import { PackageType, PaymentStatus } from '../types';
 
-const STORAGE_KEY = 'gira_da_mata_2025_attendees';
+// --- Supabase Client Setup ---
+const supabaseUrl = 'https://bjuzljwcbtnzylyirkzu.supabase.co';
+const supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJqdXpsandjYnRuenlseWlya3p1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjIzOTEyNDIsImV4cCI6MjA3Nzk2NzI0Mn0.VGB0hLfDHAo1jXSXFTf_xm5PecwEq0h2rQmuD-fo0Zk';
 
-// --- Mock Data ---
-const initialAttendees: Attendee[] = [
-    {
-        id: 'c8a6b0c9-4d5e-4c1b-9f2a-8d0c2b3d4e5f',
-        name: 'Maria da Guia',
-        document: '987.654.321-99',
-        documentType: DocumentType.CPF,
-        phone: '(21) 91234-5678',
-        packageType: PackageType.SITIO_ONLY,
-        registrationDate: new Date('2024-07-22T14:00:00Z').toISOString(),
+if (!supabaseUrl || !supabaseAnonKey) {
+    throw new Error("Supabase URL and Anon Key must be provided.");
+}
+const supabase = createClient(supabaseUrl, supabaseAnonKey);
+
+
+// --- Data Mapping Helpers ---
+
+/**
+ * Converte um registro do Supabase (com colunas snake_case e pagamento "achatado")
+ * para um objeto Attendee da aplicação (com propriedades camelCase e um objeto de pagamento aninhado).
+ */
+const fromSupabase = (record: any): Attendee => {
+    if (!record) return record;
+    
+    return {
+        id: record.id,
+        name: record.name,
+        document: record.document,
+        documentType: record.document_type,
+        phone: record.phone,
+        packageType: record.package_type,
+        registrationDate: record.registration_date,
         payment: {
-            amount: 70.00,
-            status: PaymentStatus.PENDENTE,
-            receiptUrl: null,
+            amount: record.payment_amount || (record.package_type === PackageType.SITIO_BUS ? 120.00 : 70.00),
+            status: record.payment_status || PaymentStatus.PENDENTE,
+            date: record.payment_date || undefined,
+            type: record.payment_type || undefined,
+            receiptUrl: record.payment_receipt_url || null,
         },
-    },
-    {
-        id: 'd9b7a1b0-5e6a-4b0c-8f3a-9e1b3c4d5e6f',
-        name: 'Carlos de Oxóssi',
-        document: '123.456.789-00',
-        documentType: DocumentType.CPF,
-        phone: '(21) 98765-4321',
-        packageType: PackageType.SITIO_BUS,
-        registrationDate: new Date('2024-07-20T10:00:00Z').toISOString(),
-        payment: {
-            amount: 120.00,
-            status: PaymentStatus.PAGO,
-            date: new Date('2024-07-21T15:30:00Z').toISOString(),
-            type: PaymentType.PIX_CONTA,
-            receiptUrl: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=',
-        },
-    },
-     {
-        id: 'b795a9d8-3c4d-4b0a-8e1b-7c9b1a2c3d4e',
-        name: 'João do Coco',
-        document: '111.222.333-44',
-        documentType: DocumentType.CPF,
-        phone: '(21) 99999-8888',
-        packageType: PackageType.SITIO_BUS,
-        registrationDate: new Date('2024-07-18T09:00:00Z').toISOString(),
-        payment: {
-            amount: 120.00,
-            status: PaymentStatus.PENDENTE,
-            receiptUrl: null,
-        },
-    },
-];
-
-
-const getAttendeesFromStorage = (): Attendee[] => {
-    try {
-        const data = localStorage.getItem(STORAGE_KEY);
-        if (data) {
-            return JSON.parse(data);
-        } else {
-            // Seed with initial data if nothing is in storage
-            localStorage.setItem(STORAGE_KEY, JSON.stringify(initialAttendees));
-            return initialAttendees;
-        }
-    } catch (error) {
-        console.error("Failed to read from localStorage", error);
-        return initialAttendees; // fallback to initial data
-    }
+    };
 };
 
-const saveAttendeesToStorage = (attendees: Attendee[]) => {
-    try {
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(attendees));
-    } catch (error) {
-        console.error("Failed to write to localStorage", error);
+
+/**
+ * Converte um objeto Attendee da aplicação para um registro do Supabase,
+ * "achatando" o objeto de pagamento e convertendo os nomes das propriedades para snake_case.
+ */
+const toSupabase = (attendee: Partial<Attendee>): any => {
+    const record: { [key: string]: any } = {};
+
+    if (attendee.name !== undefined) record.name = attendee.name;
+    if (attendee.document !== undefined) record.document = attendee.document;
+    if (attendee.phone !== undefined) record.phone = attendee.phone;
+    if (attendee.documentType !== undefined) record.document_type = attendee.documentType;
+    if (attendee.packageType !== undefined) record.package_type = attendee.packageType;
+    if (attendee.registrationDate !== undefined) record.registration_date = attendee.registrationDate;
+
+    // "Achata" o objeto de pagamento em colunas individuais
+    if (attendee.payment) {
+        record.payment_amount = attendee.payment.amount;
+        record.payment_status = attendee.payment.status;
+        record.payment_date = attendee.payment.date === undefined ? null : attendee.payment.date;
+        record.payment_type = attendee.payment.type === undefined ? null : attendee.payment.type;
+        record.payment_receipt_url = attendee.payment.receiptUrl === undefined ? null : attendee.payment.receiptUrl;
     }
+    
+    return record;
 };
 
-const simulateDelay = (ms: number) => new Promise(res => setTimeout(res, ms));
+
+// --- API Functions ---
 
 // GET /attendees
 export const fetchAttendees = async (): Promise<Attendee[]> => {
-    await simulateDelay(500); // Simulate network latency
-    const attendees = getAttendeesFromStorage();
-    // Sort by registration date descending to mimic a real API that often returns newest first
-    return attendees.sort((a, b) => new Date(b.registrationDate).getTime() - new Date(a.registrationDate).getTime());
+    const { data, error } = await supabase
+        .from('attendees')
+        .select('*')
+        .order('registration_date', { ascending: false });
+
+    if (error) {
+        console.error('Error fetching attendees:', error);
+        throw new Error(`Failed to fetch attendees: ${error.message}`);
+    }
+    return data.map(fromSupabase);
 };
 
 // POST /attendees
 export const createAttendee = async (attendeeData: any): Promise<Attendee> => {
-    await simulateDelay(500);
-    const attendees = getAttendeesFromStorage();
-    const newAttendee: Attendee = {
-        ...attendeeData,
-        id: crypto.randomUUID(),
-        registrationDate: new Date().toISOString(),
-        payment: {
-            ...attendeeData.payment,
-            receiptUrl: null, // Ensure receiptUrl is null on creation
-        }
+     const newAttendeePayload = {
+        name: attendeeData.name,
+        document: attendeeData.document,
+        document_type: attendeeData.documentType,
+        phone: attendeeData.phone,
+        package_type: attendeeData.packageType,
+        payment_amount: attendeeData.payment.amount,
+        payment_status: attendeeData.payment.status,
     };
-    const updatedAttendees = [newAttendee, ...attendees];
-    saveAttendeesToStorage(updatedAttendees);
-    return newAttendee;
+
+    const { data, error } = await supabase
+        .from('attendees')
+        .insert(newAttendeePayload)
+        .select()
+        .single();
+    
+    if (error) {
+        console.error('Error creating attendee:', error);
+        throw new Error(`Failed to create attendee: ${error.message}`);
+    }
+    return fromSupabase(data);
 };
 
-// PUT /attendees
+// PUT /attendees/:id
 export const updateAttendee = async (attendeeToUpdate: Attendee): Promise<Attendee> => {
-    await simulateDelay(500);
-    let attendees = getAttendeesFromStorage();
-    const index = attendees.findIndex(a => a.id === attendeeToUpdate.id);
-    if (index !== -1) {
-        attendees[index] = attendeeToUpdate;
-        saveAttendeesToStorage(attendees);
-        return attendeeToUpdate;
+    const { id, ...updateData } = attendeeToUpdate;
+
+    const { data, error } = await supabase
+        .from('attendees')
+        .update(toSupabase(updateData))
+        .eq('id', id)
+        .select()
+        .single();
+    
+    if (error) {
+        console.error('Error updating attendee:', error);
+        throw new Error(`Failed to update attendee: ${error.message}`);
     }
-    throw new Error("Attendee not found");
+    return fromSupabase(data);
 };
 
-// DELETE /attendees?id=:id
+// DELETE /attendees/:id
 export const deleteAttendee = async (id: string): Promise<void> => {
-    await simulateDelay(500);
-    let attendees = getAttendeesFromStorage();
-    const updatedAttendees = attendees.filter(a => a.id !== id);
-    if (attendees.length === updatedAttendees.length) {
-         throw new Error("Attendee not found for deletion");
+    const { error } = await supabase
+        .from('attendees')
+        .delete()
+        .eq('id', id);
+
+    if (error) {
+        console.error('Error deleting attendee:', error);
+        throw new Error(`Failed to delete attendee: ${error.message}`);
     }
-    saveAttendeesToStorage(updatedAttendees);
 };

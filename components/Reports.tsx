@@ -1,6 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import type { Attendee, ReportConfig, ReportField } from '../types';
-import { PackageType, PaymentStatus } from '../types';
+import { PackageType, PaymentStatus, DocumentType } from '../types';
+import { formatDocument, getDocumentType } from '../utils/formatters';
 
 // --- Componente: Modal de Opções de Compartilhamento ---
 const ShareOptionsModal: React.FC<{
@@ -18,7 +19,7 @@ const ShareOptionsModal: React.FC<{
                         <span>Texto via WhatsApp</span>
                     </button>
                     <button onClick={onShareAsPdf} className="w-full bg-blue-500 text-white font-bold py-3 px-4 rounded-full hover:bg-blue-600 transition-colors shadow-sm flex items-center justify-center gap-2">
-                         <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M5 4v3H4a2 2 0 00-2 2v3a2 2 0 002 2h1v-2a1 1 0 011-1h8a1 1 0 011 1v2h1a2 2 0 002-2v-3a2 2 0 00-2-2h-1V4a2 2 0 00-2-2H7a2 2 0 00-2 2zm8 0H7v3h6V4zm0 8H7v4h6v-4z" clipRule="evenodd" /></svg>
+                         <svg xmlns="http://www.w.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M5 4v3H4a2 2 0 00-2 2v3a2 2 0 002 2h1v-2a1 1 0 011-1h8a1 1 0 011 1v2h1a2 2 0 002-2v-3a2 2 0 00-2-2h-1V4a2 2 0 00-2-2H7a2 2 0 00-2 2zm8 0H7v3h6V4zm0 8H7v4h6v-4z" clipRule="evenodd" /></svg>
                         <span>Compartilhar como PDF</span>
                     </button>
                 </div>
@@ -272,6 +273,182 @@ const InteractiveReportPreview: React.FC<{ data: Attendee[]; config: ReportConfi
     );
 };
 
+// --- Componentes para correção de documentos ---
+const SpinnerIcon: React.FC<{ white?: boolean }> = ({ white = true }) => (
+    <svg className={`animate-spin h-4 w-4 ${white ? 'text-white' : 'text-zinc-700'}`} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+    </svg>
+);
+
+interface ConfirmDocUpdateModalProps {
+    attendeeName: string;
+    newDocument: string;
+    docType: DocumentType;
+    onConfirm: () => void;
+    onCancel: () => void;
+    isSaving: boolean;
+}
+
+const ConfirmDocUpdateModal: React.FC<ConfirmDocUpdateModalProps> = ({ attendeeName, newDocument, docType, onConfirm, onCancel, isSaving }) => (
+    <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 animate-fadeIn">
+        <div className="bg-white rounded-xl shadow-lg p-6 max-w-sm w-full animate-popIn">
+            <h3 className="text-lg leading-6 font-bold text-zinc-900">Confirmar Alteração?</h3>
+            <div className="mt-4 space-y-2 text-sm">
+                <p><span className="font-semibold text-zinc-500">Nome:</span> <span className="text-zinc-800">{attendeeName}</span></p>
+                <p><span className="font-semibold text-zinc-500">Novo Documento:</span> <span className="font-mono text-zinc-800">{newDocument} ({docType})</span></p>
+            </div>
+            <p className="mt-3 text-xs text-zinc-500">Essa ação atualizará o documento do inscrito. Verifique se as informações estão corretas.</p>
+            <div className="mt-5 sm:mt-4 flex flex-col-reverse sm:flex-row sm:justify-end gap-3">
+                <button type="button" onClick={onCancel} disabled={isSaving} className="w-full justify-center rounded-full border border-zinc-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-zinc-700 hover:bg-zinc-50 sm:w-auto sm:text-sm">
+                    Cancelar
+                </button>
+                <button type="button" onClick={onConfirm} disabled={isSaving} className="w-full justify-center rounded-full border border-transparent shadow-sm px-4 py-2 bg-green-600 text-base font-medium text-white hover:bg-green-700 sm:w-auto sm:text-sm disabled:bg-green-400 flex items-center gap-2">
+                    {isSaving ? <SpinnerIcon /> : null}
+                    {isSaving ? 'Salvando...' : 'Confirmar'}
+                </button>
+            </div>
+        </div>
+    </div>
+);
+
+
+interface ZeroDocListItemProps {
+    attendee: Attendee;
+    onUpdate: (attendee: Attendee) => Promise<void>;
+}
+
+const ZeroDocListItem: React.FC<ZeroDocListItemProps> = ({ attendee, onUpdate }) => {
+    const [documentValue, setDocumentValue] = useState(attendee.document);
+    const [docType, setDocType] = useState<DocumentType>(() => getDocumentType(attendee.document).type);
+    const [error, setError] = useState('');
+    const [status, setStatus] = useState<'idle' | 'saving' | 'success'>('idle');
+    const [isConfirming, setIsConfirming] = useState(false);
+
+    const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const formattedValue = formatDocument(e.target.value);
+        setDocumentValue(formattedValue);
+        const { type } = getDocumentType(formattedValue);
+        setDocType(type);
+        setError('');
+    };
+
+    const handleInitiateSave = () => {
+        setError('');
+        const docInfo = getDocumentType(documentValue);
+        if (!docInfo.valid || /^0+$/.test(documentValue.replace(/[^\d]/g, ''))) {
+            setError('Documento inválido ou ainda pendente.');
+            return;
+        }
+        setIsConfirming(true);
+    };
+
+    const handleConfirmSave = async () => {
+        setStatus('saving');
+        try {
+            const updatedAttendee: Attendee = {
+                ...attendee,
+                document: documentValue,
+                documentType: docType,
+            };
+            await onUpdate(updatedAttendee);
+            setStatus('success');
+        } catch (err) {
+            console.error(err);
+            setError('Falha ao salvar. Tente novamente.');
+            setStatus('idle');
+        } finally {
+            setIsConfirming(false);
+        }
+    };
+    
+    const isIdle = status === 'idle';
+
+    return (
+        <>
+            <div className={`bg-white p-3 rounded-xl border border-zinc-200 shadow-sm transition-opacity duration-500 ${status === 'success' ? 'opacity-40' : 'opacity-100'}`}>
+                <div className="flex items-center justify-between gap-3 flex-wrap">
+                    <p className="font-bold text-zinc-800 flex-1 min-w-0">{attendee.name}</p>
+                    <div className="flex items-center gap-2">
+                        <div className="relative w-40">
+                            <input
+                                type="tel"
+                                value={documentValue}
+                                onChange={handleInputChange}
+                                placeholder="Novo documento"
+                                disabled={!isIdle}
+                                className={`w-full pl-2 pr-10 py-1 bg-white border ${error ? 'border-red-500' : 'border-zinc-300'} rounded-md text-sm focus:outline-none focus:ring-1 focus:ring-green-500`}
+                            />
+                            {docType !== DocumentType.OUTRO && documentValue.length > 0 && (
+                                <div className="absolute inset-y-0 right-0 pr-2 flex items-center pointer-events-none">
+                                    <span className="text-zinc-500 text-xs font-semibold bg-zinc-100 px-1.5 py-0.5 rounded-md animate-fadeIn">
+                                        {docType}
+                                    </span>
+                                </div>
+                            )}
+                        </div>
+                        <button
+                            onClick={handleInitiateSave}
+                            disabled={!isIdle}
+                            className="bg-green-500 text-white font-semibold text-sm py-1 px-3 rounded-full hover:bg-green-600 transition-colors disabled:bg-green-300 disabled:cursor-not-allowed flex items-center justify-center w-20"
+                        >
+                            {status === 'success' ? 'Salvo!' : 'Salvar'}
+                        </button>
+                    </div>
+                </div>
+                {error && <p className="mt-1 text-xs text-red-600 animate-fadeIn pl-2">{error}</p>}
+            </div>
+            {isConfirming && (
+                <ConfirmDocUpdateModal
+                    attendeeName={attendee.name}
+                    newDocument={documentValue}
+                    docType={docType}
+                    onConfirm={handleConfirmSave}
+                    onCancel={() => setIsConfirming(false)}
+                    isSaving={status === 'saving'}
+                />
+            )}
+        </>
+    );
+};
+
+
+interface ZeroDocListProps {
+    attendees: Attendee[];
+    onBack: () => void;
+    onUpdateAttendee: (attendee: Attendee) => Promise<void>;
+}
+
+const ZeroDocList: React.FC<ZeroDocListProps> = ({ attendees, onBack, onUpdateAttendee }) => {
+    return (
+        <div className="animate-fadeIn">
+            <header className="sticky top-0 md:static bg-white z-10 p-4 md:pt-6 border-b border-zinc-200 flex items-center gap-4">
+                <button onClick={onBack} className="text-zinc-500 hover:text-zinc-800 p-1 rounded-full hover:bg-zinc-100">
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>
+                </button>
+                <h1 className="text-xl md:text-2xl font-bold text-zinc-800">Corrigir Documentos ({attendees.length})</h1>
+            </header>
+            <main className="p-4 space-y-3">
+                <div className="bg-yellow-50 border border-yellow-200 text-yellow-800 p-3 rounded-lg text-sm">
+                    <p>A lista abaixo mostra os inscritos que registraram um documento com "000...". Por favor, atualize com o documento correto de cada um.</p>
+                </div>
+                {attendees.length > 0 ? (
+                    attendees.map((attendee, index) => (
+                        <div key={attendee.id} className="opacity-0 animate-fadeInUp" style={{ animationDelay: `${index * 50}ms`, animationFillMode: 'forwards' }}>
+                            <ZeroDocListItem attendee={attendee} onUpdate={onUpdateAttendee} />
+                        </div>
+                    ))
+                ) : (
+                    <div className="text-center text-zinc-500 py-12">
+                        <p className="font-semibold">Nenhuma pendência encontrada!</p>
+                        <p className="mt-1 text-sm">Todos os documentos foram corrigidos. 🎉</p>
+                    </div>
+                )}
+            </main>
+        </div>
+    );
+};
+
 // --- Componente: Painel Principal de Relatórios ---
 const StatCard: React.FC<{ title: string; children: React.ReactNode; icon: React.ReactElement; className?: string, delay: number }> = ({ title, children, icon, className = '', delay }) => (
     <div className={`bg-white p-4 rounded-xl border border-zinc-200 shadow-sm opacity-0 animate-fadeInUp ${className}`} style={{ animationDelay: `${delay}ms`, animationFillMode: 'forwards' }}>
@@ -284,8 +461,8 @@ const ProgressBar: React.FC<{ value: number; max: number; colorClass?: string }>
     return (<div className="w-full bg-zinc-200 rounded-full h-2"><div className={`${colorClass} h-2 rounded-full transition-all duration-500`} style={{ width: `${percentage}%` }}></div></div>);
 };
 
-const ReportsDashboard: React.FC<{ attendees: Attendee[]; onGenerateReportClick: () => void; onLogout: () => void; }> = ({ attendees, onGenerateReportClick, onLogout }) => {
-    const { totalAttendees, paidCount, pendingCount, totalRevenue, pendingRevenue, totalPossibleRevenue, buses, sitioOnlyCount } = useMemo(() => {
+const ReportsDashboard: React.FC<{ attendees: Attendee[]; onGenerateReportClick: () => void; onLogout: () => void; onFixDocsClick: () => void; }> = ({ attendees, onGenerateReportClick, onLogout, onFixDocsClick }) => {
+    const { totalAttendees, paidCount, pendingCount, totalRevenue, pendingRevenue, totalPossibleRevenue, buses, sitioOnlyCount, zeroDocAttendees } = useMemo(() => {
         const busAttendees = attendees.filter(a => a.packageType === PackageType.SITIO_BUS);
         const BUS_CAPACITY = 50;
         const busCount = Math.ceil(busAttendees.length / BUS_CAPACITY) || (busAttendees.length > 0 ? 1 : 0);
@@ -301,6 +478,7 @@ const ReportsDashboard: React.FC<{ attendees: Attendee[]; onGenerateReportClick:
                 return { busNumber: i + 1, filledSeats, remainingSeats: BUS_CAPACITY - filledSeats, capacity: BUS_CAPACITY };
             }),
             sitioOnlyCount: attendees.filter(a => a.packageType === PackageType.SITIO_ONLY).length,
+            zeroDocAttendees: attendees.filter(a => /^0+$/.test(a.document.replace(/[^\d]/g, ''))),
         };
     }, [attendees]);
 
@@ -309,6 +487,7 @@ const ReportsDashboard: React.FC<{ attendees: Attendee[]; onGenerateReportClick:
     const IconBus = <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path d="M9 17a2 2 0 11-4 0 2 2 0 014 0zM19 17a2 2 0 11-4 0 2 2 0 014 0z" /><path strokeLinecap="round" strokeLinejoin="round" d="M13 16V6a1 1 0 00-1-1H4a1 1 0 00-1 1v10l2 2h8l2-2zM5 11h6" /></svg>;
     const IconHome = <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" /></svg>;
     const IconClipboardList = <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" /></svg>;
+    const IconWarning = <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>;
     
     return (
         <div className="pb-4 animate-fadeIn">
@@ -333,6 +512,17 @@ const ReportsDashboard: React.FC<{ attendees: Attendee[]; onGenerateReportClick:
                     </div>
                 </StatCard>
                 <StatCard title="Financeiro" icon={IconDollar} delay={150}><div className="flex justify-between items-baseline"><span className="font-bold text-3xl text-zinc-800">R$ {totalRevenue.toFixed(2).replace('.',',')}</span><span className="text-sm font-semibold text-zinc-500">Arrecadado</span></div><ProgressBar value={totalRevenue} max={totalPossibleRevenue} /><div className="flex justify-between text-sm"><span className="font-semibold text-zinc-500">Pendente: R$ {pendingRevenue.toFixed(2).replace('.',',')}</span></div></StatCard>
+                {zeroDocAttendees.length > 0 && (
+                    <div onClick={onFixDocsClick} className="cursor-pointer md:col-span-2 lg:col-span-1">
+                        <StatCard title="Documentos Pendentes" icon={IconWarning} delay={175} className="bg-yellow-50 border-yellow-300 h-full">
+                           <div className="flex justify-between items-baseline">
+                                <span className="font-bold text-3xl text-yellow-800">{zeroDocAttendees.length}</span>
+                                <span className="text-sm font-semibold text-yellow-700">{zeroDocAttendees.length === 1 ? 'Inscrito' : 'Inscritos'}</span>
+                            </div>
+                            <p className="text-xs text-yellow-700">Com documento '000...'. Clique aqui para corrigir.</p>
+                        </StatCard>
+                    </div>
+                )}
                 {buses.map((bus, index) => (<StatCard key={bus.busNumber} title={`Ônibus ${bus.busNumber}`} icon={IconBus} delay={200 + index * 50}><div className="flex justify-between items-baseline"><span className="font-bold text-3xl text-zinc-800">{bus.filledSeats}</span><span className="text-sm font-semibold text-zinc-500">/ {bus.capacity} vagas</span></div><ProgressBar value={bus.filledSeats} max={bus.capacity} colorClass="bg-blue-500" /><div className="flex justify-between text-sm"><span className="font-semibold text-blue-600">{bus.filledSeats} {bus.filledSeats === 1 ? 'Preenchida' : 'Preenchidas'}</span><span className="font-semibold text-zinc-500">{bus.remainingSeats} {bus.remainingSeats === 1 ? 'Restante' : 'Restantes'}</span></div></StatCard>))}
                 <StatCard title="Apenas Sítio" icon={IconHome} delay={200 + (buses.length * 50)}>
                     <div className="flex justify-between items-baseline">
@@ -353,12 +543,17 @@ const ReportsDashboard: React.FC<{ attendees: Attendee[]; onGenerateReportClick:
 interface ReportsProps {
     attendees: Attendee[];
     onLogout: () => void;
+    onUpdateAttendee: (attendee: Attendee) => Promise<void>;
 }
 
-const Reports: React.FC<ReportsProps> = ({ attendees, onLogout }) => {
-    const [mode, setMode] = useState<'dashboard' | 'form' | 'preview'>('dashboard');
+const Reports: React.FC<ReportsProps> = ({ attendees, onLogout, onUpdateAttendee }) => {
+    const [mode, setMode] = useState<'dashboard' | 'form' | 'preview' | 'zeroDoc'>('dashboard');
     const [reportConfig, setReportConfig] = useState<ReportConfig | null>(null);
     const [reportData, setReportData] = useState<Attendee[]>([]);
+
+    const zeroDocAttendees = useMemo(() => {
+        return attendees.filter(a => /^0+$/.test(a.document.replace(/[^\d]/g, '')));
+    }, [attendees]);
 
     const handleGenerate = (config: ReportConfig) => {
         const filteredData = attendees.filter(attendee => {
@@ -379,7 +574,11 @@ const Reports: React.FC<ReportsProps> = ({ attendees, onLogout }) => {
         return <InteractiveReportPreview data={reportData} config={reportConfig} onBack={() => setMode('form')} />;
     }
 
-    return <ReportsDashboard attendees={attendees} onGenerateReportClick={() => setMode('form')} onLogout={onLogout} />;
+    if (mode === 'zeroDoc') {
+        return <ZeroDocList attendees={zeroDocAttendees} onBack={() => setMode('dashboard')} onUpdateAttendee={onUpdateAttendee} />;
+    }
+
+    return <ReportsDashboard attendees={attendees} onGenerateReportClick={() => setMode('form')} onLogout={onLogout} onFixDocsClick={() => setMode('zeroDoc')} />;
 };
 
 export default Reports;

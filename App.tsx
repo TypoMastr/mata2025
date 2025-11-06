@@ -146,7 +146,7 @@ const App: React.FC = () => {
             case 'editPayment':
                 return selectedAttendee && <RegisterPaymentForm attendee={selectedAttendee} onRegisterPayment={handleRegisterPayment} onCancel={() => setView('detail')} onDeletePayment={handleDeletePaymentRequest} />;
              case 'reports':
-                return <Reports attendees={attendees} onLogout={handleLogout} />;
+                return <Reports attendees={attendees} onLogout={handleLogout} onUpdateAttendee={updateAttendee} />;
              case 'info':
                 return <InfoPage onLogout={handleLogout} />;
             case 'list':

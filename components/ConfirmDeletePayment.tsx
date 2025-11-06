@@ -1,13 +1,33 @@
-import React from 'react';
+import React, { useState } from 'react';
 import type { Attendee } from '../types';
 
 interface ConfirmDeletePaymentProps {
     attendee: Attendee;
-    onConfirm: () => void;
+    onConfirm: () => Promise<void>;
     onCancel: () => void;
 }
 
+const SpinnerIcon: React.FC = () => (
+    <svg className="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+    </svg>
+);
+
 const ConfirmDeletePayment: React.FC<ConfirmDeletePaymentProps> = ({ attendee, onConfirm, onCancel }) => {
+    const [isDeleting, setIsDeleting] = useState(false);
+
+    const handleConfirmClick = async () => {
+        setIsDeleting(true);
+        try {
+            await onConfirm();
+            // The component will be unmounted by the parent on success
+        } catch (error) {
+            console.error("Failed to delete payment:", error);
+            setIsDeleting(false);
+        }
+    };
+
     return (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 animate-fadeIn">
             <div className="bg-white rounded-xl shadow-lg p-6 max-w-sm w-full animate-popIn">
@@ -32,14 +52,16 @@ const ConfirmDeletePayment: React.FC<ConfirmDeletePaymentProps> = ({ attendee, o
                 <div className="mt-5 sm:mt-4 sm:flex sm:flex-row-reverse gap-3">
                      <button
                         type="button"
-                        onClick={onConfirm}
-                        className="w-full inline-flex justify-center rounded-full border border-transparent shadow-sm px-4 py-2 bg-red-600 text-base font-medium text-white hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 sm:w-auto sm:text-sm"
+                        onClick={handleConfirmClick}
+                        disabled={isDeleting}
+                        className="w-full inline-flex justify-center rounded-full border border-transparent shadow-sm px-4 py-2 bg-red-600 text-base font-medium text-white hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 sm:w-auto sm:text-sm disabled:bg-red-400 disabled:cursor-not-allowed"
                     >
-                        Excluir
+                         {isDeleting ? <SpinnerIcon /> : 'Excluir'}
                     </button>
                     <button
                         type="button"
                         onClick={onCancel}
+                        disabled={isDeleting}
                         className="mt-3 w-full inline-flex justify-center rounded-full border border-zinc-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-zinc-700 hover:bg-zinc-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 sm:mt-0 sm:w-auto sm:text-sm"
                     >
                         Cancelar

@@ -76,9 +76,9 @@ const App: React.FC = () => {
         setAttendeeToDelete(attendee);
     };
 
-    const handleConfirmDelete = () => {
+    const handleConfirmDelete = async () => {
         if (attendeeToDelete) {
-            deleteAttendee(attendeeToDelete.id);
+            await deleteAttendee(attendeeToDelete.id);
             setAttendeeToDelete(null);
             setView('list');
         }
@@ -92,7 +92,7 @@ const App: React.FC = () => {
         setAttendeePaymentToDelete(attendee);
     };
 
-    const handleConfirmDeletePayment = () => {
+    const handleConfirmDeletePayment = async () => {
         if (attendeePaymentToDelete) {
             const attendeeToUpdate: Attendee = {
                 ...attendeePaymentToDelete,
@@ -104,7 +104,7 @@ const App: React.FC = () => {
                     receiptUrl: null,
                 }
             };
-            updateAttendee(attendeeToUpdate);
+            await updateAttendee(attendeeToUpdate);
             setAttendeePaymentToDelete(null);
             setView('detail');
         }
@@ -115,18 +115,18 @@ const App: React.FC = () => {
     };
 
 
-    const handleSaveAttendee = (formData: Omit<AttendeeFormData, 'paymentAmount'> & { paymentAmount: number }) => {
-        addAttendee(formData);
+    const handleSaveAttendee = async (formData: Omit<AttendeeFormData, 'paymentAmount'> & { paymentAmount: number }) => {
+        await addAttendee(formData);
         setView('list');
     };
 
-    const handleUpdateAttendee = (updatedAttendee: Attendee) => {
-        updateAttendee(updatedAttendee);
+    const handleUpdateAttendee = async (updatedAttendee: Attendee) => {
+        await updateAttendee(updatedAttendee);
         setView('detail');
     };
 
-    const handleRegisterPayment = (updatedAttendee: Attendee) => {
-        updateAttendee(updatedAttendee);
+    const handleRegisterPayment = async (updatedAttendee: Attendee) => {
+        await updateAttendee(updatedAttendee);
         setView('detail');
     };
 

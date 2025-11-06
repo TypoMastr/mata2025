@@ -4,10 +4,17 @@ import { PaymentStatus, PaymentType } from '../types';
 
 interface RegisterPaymentFormProps {
     attendee: Attendee;
-    onRegisterPayment: (attendee: Attendee) => void;
+    onRegisterPayment: (attendee: Attendee) => Promise<void>;
     onCancel: () => void;
     onDeletePayment: (attendee: Attendee) => void;
 }
+
+const SpinnerIcon: React.FC = () => (
+    <svg className="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+    </svg>
+);
 
 const RegisterPaymentForm: React.FC<RegisterPaymentFormProps> = ({ attendee, onRegisterPayment, onCancel, onDeletePayment }) => {
     const isEditMode = attendee.payment.status === PaymentStatus.PAGO;
@@ -20,6 +27,8 @@ const RegisterPaymentForm: React.FC<RegisterPaymentFormProps> = ({ attendee, onR
     const [paymentType, setPaymentType] = useState<PaymentType>(attendee.payment.type || PaymentType.PIX_MAQUINA);
     const [receipt, setReceipt] = useState<string | null>(attendee.payment.receiptUrl);
     const [fileName, setFileName] = useState<string>('');
+    const [isSubmitting, setIsSubmitting] = useState(false);
+    const [submissionError, setSubmissionError] = useState<string | null>(null);
     
     useEffect(() => {
         if (isEditMode && receipt) {
@@ -40,19 +49,28 @@ const RegisterPaymentForm: React.FC<RegisterPaymentFormProps> = ({ attendee, onR
         }
     };
 
-    const handleSubmit = (e: React.FormEvent) => {
+    const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-        const updatedAttendee: Attendee = {
-            ...attendee,
-            payment: {
-                ...attendee.payment,
-                status: PaymentStatus.PAGO,
-                date: new Date(paymentDate).toISOString(),
-                type: paymentType,
-                receiptUrl: receipt,
-            },
-        };
-        onRegisterPayment(updatedAttendee);
+        setIsSubmitting(true);
+        setSubmissionError(null);
+        try {
+            const updatedAttendee: Attendee = {
+                ...attendee,
+                payment: {
+                    ...attendee.payment,
+                    status: PaymentStatus.PAGO,
+                    date: new Date(paymentDate).toISOString(),
+                    type: paymentType,
+                    receiptUrl: receipt,
+                },
+            };
+            await onRegisterPayment(updatedAttendee);
+            // Parent component handles navigation on success
+        } catch (error) {
+            console.error("Failed to register payment:", error);
+            setSubmissionError("Falha ao salvar pagamento. Tente novamente.");
+            setIsSubmitting(false);
+        }
     };
 
     const getAnimationStyle = (delay: number) => ({
@@ -128,8 +146,18 @@ const RegisterPaymentForm: React.FC<RegisterPaymentFormProps> = ({ attendee, onR
 
                 <div className="flex flex-col md:flex-row gap-4 pt-2 opacity-0 animate-fadeInUp" style={getAnimationStyle(300)}>
                     <button type="button" onClick={onCancel} className="w-full bg-zinc-200 text-zinc-800 font-bold py-3 px-4 rounded-full hover:bg-zinc-300 transition-colors">Cancelar</button>
-                    <button type="submit" className="w-full bg-green-500 text-white font-bold py-3 px-4 rounded-full hover:bg-green-600 transition-colors shadow-sm">{isEditMode ? 'Salvar Alterações' : 'Confirmar Pagamento'}</button>
+                    <button type="submit" disabled={isSubmitting} className="w-full bg-green-500 text-white font-bold py-3 px-4 rounded-full hover:bg-green-600 transition-colors shadow-sm flex items-center justify-center gap-2 disabled:bg-green-400 disabled:cursor-not-allowed">
+                        {isSubmitting ? (
+                            <>
+                                <SpinnerIcon />
+                                <span>Salvando...</span>
+                            </>
+                        ) : (
+                            isEditMode ? 'Salvar Alterações' : 'Confirmar Pagamento'
+                        )}
+                    </button>
                 </div>
+                 {submissionError && <p className="text-center text-sm text-red-600 animate-fadeIn">{submissionError}</p>}
                  {isEditMode && (
                     <div className="pt-2 opacity-0 animate-fadeInUp" style={getAnimationStyle(350)}>
                         <button

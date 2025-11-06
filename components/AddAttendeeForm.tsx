@@ -4,8 +4,8 @@ import { PackageType, DocumentType } from '../types';
 import { formatPhoneNumber, formatDocument, getDocumentType } from '../utils/formatters';
 
 interface AddAttendeeFormProps {
-    onAddAttendee?: (data: Omit<AttendeeFormData, 'paymentAmount'> & { paymentAmount: number }) => void;
-    onUpdateAttendee?: (data: Attendee) => void;
+    onAddAttendee?: (data: Omit<AttendeeFormData, 'paymentAmount'> & { paymentAmount: number }) => Promise<void>;
+    onUpdateAttendee?: (data: Attendee) => Promise<void>;
     onCancel: () => void;
     attendeeToEdit?: Attendee;
 }
@@ -27,6 +27,17 @@ const InputField: React.FC<{ label: string, name: string, value: string, onChang
         />
         {error && <p id={`${name}-error`} className="mt-1 text-sm text-red-600 animate-fadeIn">{error}</p>}
     </div>
+);
+
+const SpinnerIcon: React.FC = () => (
+    <svg className="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+    </svg>
+);
+
+const SuccessIcon: React.FC = () => (
+     <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-white" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" /></svg>
 );
 
 
@@ -56,6 +67,8 @@ const AddAttendeeForm: React.FC<AddAttendeeFormProps> = ({ onAddAttendee, onUpda
     const [docType, setDocType] = useState<DocumentType>(() => 
         isEditMode ? getDocumentType(attendeeToEdit.document).type : DocumentType.OUTRO
     );
+    const [submissionStatus, setSubmissionStatus] = useState<'idle' | 'submitting' | 'success' | 'error'>('idle');
+    const [submissionError, setSubmissionError] = useState<string | null>(null);
 
     useEffect(() => {
         const newAmount = formState.packageType === PackageType.SITIO_ONLY ? '70.00' : '120.00';
@@ -94,33 +107,45 @@ const AddAttendeeForm: React.FC<AddAttendeeFormProps> = ({ onAddAttendee, onUpda
     };
 
 
-    const handleSubmit = (e: React.FormEvent) => {
+    const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
+        setSubmissionError(null);
         if (validate()) {
-            const { type: docType } = getDocumentType(formState.document);
-            if (isEditMode && onUpdateAttendee && attendeeToEdit) {
-                 const updatedAttendee: Attendee = {
-                    ...attendeeToEdit,
-                    name: formState.name,
-                    document: formState.document,
-                    documentType: docType,
-                    phone: formState.phone,
-                    packageType: formState.packageType,
-                    payment: {
-                        ...attendeeToEdit.payment,
-                        amount: parseFloat(formState.paymentAmount),
-                    },
-                };
-                onUpdateAttendee(updatedAttendee);
-            } else if (!isEditMode && onAddAttendee) {
-                onAddAttendee({
-                    ...formState,
-                    paymentAmount: parseFloat(formState.paymentAmount),
-                });
+            setSubmissionStatus('submitting');
+            try {
+                const { type: docType } = getDocumentType(formState.document);
+                if (isEditMode && onUpdateAttendee && attendeeToEdit) {
+                     const updatedAttendee: Attendee = {
+                        ...attendeeToEdit,
+                        name: formState.name,
+                        document: formState.document,
+                        documentType: docType,
+                        phone: formState.phone,
+                        packageType: formState.packageType,
+                        payment: {
+                            ...attendeeToEdit.payment,
+                            amount: parseFloat(formState.paymentAmount),
+                        },
+                    };
+                    await onUpdateAttendee(updatedAttendee);
+                } else if (!isEditMode && onAddAttendee) {
+                    await onAddAttendee({
+                        ...formState,
+                        paymentAmount: parseFloat(formState.paymentAmount),
+                    });
+                }
+                setSubmissionStatus('success');
+                // The parent component will handle navigation on success.
+            } catch (error) {
+                console.error("Submission failed:", error);
+                setSubmissionStatus('error');
+                setSubmissionError('Falha ao salvar os dados. Por favor, tente novamente.');
             }
         }
     };
     
+    const isSubmitting = submissionStatus === 'submitting';
+
     return (
         <div className="animate-fadeIn">
             <header className="sticky top-0 md:static bg-white/80 md:bg-transparent backdrop-blur-sm z-10 p-4 md:pt-6 border-b border-zinc-200 flex items-center gap-4">
@@ -181,8 +206,18 @@ const AddAttendeeForm: React.FC<AddAttendeeFormProps> = ({ onAddAttendee, onUpda
 
                     <div className="flex flex-col md:flex-row gap-4 pt-4 md:col-span-2 opacity-0 animate-fadeInUp" style={{ animationDelay: '350ms', animationFillMode: 'forwards' }}>
                         <button type="button" onClick={onCancel} className="w-full bg-zinc-200 text-zinc-800 font-bold py-3 px-4 rounded-full hover:bg-zinc-300 transition-colors">Cancelar</button>
-                        <button type="submit" className="w-full bg-green-500 text-white font-bold py-3 px-4 rounded-full hover:bg-green-600 transition-colors shadow-sm">{isEditMode ? 'Salvar Alterações' : 'Salvar'}</button>
+                        <button type="submit" disabled={isSubmitting} className="w-full bg-green-500 text-white font-bold py-3 px-4 rounded-full hover:bg-green-600 transition-colors shadow-sm flex items-center justify-center gap-2 disabled:bg-green-400 disabled:cursor-not-allowed">
+                            {isSubmitting ? (
+                                <>
+                                    <SpinnerIcon />
+                                    <span>Salvando...</span>
+                                </>
+                            ) : (
+                                isEditMode ? 'Salvar Alterações' : 'Salvar'
+                            )}
+                        </button>
                     </div>
+                     {submissionError && <p className="text-center text-sm text-red-600 animate-fadeIn md:col-span-2">{submissionError}</p>}
                 </div>
             </form>
         </div>

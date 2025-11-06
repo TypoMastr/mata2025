@@ -11,27 +11,26 @@ const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
     const [isExiting, setIsExiting] = useState(false);
     const [shakeError, setShakeError] = useState(false);
     const [biometricStatus, setBiometricStatus] = useState<'checking' | 'prompting' | 'failed' | 'idle'>('checking');
-
+    
+    // This handler can be triggered automatically on load or manually by button click
+    const handleBiometricLogin = async () => {
+        if (authService.hasBiometricCredential()) {
+            setBiometricStatus('prompting');
+            const success = await authService.authenticateWithBiometricCredential();
+            if (success) {
+                setIsExiting(true);
+                setTimeout(() => onLoginSuccess(), 500);
+            } else {
+                setBiometricStatus('failed');
+            }
+        } else {
+            setBiometricStatus('idle');
+        }
+    };
 
     useEffect(() => {
-        const attemptBiometricLogin = async () => {
-            if (authService.hasBiometricCredential()) {
-                setBiometricStatus('prompting');
-                const success = await authService.authenticateWithBiometricCredential();
-                if (success) {
-                    setIsExiting(true);
-                    setTimeout(() => onLoginSuccess(), 500);
-                } else {
-                    // User cancelled or it failed
-                    setBiometricStatus('failed');
-                }
-            } else {
-                setBiometricStatus('idle');
-            }
-        };
-
-        // Delay slightly to allow the UI to render first and feel less abrupt
-        setTimeout(attemptBiometricLogin, 100);
+        // Automatically attempt biometric login on component mount.
+        setTimeout(handleBiometricLogin, 100);
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
@@ -44,7 +43,7 @@ const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
             setIsExiting(true);
             setTimeout(() => {
                 onLoginSuccess();
-            }, 500); // Wait for animation to complete
+            }, 500);
         } else {
             setError('Senha incorreta. Tente novamente.');
             setPassword('');
@@ -59,6 +58,9 @@ const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
         animationDelay: isExiting ? `${exitDelay}ms` : `${entryDelay}ms`,
         animationFillMode: 'forwards',
     });
+    
+    const IconFingerPrint = <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M7.864 4.243A7.5 7.5 0 0119.5 12c0 2.252-.903 4.34-2.378 5.855A7.5 7.5 0 019.622 4.145m1.503 1.498a5.25 5.25 0 00-6.236 6.236l-3.5 3.5a.75.75 0 001.06 1.06l3.5-3.5a5.25 5.25 0 006.236-6.236-1.503-1.503z" /></svg>;
+
 
     if (biometricStatus === 'checking' || biometricStatus === 'prompting') {
         return (
@@ -77,7 +79,7 @@ const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
     return (
         <div className="bg-zinc-50 flex flex-col items-center justify-center min-h-screen p-4 font-sans overflow-hidden">
             <div className={`w-full max-w-sm mx-auto text-center ${shakeError ? 'animate-shake' : ''}`}>
-                 {biometricStatus === 'failed' && <p className="text-center text-sm text-zinc-500 mb-6 animate-fadeIn">Biometria cancelada. Use sua senha.</p>}
+                 {biometricStatus === 'failed' && <p className="text-center text-sm text-zinc-500 mb-6 animate-fadeIn">Biometria cancelada. Use sua senha ou tente novamente.</p>}
                 <div 
                     className={`mx-auto mb-6 h-48 w-48 ${!isExiting ? 'opacity-0' : ''} ${animationClass}`}
                     style={getAnimationStyle(0, 200)}
@@ -121,13 +123,25 @@ const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
                         />
                     </div>
                      {error && <p className={`text-sm text-red-600 opacity-0 animate-fadeInUp`} style={{ animationFillMode: 'forwards' }}>{error}</p>}
-                    <button
-                        type="submit"
-                        className={`w-full bg-green-500 text-white font-bold py-3 px-4 rounded-full hover:bg-green-600 transition-all duration-300 shadow-lg focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 ${!isExiting ? 'opacity-0' : ''} ${animationClass}`}
-                        style={getAnimationStyle(400, 0)}
-                    >
-                        Entrar
-                    </button>
+
+                    <div className={`space-y-3 ${!isExiting ? 'opacity-0' : ''} ${animationClass}`} style={getAnimationStyle(400, 0)}>
+                        <button
+                            type="submit"
+                            className="w-full bg-green-500 text-white font-bold py-3 px-4 rounded-full hover:bg-green-600 transition-all duration-300 shadow-lg focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500"
+                        >
+                            Entrar com Senha
+                        </button>
+                        {authService.hasBiometricCredential() && (
+                            <button
+                                type="button"
+                                onClick={handleBiometricLogin}
+                                className="w-full bg-zinc-200 text-zinc-800 font-bold py-3 px-4 rounded-full hover:bg-zinc-300 transition-colors flex items-center justify-center gap-2"
+                            >
+                                {IconFingerPrint}
+                                <span>Entrar com Biometria</span>
+                            </button>
+                        )}
+                    </div>
                 </form>
             </div>
         </div>

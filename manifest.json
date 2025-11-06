@@ -1,5 +1,5 @@
 {
-  "name": "Gira da Mata 2025",
+  "name": "Gira da Mata",
   "short_name": "Gira da Mata",
   "start_url": "/",
   "display": "standalone",
@@ -8,13 +8,13 @@
   "description": "Painel de controle para o evento Gira da Mata 2025.",
   "icons": [
     {
-      "src": "https://cdn-icons-png.flaticon.com/512/284/284471.png",
+      "src": "https://www.teuco.com.br/mata2025/icon.png",
       "sizes": "192x192",
       "type": "image/png",
       "purpose": "any maskable"
     },
     {
-      "src": "https://cdn-icons-png.flaticon.com/512/284/284471.png",
+      "src": "https://www.teuco.com.br/mata2025/icon.png",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "any maskable"

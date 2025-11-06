@@ -52,7 +52,7 @@ const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
                     className={`text-2xl font-bold text-zinc-800 mb-2 ${!isExiting ? 'opacity-0' : ''} ${animationClass}`}
                     style={getAnimationStyle(100, 150)}
                 >
-                    Gira da Mata 2025
+                    Gira da Mata
                 </h1>
                 <p 
                     className={`text-zinc-500 mb-8 ${!isExiting ? 'opacity-0' : ''} ${animationClass}`}

@@ -60,7 +60,7 @@ const AttendeeList: React.FC<AttendeeListProps> = ({ attendees, onSelectAttendee
 
     return (
         <div className="animate-fadeIn">
-            <header className="sticky top-0 md:static bg-white/90 md:bg-transparent backdrop-blur-sm z-10 p-4 border-b border-zinc-200 md:border-b-0 md:pt-6 space-y-4 animate-fadeInUp">
+            <header className="sticky top-0 md:static bg-white/95 md:bg-transparent z-10 p-4 border-b border-zinc-200 md:border-b-0 md:pt-6 space-y-4">
                  <div className="flex justify-between items-center">
                     <h1 className="text-xl md:text-2xl font-bold text-zinc-800">Inscrições ({filteredAttendees.length})</h1>
                     <div className="flex items-center gap-2">

@@ -1,0 +1,46 @@
+import React from 'react';
+import type { Attendee } from '../types';
+import { PaymentStatus, PackageType } from '../types';
+
+interface AttendeeListItemProps {
+    attendee: Attendee;
+    onSelect: () => void;
+    index: number;
+}
+
+const AttendeeListItem: React.FC<AttendeeListItemProps> = ({ attendee, onSelect, index }) => {
+    const isPaid = attendee.payment.status === PaymentStatus.PAGO;
+    const statusClasses = isPaid 
+        ? 'bg-green-100 text-green-800' 
+        : 'bg-red-100 text-red-800';
+
+    const packageIcon = attendee.packageType === PackageType.SITIO_BUS 
+        ? <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1.5 text-zinc-400 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path d="M9 17a2 2 0 11-4 0 2 2 0 014 0zM19 17a2 2 0 11-4 0 2 2 0 014 0z" /><path strokeLinecap="round" strokeLinejoin="round" d="M13 16V6a1 1 0 00-1-1H4a1 1 0 00-1 1v10l2 2h8l2-2zM5 11h6" /></svg>
+        : <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1.5 text-zinc-400 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" /></svg>;
+
+    return (
+        <button 
+            onClick={onSelect} 
+            className="w-full text-left p-4 bg-white rounded-xl border border-zinc-200 shadow-sm hover:bg-zinc-50 hover:border-zinc-300 transition-all duration-200 flex justify-between items-center opacity-0 animate-fadeInUp"
+            style={{ animationDelay: `${index * 50}ms`, animationFillMode: 'forwards' }}
+        >
+            <div>
+                <p className="font-bold text-zinc-800">{attendee.name}</p>
+                <p className="text-sm text-zinc-500 flex items-center mt-1">
+                    {packageIcon}
+                    <span>{attendee.packageType}</span>
+                </p>
+            </div>
+            <div className="flex items-center gap-3">
+                 <span className={`px-3 py-1 text-xs font-bold rounded-full ${statusClasses}`}>
+                    {attendee.payment.status.toUpperCase()}
+                </span>
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-zinc-400" viewBox="0 0 20 20" fill="currentColor">
+                    <path fillRule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clipRule="evenodd" />
+                </svg>
+            </div>
+        </button>
+    );
+};
+
+export default AttendeeListItem;

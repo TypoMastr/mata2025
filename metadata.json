@@ -1,0 +1,5 @@
+{
+  "name": "Gira da Mata 2025",
+  "description": "A progressive web application to manage attendees for the Gira da Mata 2025 event, including registration, payment tracking, and AI-powered reporting.",
+  "requestFramePermissions": []
+}

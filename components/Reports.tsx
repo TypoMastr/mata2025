@@ -34,7 +34,7 @@ const InteractiveReportForm: React.FC<{ onGenerate: (config: ReportConfig) => vo
     
     return (
         <div className="animate-fadeIn">
-            <header className="sticky top-0 md:static bg-white md:bg-transparent z-10 p-4 md:pt-6 border-b border-zinc-200 flex items-center gap-4">
+            <header className="sticky top-0 md:static bg-white z-10 p-4 md:pt-6 border-b border-zinc-200 flex items-center gap-4">
                  <button onClick={onCancel} className="text-zinc-500 hover:text-zinc-800 p-1 rounded-full hover:bg-zinc-100">
                     <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>
                 </button>
@@ -114,19 +114,30 @@ const InteractiveReportPreview: React.FC<{ data: Attendee[]; config: ReportConfi
         const tableRows = data.map(attendee => `<tr>${config.fields.map(field => `<td>${formatValue(attendee, field)}</td>`).join('')}</tr>`).join('');
         const appliedFilters = `Status: ${config.filters.status}, Pacote: ${config.filters.packageType}`;
         const printableHtml = `
-            <!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8"><title>Relatório Gira da Mata 2025</title>
+            <!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8"><title>Relatório Gira da Mata</title>
             <style>
                 body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; margin: 1.5rem; color: #333; }
                 h1 { color: #10B981; border-bottom: 2px solid #10B981; padding-bottom: 0.5rem; }
-                .print-info { display: none; }
                 p { font-size: 0.9rem; }
                 table { width: 100%; border-collapse: collapse; margin-top: 1rem; font-size: 0.8rem; }
                 th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
                 th { background-color: #f7f7f7; font-weight: 600; }
                 tr:nth-child(even) { background-color: #fcfcfc; }
+                .no-print {
+                    position: fixed; top: 1rem; right: 1rem;
+                    background-color: #333; color: white;
+                    padding: 0.5rem 1rem; border-radius: 9999px;
+                    border: none; font-weight: bold; cursor: pointer;
+                    box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+                    z-index: 100;
+                }
                 @page { size: A4; margin: 1in; }
+                @media print {
+                    .no-print { display: none; }
+                }
             </style></head><body>
-                <h1>Relatório - Gira da Mata 2025</h1>
+                <button class="no-print" onclick="window.close()">Fechar</button>
+                <h1>Relatório - Gira da Mata</h1>
                 <p><strong>Data de Geração:</strong> ${new Date().toLocaleString('pt-BR')}</p>
                 <p><strong>Filtros Aplicados:</strong> ${appliedFilters}</p>
                 <p><strong>Total de Registros:</strong> ${data.length}</p>
@@ -143,7 +154,7 @@ const InteractiveReportPreview: React.FC<{ data: Attendee[]; config: ReportConfi
     };
     
     const handleShare = async () => {
-        const title = `Relatório Gira da Mata 2025 (${data.length} registros)`;
+        const title = `Relatório Gira da Mata (${data.length} registros)`;
         let text = `${title}\n\n`;
         data.forEach((attendee, index) => {
             text += `Registro ${index + 1}:\n`;
@@ -168,7 +179,7 @@ const InteractiveReportPreview: React.FC<{ data: Attendee[]; config: ReportConfi
 
     return (
         <div className="flex flex-col animate-fadeIn">
-             <header className="sticky top-0 md:static bg-white md:bg-transparent z-10 p-4 md:pt-6 border-b border-zinc-200 flex items-center justify-between">
+             <header className="sticky top-0 md:static bg-white z-10 p-4 md:pt-6 border-b border-zinc-200 flex items-center justify-between">
                 <div className="flex items-center gap-4">
                     <button onClick={onBack} className="text-zinc-500 hover:text-zinc-800 p-1 rounded-full hover:bg-zinc-100">
                         <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>
@@ -250,7 +261,7 @@ const ReportsDashboard: React.FC<{ attendees: Attendee[]; onGenerateReportClick:
     
     return (
         <div className="pb-4 animate-fadeIn">
-            <header className="sticky top-0 md:static bg-white md:bg-transparent z-10 p-4 md:pt-6 border-b border-zinc-200 flex justify-between items-center">
+            <header className="sticky top-0 md:static bg-white z-10 p-4 md:pt-6 border-b border-zinc-200 flex justify-between items-center">
                 <h1 className="text-xl md:text-2xl font-bold text-zinc-800">Relatórios</h1>
                 <button onClick={onLogout} className="p-2 text-zinc-500 rounded-full hover:bg-zinc-200 hover:text-zinc-800 transition-colors" aria-label="Sair">
                     <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>

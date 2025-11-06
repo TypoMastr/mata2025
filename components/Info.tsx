@@ -31,7 +31,7 @@ const InfoPage: React.FC<{ onLogout: () => void; }> = ({ onLogout }) => {
 
     return (
         <div className="pb-4 animate-fadeIn">
-            <header className="sticky top-0 md:static bg-white/90 md:bg-transparent backdrop-blur-sm z-10 p-4 md:pt-6 border-b border-zinc-200 flex justify-between items-center">
+            <header className="sticky top-0 md:static bg-white md:bg-transparent z-10 p-4 md:pt-6 border-b border-zinc-200 flex justify-between items-center">
                 <h1 className="text-xl md:text-2xl font-bold text-zinc-800">Informações do Evento</h1>
                  <button onClick={onLogout} className="p-2 text-zinc-500 rounded-full hover:bg-zinc-200 hover:text-zinc-800 transition-colors" aria-label="Sair">
                     <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>

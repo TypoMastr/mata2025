@@ -2,6 +2,35 @@ import React, { useState, useMemo } from 'react';
 import type { Attendee, ReportConfig, ReportField } from '../types';
 import { PackageType, PaymentStatus } from '../types';
 
+// --- Componente: Modal de Opções de Compartilhamento ---
+const ShareOptionsModal: React.FC<{
+    onClose: () => void;
+    onShareAsText: () => void;
+    onShareAsPdf: () => void;
+}> = ({ onClose, onShareAsText, onShareAsPdf }) => {
+    return (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 animate-fadeIn" onClick={onClose}>
+            <div className="bg-white rounded-xl shadow-lg p-6 max-w-sm w-full animate-popIn" onClick={(e) => e.stopPropagation()}>
+                <h3 className="text-lg leading-6 font-bold text-zinc-900 mb-4 text-center">Como deseja compartilhar?</h3>
+                <div className="space-y-3">
+                    <button onClick={onShareAsText} className="w-full bg-green-500 text-white font-bold py-3 px-4 rounded-full hover:bg-green-600 transition-colors shadow-sm flex items-center justify-center gap-2">
+                        <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path d="M12.04 2c-5.46 0-9.91 4.45-9.91 9.91 0 1.75.46 3.45 1.32 4.95L2.05 22l5.25-1.38c1.45.79 3.08 1.21 4.74 1.21 5.46 0 9.91-4.45 9.91-9.91S17.5 2 12.04 2zM12.04 20.1c-1.48 0-2.93-.4-4.2-1.15l-.3-.18-3.12.82.83-3.04-.2-.31c-.82-1.31-1.26-2.83-1.26-4.41 0-4.54 3.7-8.24 8.24-8.24 4.54 0 8.24 3.7 8.24 8.24s-3.7 8.24-8.24 8.24zm4.24-6.23c-.24-.12-1.42-.7-1.64-.78-.22-.08-.38-.12-.54.12-.16.24-.62.78-.76.94-.14.16-.28.18-.52.06-.24-.12-1.02-.38-1.94-1.2-1.12-.92-1.38-1.53-1.48-1.83-.12-.24-.02-.38.1-.5.1-.12.24-.3.36-.45.12-.15.16-.25.24-.41.08-.16.04-.3-.02-.42-.06-.12-.54-1.29-.74-1.77-.2-.48-.4-.41-.54-.42-.14 0-.3 0-.46 0-.16 0-.42.06-.64.3-.22.24-.86.84-.86 2.05 0 1.21.88 2.37 1 2.53.12.16 1.75 2.67 4.24 3.73.59.26 1.05.41 1.41.52.6.18 1.15.16 1.58.1.48-.06 1.42-.58 1.62-1.14.2-.56.2-1.04.14-1.14-.06-.1-.22-.16-.46-.28z" /></svg>
+                        <span>Texto via WhatsApp</span>
+                    </button>
+                    <button onClick={onShareAsPdf} className="w-full bg-blue-500 text-white font-bold py-3 px-4 rounded-full hover:bg-blue-600 transition-colors shadow-sm flex items-center justify-center gap-2">
+                         <svg xmlns="http://www.w.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M5 4v3H4a2 2 0 00-2 2v3a2 2 0 002 2h1v-2a1 1 0 011-1h8a1 1 0 011 1v2h1a2 2 0 002-2v-3a2 2 0 00-2-2h-1V4a2 2 0 00-2-2H7a2 2 0 00-2 2zm8 0H7v3h6V4zm0 8H7v4h6v-4z" clipRule="evenodd" /></svg>
+                        <span>Compartilhar como PDF</span>
+                    </button>
+                </div>
+                 <button onClick={onClose} className="w-full text-zinc-700 font-bold py-3 px-4 rounded-full hover:bg-zinc-100 transition-colors mt-4">
+                    Cancelar
+                </button>
+            </div>
+        </div>
+    );
+};
+
+
 // --- Componente: Formulário de Geração de Relatório ---
 const InteractiveReportForm: React.FC<{ onGenerate: (config: ReportConfig) => void; onCancel: () => void; }> = ({ onGenerate, onCancel }) => {
     const allFields: { id: ReportField; label: string }[] = [
@@ -93,6 +122,8 @@ const InteractiveReportForm: React.FC<{ onGenerate: (config: ReportConfig) => vo
 
 // --- Componente: Visualização do Relatório ---
 const InteractiveReportPreview: React.FC<{ data: Attendee[]; config: ReportConfig; onBack: () => void; }> = ({ data, config, onBack }) => {
+    const [isShareModalOpen, setIsShareModalOpen] = useState(false);
+    
     const fieldNames: Record<ReportField, string> = {
         name: 'Nome', document: 'Documento', phone: 'Telefone', packageType: 'Pacote',
         'payment.status': 'Status', 'payment.amount': 'Valor (R$)',
@@ -153,28 +184,39 @@ const InteractiveReportPreview: React.FC<{ data: Attendee[]; config: ReportConfi
         }
     };
     
-    const handleShare = async () => {
+    const handleShareAsText = async () => {
+        setIsShareModalOpen(false);
         const title = `Relatório Gira da Mata (${data.length} registros)`;
-        let text = `${title}\n\n`;
-        data.forEach((attendee, index) => {
-            text += `Registro ${index + 1}:\n`;
+        let reportText = `${title}\n\n`;
+        data.forEach((attendee) => {
+            reportText += `*${formatValue(attendee, 'name')}*\n`;
             config.fields.forEach(field => {
-                text += `  - ${fieldNames[field]}: ${formatValue(attendee, field)}\n`;
+                if (field !== 'name') {
+                    reportText += ` - ${fieldNames[field]}: ${formatValue(attendee, field)}\n`;
+                }
             });
-            text += '\n';
+            reportText += '\n';
         });
 
         if (navigator.share) {
             try {
-                await navigator.share({ title, text });
+                await navigator.share({
+                    title: title,
+                    text: reportText,
+                });
             } catch (error) {
-                if (!(error instanceof DOMException && error.name === 'AbortError')) {
-                    console.error('Erro ao compartilhar:', error);
-                }
+                console.error('Error sharing text:', error);
             }
         } else {
-            alert('Seu navegador não suporta compartilhamento direto. Use a opção "Imprimir / Salvar PDF" e compartilhe o arquivo.');
+            const encodedText = encodeURIComponent(reportText);
+            const whatsappUrl = `https://wa.me/?text=${encodedText}`;
+            window.open(whatsappUrl, '_blank');
         }
+    };
+
+    const handleShareAsPdf = () => {
+        handlePrintAndExport();
+        setIsShareModalOpen(false);
     };
 
     return (
@@ -187,7 +229,7 @@ const InteractiveReportPreview: React.FC<{ data: Attendee[]; config: ReportConfi
                     <h1 className="text-xl md:text-2xl font-bold text-zinc-800">Relatório ({data.length})</h1>
                 </div>
                 <div className="flex items-center gap-2">
-                    <button onClick={handleShare} className="p-2 rounded-full text-zinc-700 bg-zinc-200 hover:bg-zinc-300 transition-colors" aria-label="Compartilhar">
+                    <button onClick={() => setIsShareModalOpen(true)} className="p-2 rounded-full text-zinc-700 bg-zinc-200 hover:bg-zinc-300 transition-colors" aria-label="Compartilhar">
                         <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path d="M15 8a3 3 0 10-2.977-2.63l-4.94 2.47a3 3 0 100 4.319l4.94 2.47a3 3 0 10.895-1.789l-4.94-2.47a3.027 3.027 0 000-.74l4.94-2.47C13.456 7.68 14.19 8 15 8z" /></svg>
                     </button>
                     <button onClick={handlePrintAndExport} className="p-2 rounded-full text-white bg-blue-500 hover:bg-blue-600 transition-colors shadow-sm" aria-label="Imprimir / PDF">
@@ -219,6 +261,13 @@ const InteractiveReportPreview: React.FC<{ data: Attendee[]; config: ReportConfi
                     </>
                 ) : <p className="text-center text-zinc-500 animate-fadeIn">Nenhum registro encontrado para os filtros selecionados.</p>}
             </main>
+            {isShareModalOpen && (
+                <ShareOptionsModal
+                    onClose={() => setIsShareModalOpen(false)}
+                    onShareAsText={handleShareAsText}
+                    onShareAsPdf={handleShareAsPdf}
+                />
+            )}
         </div>
     );
 };

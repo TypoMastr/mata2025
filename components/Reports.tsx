@@ -1,6 +1,5 @@
 import React, { useState, useMemo } from 'react';
 import type { Attendee, ReportConfig, ReportField } from '../types';
-import { generateReport } from '../services/geminiService';
 import { PackageType, PaymentStatus } from '../types';
 
 // --- Componente: Formulário de Geração de Relatório ---
@@ -224,50 +223,8 @@ const ProgressBar: React.FC<{ value: number; max: number; colorClass?: string }>
     const percentage = max > 0 ? (value / max) * 100 : 0;
     return (<div className="w-full bg-zinc-200 rounded-full h-2"><div className={`${colorClass} h-2 rounded-full transition-all duration-500`} style={{ width: `${percentage}%` }}></div></div>);
 };
-const AiSummaryDisplay: React.FC<{ text: string }> = ({ text }) => {
-    const formattedHtml = useMemo(() => {
-        let inList = false;
-        const lines = text.split('\n').filter(line => line.trim() !== '');
-        let html = '';
-
-        for (const line of lines) {
-            const trimmedLine = line.trim();
-            if (trimmedLine.startsWith('* ')) {
-                if (!inList) {
-                    html += '<ul class="list-disc list-inside space-y-1 mt-1 mb-3">';
-                    inList = true;
-                }
-                const itemText = trimmedLine.substring(2).replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
-                html += `<li>${itemText}</li>`;
-            } else {
-                if (inList) {
-                    html += '</ul>';
-                    inList = false;
-                }
-                if (trimmedLine.startsWith('**') && trimmedLine.endsWith('**')) {
-                     html += `<h3 class="font-bold text-zinc-800 mt-4 first:mt-0 mb-1">${trimmedLine.replace(/\*\*/g, '')}</h3>`;
-                } else {
-                    html += `<p class="my-2">${trimmedLine.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')}</p>`;
-                }
-            }
-        }
-
-        if (inList) {
-            html += '</ul>'; // Close any open list
-        }
-
-        return html;
-    }, [text]);
-
-    return <div className="text-sm text-zinc-700" dangerouslySetInnerHTML={{ __html: formattedHtml }} />;
-};
-
 
 const ReportsDashboard: React.FC<{ attendees: Attendee[]; onGenerateReportClick: () => void; onLogout: () => void; }> = ({ attendees, onGenerateReportClick, onLogout }) => {
-    const [aiReport, setAiReport] = useState<string | null>(null);
-    const [isLoading, setIsLoading] = useState(false);
-    const [error, setError] = useState<string | null>(null);
-
     const { totalAttendees, paidCount, pendingCount, totalRevenue, pendingRevenue, totalPossibleRevenue, buses } = useMemo(() => {
         const busAttendees = attendees.filter(a => a.packageType === PackageType.SITIO_BUS);
         const BUS_CAPACITY = 50;
@@ -286,18 +243,9 @@ const ReportsDashboard: React.FC<{ attendees: Attendee[]; onGenerateReportClick:
         };
     }, [attendees]);
 
-    const handleGenerateAiReport = async () => {
-        setIsLoading(true); setError(null); setAiReport(null);
-        try {
-            const result = await generateReport(attendees, buses);
-            setAiReport(result);
-        } catch (e) { setError('Falha ao gerar o resumo. Tente novamente.'); console.error(e); } finally { setIsLoading(false); }
-    };
-
     const IconUsers = <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.653-.124-1.282-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.653.124-1.282.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" /></svg>;
     const IconDollar = <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v.01M12 12v-2m0 2v2m0-2.35V10M12 15v2m0-2v-2m0 0h.01M12 7.02c.164.017.324.041.48.072M7.5 9.51c.418-.472 1.012-.867 1.697-1.126M12 21a9 9 0 100-18 9 9 0 000 18z" /></svg>;
     const IconBus = <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path d="M9 17a2 2 0 11-4 0 2 2 0 014 0zM19 17a2 2 0 11-4 0 2 2 0 014 0z" /><path strokeLinecap="round" strokeLinejoin="round" d="M13 16V6a1 1 0 00-1-1H4a1 1 0 00-1 1v10l2 2h8l2-2zM5 11h6" /></svg>;
-    const IconSparkles = <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z" /></svg>;
     const IconClipboardList = <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" /></svg>;
     
     return (
@@ -314,8 +262,7 @@ const ReportsDashboard: React.FC<{ attendees: Attendee[]; onGenerateReportClick:
                 <StatCard title="Inscrições" icon={IconUsers} delay={100}><div className="flex justify-between items-baseline"><span className="font-bold text-3xl text-zinc-800">{totalAttendees}</span><span className="text-sm font-semibold text-zinc-500">Total</span></div><ProgressBar value={paidCount} max={totalAttendees} /><div className="flex justify-between text-sm"><span className="font-semibold text-green-600">{paidCount} Pagos</span><span className="font-semibold text-yellow-600">{pendingCount} Pendentes</span></div></StatCard>
                 <StatCard title="Financeiro" icon={IconDollar} delay={150}><div className="flex justify-between items-baseline"><span className="font-bold text-3xl text-zinc-800">R$ {totalRevenue.toFixed(2).replace('.',',')}</span><span className="text-sm font-semibold text-zinc-500">Arrecadado</span></div><ProgressBar value={totalRevenue} max={totalPossibleRevenue} /><div className="flex justify-between text-sm"><span className="font-semibold text-zinc-500">Pendente: R$ {pendingRevenue.toFixed(2).replace('.',',')}</span></div></StatCard>
                 {buses.map((bus, index) => (<StatCard key={bus.busNumber} title={`Ônibus ${bus.busNumber}`} icon={IconBus} delay={200 + index * 50}><div className="flex justify-between items-baseline"><span className="font-bold text-3xl text-zinc-800">{bus.filledSeats}</span><span className="text-sm font-semibold text-zinc-500">/ {bus.capacity} vagas</span></div><ProgressBar value={bus.filledSeats} max={bus.capacity} colorClass="bg-blue-500" /><div className="flex justify-between text-sm"><span className="font-semibold text-blue-600">{bus.filledSeats} Preenchidas</span><span className="font-semibold text-zinc-500">{bus.remainingSeats} Restantes</span></div></StatCard>))}
-                <StatCard title="Relatórios Personalizados" icon={IconClipboardList} delay={250} className="md:col-span-2 lg:col-span-1"><p className="text-sm text-zinc-600">Crie relatórios com filtros e campos específicos. Exporte em PDF, imprima ou compartilhe.</p><button onClick={onGenerateReportClick} className="mt-2 w-full bg-blue-500 text-white font-bold py-2 px-4 rounded-full hover:bg-blue-600 transition-colors shadow-sm flex items-center justify-center gap-2">Gerar Relatório</button></StatCard>
-                <StatCard title="Resumo com IA" icon={IconSparkles} delay={300} className="md:col-span-2 lg:col-span-3"><p className="text-sm text-zinc-600">Obtenha uma análise detalhada e insights gerados por IA sobre inscrições, finanças e logística do evento.</p><button onClick={handleGenerateAiReport} disabled={isLoading} className="mt-2 w-full bg-green-500 text-white font-bold py-2 px-4 rounded-full hover:bg-green-600 transition-colors shadow-sm disabled:bg-zinc-400 disabled:cursor-not-allowed flex items-center justify-center gap-2">{isLoading ? (<><svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>Gerando...</>) : ('Gerar Resumo')}</button>{error && <p className="mt-2 text-sm text-red-600 animate-fadeIn">{error}</p>}{aiReport && !isLoading && (<div className="mt-4 pt-4 border-t border-zinc-200 animate-fadeIn"><AiSummaryDisplay text={aiReport} /></div>)}</StatCard>
+                <StatCard title="Relatórios Personalizados" icon={IconClipboardList} delay={250} className="md:col-span-2"><p className="text-sm text-zinc-600">Crie relatórios com filtros e campos específicos. Exporte em PDF, imprima ou compartilhe.</p><button onClick={onGenerateReportClick} className="mt-2 w-full bg-blue-500 text-white font-bold py-2 px-4 rounded-full hover:bg-blue-600 transition-colors shadow-sm flex items-center justify-center gap-2">Gerar Relatório</button></StatCard>
             </div>
         </div>
     );

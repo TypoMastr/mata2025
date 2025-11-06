@@ -59,9 +59,6 @@ const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
         animationFillMode: 'forwards',
     });
     
-    const IconFingerPrint = <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M7.864 4.243A7.5 7.5 0 0119.5 12c0 2.252-.903 4.34-2.378 5.855A7.5 7.5 0 019.622 4.145m1.503 1.498a5.25 5.25 0 00-6.236 6.236l-3.5 3.5a.75.75 0 001.06 1.06l3.5-3.5a5.25 5.25 0 006.236-6.236-1.503-1.503z" /></svg>;
-
-
     if (biometricStatus === 'checking' || biometricStatus === 'prompting') {
         return (
             <div className="bg-zinc-50 flex flex-col items-center justify-center min-h-screen p-4 font-sans">
@@ -135,10 +132,9 @@ const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
                             <button
                                 type="button"
                                 onClick={handleBiometricLogin}
-                                className="w-full bg-zinc-200 text-zinc-800 font-bold py-3 px-4 rounded-full hover:bg-zinc-300 transition-colors flex items-center justify-center gap-2"
+                                className="w-full bg-zinc-200 text-zinc-800 font-bold py-3 px-4 rounded-full hover:bg-zinc-300 transition-colors"
                             >
-                                {IconFingerPrint}
-                                <span>Entrar com Biometria</span>
+                                Entrar com Biometria
                             </button>
                         )}
                     </div>

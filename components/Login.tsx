@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import * as authService from '../services/authService';
 
 interface LoginProps {
     onLoginSuccess: () => void;
@@ -9,6 +10,30 @@ const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
     const [error, setError] = useState('');
     const [isExiting, setIsExiting] = useState(false);
     const [shakeError, setShakeError] = useState(false);
+    const [biometricStatus, setBiometricStatus] = useState<'checking' | 'prompting' | 'failed' | 'idle'>('checking');
+
+
+    useEffect(() => {
+        const attemptBiometricLogin = async () => {
+            if (authService.hasBiometricCredential()) {
+                setBiometricStatus('prompting');
+                const success = await authService.authenticateWithBiometricCredential();
+                if (success) {
+                    setIsExiting(true);
+                    setTimeout(() => onLoginSuccess(), 500);
+                } else {
+                    // User cancelled or it failed
+                    setBiometricStatus('failed');
+                }
+            } else {
+                setBiometricStatus('idle');
+            }
+        };
+
+        // Delay slightly to allow the UI to render first and feel less abrupt
+        setTimeout(attemptBiometricLogin, 100);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
@@ -35,9 +60,24 @@ const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
         animationFillMode: 'forwards',
     });
 
+    if (biometricStatus === 'checking' || biometricStatus === 'prompting') {
+        return (
+            <div className="bg-zinc-50 flex flex-col items-center justify-center min-h-screen p-4 font-sans">
+                <div className="text-center animate-fadeIn">
+                    <img src="https://cdn-icons-png.flaticon.com/512/284/284471.png" alt="Gira da Mata Logo" className="w-48 h-48 mx-auto mb-6" />
+                    <h1 className="text-2xl font-bold text-zinc-800">Gira da Mata</h1>
+                    <p className="text-zinc-500 mt-4">
+                        {biometricStatus === 'prompting' ? 'Use sua biometria para entrar...' : 'Verificando acesso rápido...'}
+                    </p>
+                </div>
+            </div>
+        );
+    }
+
     return (
         <div className="bg-zinc-50 flex flex-col items-center justify-center min-h-screen p-4 font-sans overflow-hidden">
             <div className={`w-full max-w-sm mx-auto text-center ${shakeError ? 'animate-shake' : ''}`}>
+                 {biometricStatus === 'failed' && <p className="text-center text-sm text-zinc-500 mb-6 animate-fadeIn">Biometria cancelada. Use sua senha.</p>}
                 <div 
                     className={`mx-auto mb-6 h-48 w-48 ${!isExiting ? 'opacity-0' : ''} ${animationClass}`}
                     style={getAnimationStyle(0, 200)}

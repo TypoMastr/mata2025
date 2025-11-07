@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import type { Attendee, ReportConfig, ReportField } from '../types';
-import { PackageType, PaymentStatus, DocumentType } from '../types';
+import { PackageType, PaymentStatus, DocumentType, PaymentType } from '../types';
 import { formatDocument, getDocumentType } from '../utils/formatters';
 
 // --- Componente: Modal de Opções de Compartilhamento ---
@@ -463,15 +463,36 @@ const ProgressBar: React.FC<{ value: number; max: number; colorClass?: string }>
 };
 
 const ReportsDashboard: React.FC<{ attendees: Attendee[]; onGenerateReportClick: () => void; onLogout: () => void; onFixDocsClick: () => void; }> = ({ attendees, onGenerateReportClick, onLogout, onFixDocsClick }) => {
-    const { totalAttendees, paidCount, pendingCount, totalRevenue, pendingRevenue, totalPossibleRevenue, buses, sitioOnlyCount, zeroDocAttendees } = useMemo(() => {
+    const { totalAttendees, paidCount, pendingCount, totalRevenue, pendingRevenue, totalPossibleRevenue, buses, sitioOnlyCount, zeroDocAttendees, paymentStats } = useMemo(() => {
         const busAttendees = attendees.filter(a => a.packageType === PackageType.SITIO_BUS);
         const BUS_CAPACITY = 50;
         const busCount = Math.ceil(busAttendees.length / BUS_CAPACITY) || (busAttendees.length > 0 ? 1 : 0);
+
+        const paidAttendees = attendees.filter(a => a.payment.status === PaymentStatus.PAGO);
+        const paidCountValue = paidAttendees.length;
+
+        const calculatedPaymentStats = paidAttendees
+            .filter(a => a.payment.type) // Ensure payment type exists
+            .reduce((acc, attendee) => {
+                const type = attendee.payment.type!;
+                if (!acc[type]) {
+                    acc[type] = { count: 0, total: 0 };
+                }
+                acc[type].count += 1;
+                acc[type].total += attendee.payment.amount;
+                return acc;
+            }, {} as Record<PaymentType, { count: number; total: number }>);
+        
+        // FIX: Cast `a` and `b` to fix TypeScript error where `count` property is not found on type `unknown`.
+        const sortedPaymentStats = Object.entries(calculatedPaymentStats)
+            .sort(([, a], [, b]) => (b as { count: number }).count - (a as { count: number }).count)
+            .reduce((r, [k, v]) => ({ ...r, [k as PaymentType]: v }), {} as Record<PaymentType, { count: number; total: number }>);
+
         return {
             totalAttendees: attendees.length,
-            paidCount: attendees.filter(a => a.payment.status === PaymentStatus.PAGO).length,
+            paidCount: paidCountValue,
             pendingCount: attendees.filter(a => a.payment.status === PaymentStatus.PENDENTE).length,
-            totalRevenue: attendees.filter(a => a.payment.status === PaymentStatus.PAGO).reduce((sum, a) => sum + a.payment.amount, 0),
+            totalRevenue: paidAttendees.reduce((sum, a) => sum + a.payment.amount, 0),
             pendingRevenue: attendees.filter(a => a.payment.status === PaymentStatus.PENDENTE).reduce((sum, a) => sum + a.payment.amount, 0),
             totalPossibleRevenue: attendees.reduce((sum, a) => sum + a.payment.amount, 0),
             buses: Array.from({ length: busCount }, (_, i) => {
@@ -480,6 +501,7 @@ const ReportsDashboard: React.FC<{ attendees: Attendee[]; onGenerateReportClick:
             }),
             sitioOnlyCount: attendees.filter(a => a.packageType === PackageType.SITIO_ONLY).length,
             zeroDocAttendees: attendees.filter(a => /^0+$/.test(a.document.replace(/[^\d]/g, ''))),
+            paymentStats: sortedPaymentStats
         };
     }, [attendees]);
 
@@ -489,6 +511,7 @@ const ReportsDashboard: React.FC<{ attendees: Attendee[]; onGenerateReportClick:
     const IconHome = <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" /></svg>;
     const IconClipboardList = <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" /></svg>;
     const IconWarning = <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>;
+    const IconCreditCard = <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" /></svg>;
     
     return (
         <div className="pb-4 animate-fadeIn">
@@ -513,9 +536,10 @@ const ReportsDashboard: React.FC<{ attendees: Attendee[]; onGenerateReportClick:
                     </div>
                 </StatCard>
                 <StatCard title="Financeiro" icon={IconDollar} delay={150}><div className="flex justify-between items-baseline"><span className="font-bold text-3xl text-zinc-800">R$ {totalRevenue.toFixed(2).replace('.',',')}</span><span className="text-sm font-semibold text-zinc-500">Arrecadado</span></div><ProgressBar value={totalRevenue} max={totalPossibleRevenue} /><div className="flex justify-between text-sm"><span className="font-semibold text-zinc-500">Pendente: R$ {pendingRevenue.toFixed(2).replace('.',',')}</span></div></StatCard>
+                
                 {zeroDocAttendees.length > 0 && (
                     <div onClick={onFixDocsClick} className="cursor-pointer md:col-span-2 lg:col-span-1">
-                        <StatCard title="Documentos Pendentes" icon={IconWarning} delay={175} className="bg-yellow-50 border-yellow-300 h-full">
+                        <StatCard title="Documentos Pendentes" icon={IconWarning} delay={200} className="bg-yellow-50 border-yellow-300 h-full">
                            <div className="flex justify-between items-baseline">
                                 <span className="font-bold text-3xl text-yellow-800">{zeroDocAttendees.length}</span>
                                 <span className="text-sm font-semibold text-yellow-700">{zeroDocAttendees.length === 1 ? 'Inscrito' : 'Inscritos'}</span>
@@ -524,8 +548,8 @@ const ReportsDashboard: React.FC<{ attendees: Attendee[]; onGenerateReportClick:
                         </StatCard>
                     </div>
                 )}
-                {buses.map((bus, index) => (<StatCard key={bus.busNumber} title={`Ônibus ${bus.busNumber}`} icon={IconBus} delay={200 + index * 50}><div className="flex justify-between items-baseline"><span className="font-bold text-3xl text-zinc-800">{bus.filledSeats}</span><span className="text-sm font-semibold text-zinc-500">/ {bus.capacity} vagas</span></div><ProgressBar value={bus.filledSeats} max={bus.capacity} colorClass="bg-blue-500" /><div className="flex justify-between text-sm"><span className="font-semibold text-blue-600">{bus.filledSeats} {bus.filledSeats === 1 ? 'Preenchida' : 'Preenchidas'}</span><span className="font-semibold text-zinc-500">{bus.remainingSeats} {bus.remainingSeats === 1 ? 'Restante' : 'Restantes'}</span></div></StatCard>))}
-                <StatCard title="Apenas Sítio" icon={IconHome} delay={200 + (buses.length * 50)}>
+                {buses.map((bus, index) => (<StatCard key={bus.busNumber} title={`Ônibus ${bus.busNumber}`} icon={IconBus} delay={225 + index * 50}><div className="flex justify-between items-baseline"><span className="font-bold text-3xl text-zinc-800">{bus.filledSeats}</span><span className="text-sm font-semibold text-zinc-500">/ {bus.capacity} vagas</span></div><ProgressBar value={bus.filledSeats} max={bus.capacity} colorClass="bg-blue-500" /><div className="flex justify-between text-sm"><span className="font-semibold text-blue-600">{bus.filledSeats} {bus.filledSeats === 1 ? 'Preenchida' : 'Preenchidas'}</span><span className="font-semibold text-zinc-500">{bus.remainingSeats} {bus.remainingSeats === 1 ? 'Restante' : 'Restantes'}</span></div></StatCard>))}
+                <StatCard title="Apenas Sítio" icon={IconHome} delay={225 + (buses.length * 50)}>
                     <div className="flex justify-between items-baseline">
                         <span className="font-bold text-3xl text-zinc-800">{sitioOnlyCount}</span>
                         <span className="text-sm font-semibold text-zinc-500">{sitioOnlyCount === 1 ? 'Inscrito' : 'Inscritos'}</span>
@@ -534,7 +558,31 @@ const ReportsDashboard: React.FC<{ attendees: Attendee[]; onGenerateReportClick:
                         Não há limite de vagas para este pacote.
                     </div>
                 </StatCard>
-                <StatCard title="Relatórios Personalizados" icon={IconClipboardList} delay={250 + (buses.length * 50)} className="md:col-span-2 lg:col-span-3"><p className="text-sm text-zinc-600">Crie relatórios com filtros e campos específicos. Exporte em PDF, imprima ou compartilhe.</p><button onClick={onGenerateReportClick} className="mt-2 w-full bg-blue-500 text-white font-bold py-2 px-4 rounded-full hover:bg-blue-600 transition-colors shadow-sm flex items-center justify-center gap-2">Gerar Relatório</button></StatCard>
+                <StatCard title="Formas de Pagamento" icon={IconCreditCard} delay={250 + (buses.length * 50)}>
+                    {Object.keys(paymentStats).length > 0 ? (
+                        <div className="space-y-3">
+                            {/* FIX: Cast the result of Object.entries to fix TypeScript errors where properties on `stats` are not found on type `unknown`. */}
+                            {(Object.entries(paymentStats) as [string, { count: number; total: number }][]).map(([type, stats]) => (
+                                <div key={type} className="text-sm">
+                                    <div className="flex justify-between font-semibold text-zinc-800 mb-1">
+                                        <span>{type}</span>
+                                        <span>{paidCount > 0 ? `${((stats.count / paidCount) * 100).toFixed(0)}%` : '0%'}</span>
+                                    </div>
+                                    <ProgressBar value={stats.count} max={paidCount} colorClass="bg-emerald-400" />
+                                    <div className="flex justify-between items-center text-xs text-zinc-500 mt-1">
+                                        <span>{stats.count} {stats.count === 1 ? 'pagamento' : 'pagamentos'}</span>
+                                        <span className="font-medium">R$ {stats.total.toFixed(2).replace('.', ',')}</span>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    ) : (
+                        <div className="flex items-center justify-center h-full py-4">
+                            <p className="text-sm text-zinc-500 text-center">Nenhum pagamento registrado.</p>
+                        </div>
+                    )}
+                </StatCard>
+                <StatCard title="Relatórios Personalizados" icon={IconClipboardList} delay={300 + (buses.length * 50)} className="md:col-span-2 lg:col-span-3"><p className="text-sm text-zinc-600">Crie relatórios com filtros e campos específicos. Exporte em PDF, imprima ou compartilhe.</p><button onClick={onGenerateReportClick} className="mt-2 w-full bg-blue-500 text-white font-bold py-2 px-4 rounded-full hover:bg-blue-600 transition-colors shadow-sm flex items-center justify-center gap-2">Gerar Relatório</button></StatCard>
             </div>
         </div>
     );

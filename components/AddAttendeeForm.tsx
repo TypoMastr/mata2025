@@ -96,9 +96,8 @@ const AddAttendeeForm: React.FC<AddAttendeeFormProps> = ({ onAddAttendee, onUpda
         }
     }, [formState.packageType, formState.paymentAmount]);
 
-    // FIX: Refactored `handleInputChange` to safely handle different input types (checkbox vs text/select).
-    // This resolves a TypeScript error by separating the state update logic for boolean and string values,
-    // which helps with type inference for the dynamic property update.
+    // FIX: Safely handle checkbox changes by checking the event target's type before accessing the `checked` property.
+    // This resolves a TypeScript error and ensures correct type inference for the form state.
     const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
         const { name, value, type } = e.target;
         

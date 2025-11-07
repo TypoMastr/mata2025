@@ -34,7 +34,7 @@ export const useAttendees = () => {
             ? {
                 amount: formData.paymentAmount,
                 status: PaymentStatus.PAGO,
-                date: new Date(formData.paymentDate).toISOString(),
+                date: new Date(formData.paymentDate + 'T00:00:00Z').toISOString(),
                 type: formData.paymentType,
             }
             : {

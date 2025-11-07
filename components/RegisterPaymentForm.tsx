@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import type { Attendee } from '../types';
 import { PaymentStatus, PaymentType } from '../types';
 
@@ -30,6 +30,18 @@ const RegisterPaymentForm: React.FC<RegisterPaymentFormProps> = ({ attendee, onR
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [submissionError, setSubmissionError] = useState<string | null>(null);
     
+    const formattedDisplayDate = useMemo(() => {
+        if (!paymentDate) return null;
+        const [year, month, day] = paymentDate.split('-').map(Number);
+        const date = new Date(Date.UTC(year, month - 1, day));
+        return new Intl.DateTimeFormat('pt-BR', {
+            day: '2-digit',
+            month: '2-digit',
+            year: 'numeric',
+            timeZone: 'UTC'
+        }).format(date);
+    }, [paymentDate]);
+
     useEffect(() => {
         if (isEditMode && receipt) {
             setFileName("Comprovante salvo. Anexe um novo para substituir.");
@@ -59,7 +71,7 @@ const RegisterPaymentForm: React.FC<RegisterPaymentFormProps> = ({ attendee, onR
                 payment: {
                     ...attendee.payment,
                     status: PaymentStatus.PAGO,
-                    date: new Date(paymentDate).toISOString(),
+                    date: new Date(paymentDate + 'T00:00:00Z').toISOString(),
                     type: paymentType,
                     receiptUrl: receipt,
                 },
@@ -110,6 +122,11 @@ const RegisterPaymentForm: React.FC<RegisterPaymentFormProps> = ({ attendee, onR
                                 required
                                 autoComplete="off"
                             />
+                            {formattedDisplayDate && (
+                                <p className="mt-2 text-sm text-center text-zinc-600 bg-zinc-100 p-2 rounded-md border border-zinc-200">
+                                    Confirmação: <strong className="font-bold text-green-700">{formattedDisplayDate} (dd/mm/aaaa)</strong>
+                                </p>
+                            )}
                         </div>
                         <div className="opacity-0 animate-fadeInUp" style={getAnimationStyle(200)}>
                             <label htmlFor="paymentType" className="block text-sm font-medium text-zinc-700">Tipo de Pagamento</label>

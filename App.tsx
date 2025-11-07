@@ -115,7 +115,7 @@ const App: React.FC = () => {
     };
 
 
-    const handleSaveAttendee = async (formData: Omit<AttendeeFormData, 'paymentAmount'> & { paymentAmount: number }) => {
+    const handleSaveAttendee = async (formData: AttendeeFormData & { paymentAmount: number }) => {
         await addAttendee(formData);
         setView('list');
     };

@@ -1,10 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import type { AttendeeFormData, Attendee } from '../types';
-import { PackageType, DocumentType } from '../types';
+import { PackageType, DocumentType, PaymentType } from '../types';
 import { formatPhoneNumber, formatDocument, getDocumentType } from '../utils/formatters';
 
 interface AddAttendeeFormProps {
-    onAddAttendee?: (data: Omit<AttendeeFormData, 'paymentAmount'> & { paymentAmount: number }) => Promise<void>;
+    onAddAttendee?: (data: AttendeeFormData & { paymentAmount: number }) => Promise<void>;
     onUpdateAttendee?: (data: Attendee) => Promise<void>;
     onCancel: () => void;
     attendeeToEdit?: Attendee;
@@ -52,14 +52,20 @@ const AddAttendeeForm: React.FC<AddAttendeeFormProps> = ({ onAddAttendee, onUpda
                 phone: attendeeToEdit.phone,
                 packageType: attendeeToEdit.packageType,
                 paymentAmount: attendeeToEdit.payment.amount.toFixed(2),
+                registerPaymentNow: false,
+                paymentDate: new Date().toISOString().split('T')[0],
+                paymentType: PaymentType.PIX_MAQUINA,
             };
         }
         return {
             name: '',
             document: '',
             phone: '',
-            packageType: PackageType.SITIO_ONLY,
-            paymentAmount: '70.00',
+            packageType: PackageType.SITIO_BUS,
+            paymentAmount: '120.00',
+            registerPaymentNow: false,
+            paymentDate: new Date().toISOString().split('T')[0],
+            paymentType: PaymentType.PIX_MAQUINA,
         };
     });
 
@@ -77,17 +83,28 @@ const AddAttendeeForm: React.FC<AddAttendeeFormProps> = ({ onAddAttendee, onUpda
         }
     }, [formState.packageType, formState.paymentAmount]);
 
+    // FIX: Refactored `handleInputChange` to safely handle different input types (checkbox vs text/select).
+    // This resolves a TypeScript error by separating the state update logic for boolean and string values,
+    // which helps with type inference for the dynamic property update.
     const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
-        const { name, value } = e.target;
-        let formattedValue = value;
-        if (name === 'phone') {
-            formattedValue = formatPhoneNumber(value);
-        } else if (name === 'document') {
-            formattedValue = formatDocument(value);
-            const { type } = getDocumentType(formattedValue);
-            setDocType(type);
+        const { name, value, type } = e.target;
+        
+        if (type === 'checkbox' && e.target instanceof HTMLInputElement) {
+            setFormState(prev => ({
+                ...prev,
+                [name]: e.target.checked,
+            }));
+        } else {
+            let formattedValue = value;
+            if (name === 'phone') {
+                formattedValue = formatPhoneNumber(value);
+            } else if (name === 'document') {
+                formattedValue = formatDocument(value);
+                const { type: docTypeResult } = getDocumentType(formattedValue);
+                setDocType(docTypeResult);
+            }
+            setFormState(prev => ({ ...prev, [name]: formattedValue }));
         }
-        setFormState(prev => ({ ...prev, [name]: formattedValue }));
     };
     
     const validate = (): boolean => {
@@ -188,8 +205,8 @@ const AddAttendeeForm: React.FC<AddAttendeeFormProps> = ({ onAddAttendee, onUpda
                     <div className="opacity-0 animate-fadeInUp" style={{ animationDelay: '250ms', animationFillMode: 'forwards' }}>
                         <label htmlFor="packageType" className="block text-sm font-medium text-zinc-700">Pacote</label>
                         <select name="packageType" id="packageType" value={formState.packageType} onChange={handleInputChange} className="mt-1 block w-full px-3 py-2 bg-white border border-zinc-300 rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500 sm:text-sm">
-                            <option value={PackageType.SITIO_ONLY}>Apenas Sítio</option>
                             <option value={PackageType.SITIO_BUS}>Sítio + Ônibus</option>
+                            <option value={PackageType.SITIO_ONLY}>Apenas Sítio</option>
                         </select>
                     </div>
                     <div className="opacity-0 animate-fadeInUp md:col-span-2" style={{ animationDelay: '300ms', animationFillMode: 'forwards' }}>
@@ -203,8 +220,59 @@ const AddAttendeeForm: React.FC<AddAttendeeFormProps> = ({ onAddAttendee, onUpda
                             className="mt-1 block w-full px-3 py-2 bg-zinc-100 border border-zinc-300 rounded-md shadow-sm focus:outline-none sm:text-sm text-zinc-500 cursor-not-allowed"
                         />
                     </div>
+                    
+                    {!isEditMode && (
+                         <div className="md:col-span-2 space-y-4 border-t border-zinc-200 pt-4">
+                             <div className="opacity-0 animate-fadeInUp" style={{ animationDelay: '350ms', animationFillMode: 'forwards' }}>
+                                <label className="flex items-center space-x-2 p-2 rounded-md hover:bg-zinc-50 cursor-pointer w-fit">
+                                    <input
+                                        type="checkbox"
+                                        name="registerPaymentNow"
+                                        checked={formState.registerPaymentNow}
+                                        onChange={handleInputChange}
+                                        className="h-4 w-4 rounded border-zinc-300 text-green-600 focus:ring-green-500"
+                                    />
+                                    <span className="text-sm font-medium text-zinc-700">Registrar pagamento agora</span>
+                                </label>
+                            </div>
+                            
+                            {formState.registerPaymentNow && (
+                                <div className="md:grid md:grid-cols-2 md:gap-x-6 md:gap-y-4 space-y-4 md:space-y-0 animate-fadeIn">
+                                    <div className="opacity-0 animate-fadeInUp" style={{ animationDelay: '50ms', animationFillMode: 'forwards' }}>
+                                        <label htmlFor="paymentDate" className="block text-sm font-medium text-zinc-700">Data do Pagamento</label>
+                                        <input
+                                            type="date"
+                                            id="paymentDate"
+                                            name="paymentDate"
+                                            value={formState.paymentDate}
+                                            onChange={handleInputChange}
+                                            className="mt-1 block w-full px-3 py-2 bg-white border border-zinc-300 rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500 sm:text-sm"
+                                            required
+                                        />
+                                    </div>
+                                    <div className="opacity-0 animate-fadeInUp" style={{ animationDelay: '100ms', animationFillMode: 'forwards' }}>
+                                        <label htmlFor="paymentType" className="block text-sm font-medium text-zinc-700">Tipo de Pagamento</label>
+                                        <select
+                                            id="paymentType"
+                                            name="paymentType"
+                                            value={formState.paymentType}
+                                            onChange={handleInputChange}
+                                            className="mt-1 block w-full px-3 py-2 bg-white border border-zinc-300 rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500 sm:text-sm"
+                                            required
+                                        >
+                                            <option value={PaymentType.PIX_MAQUINA}>PIX (Máquina)</option>
+                                            <option value={PaymentType.PIX_CONTA}>PIX (Conta)</option>
+                                            <option value={PaymentType.DEBITO}>Débito</option>
+                                            <option value={PaymentType.CREDITO}>Crédito</option>
+                                        </select>
+                                    </div>
+                                </div>
+                            )}
+                         </div>
+                    )}
 
-                    <div className="flex flex-col md:flex-row gap-4 pt-4 md:col-span-2 opacity-0 animate-fadeInUp" style={{ animationDelay: '350ms', animationFillMode: 'forwards' }}>
+
+                    <div className="flex flex-col md:flex-row gap-4 pt-4 md:col-span-2 opacity-0 animate-fadeInUp" style={{ animationDelay: '400ms', animationFillMode: 'forwards' }}>
                         <button type="button" onClick={onCancel} className="w-full bg-zinc-200 text-zinc-800 font-bold py-3 px-4 rounded-full hover:bg-zinc-300 transition-colors">Cancelar</button>
                         <button type="submit" disabled={isSubmitting} className="w-full bg-green-500 text-white font-bold py-3 px-4 rounded-full hover:bg-green-600 transition-colors shadow-sm flex items-center justify-center gap-2 disabled:bg-green-400 disabled:cursor-not-allowed">
                             {isSubmitting ? (

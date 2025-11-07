@@ -93,6 +93,8 @@ export const createAttendee = async (attendeeData: any): Promise<Attendee> => {
         package_type: attendeeData.packageType,
         payment_amount: attendeeData.payment.amount,
         payment_status: attendeeData.payment.status,
+        payment_date: attendeeData.payment.date || null,
+        payment_type: attendeeData.payment.type || null,
     };
 
     const { data, error } = await supabase

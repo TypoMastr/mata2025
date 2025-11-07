@@ -27,18 +27,28 @@ export const useAttendees = () => {
         fetchAttendees();
     }, [fetchAttendees]);
 
-    const addAttendee = async (formData: Omit<AttendeeFormData, 'paymentAmount'> & { paymentAmount: number }) => {
+    const addAttendee = async (formData: AttendeeFormData & { paymentAmount: number }) => {
         const { type: documentType } = getDocumentType(formData.document);
+
+        const paymentDetails = formData.registerPaymentNow
+            ? {
+                amount: formData.paymentAmount,
+                status: PaymentStatus.PAGO,
+                date: new Date(formData.paymentDate).toISOString(),
+                type: formData.paymentType,
+            }
+            : {
+                amount: formData.paymentAmount,
+                status: PaymentStatus.PENDENTE,
+            };
+
         const newAttendeeData: Omit<Attendee, 'id' | 'registrationDate' | 'payment'> & { payment: Omit<Attendee['payment'], 'receiptUrl'> } = {
             name: formData.name,
             document: formData.document,
             documentType: documentType,
             phone: formData.phone,
             packageType: formData.packageType,
-            payment: {
-                amount: formData.paymentAmount,
-                status: PaymentStatus.PENDENTE,
-            },
+            payment: paymentDetails,
         };
         
         try {

@@ -55,7 +55,7 @@ const AttendeeList: React.FC<AttendeeListProps> = ({ attendees, onSelectAttendee
             packageFilter === 'all' || attendee.packageType === packageFilter
         );
     
-    const sortedAttendees = [...filteredAttendees].sort((a, b) => new Date(b.registrationDate).getTime() - new Date(a.registrationDate).getTime());
+    const sortedAttendees = [...filteredAttendees].sort((a, b) => a.name.localeCompare(b.name));
 
 
     return (

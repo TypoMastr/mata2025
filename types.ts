@@ -46,6 +46,9 @@ export interface AttendeeFormData {
     phone: string;
     packageType: PackageType;
     paymentAmount: string;
+    registerPaymentNow: boolean;
+    paymentDate: string;
+    paymentType: PaymentType;
 }
 
 export type ReportField = 'name' | 'document' | 'phone' | 'packageType' | 'payment.status' | 'payment.amount';

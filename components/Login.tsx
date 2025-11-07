@@ -117,6 +117,7 @@ const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
                             placeholder="Senha"
                             className={`w-full pl-10 pr-4 py-3 bg-white border ${error ? 'border-red-500' : 'border-zinc-300'} rounded-full shadow-sm focus:outline-none focus:ring-2 focus:ring-green-500 transition-colors`}
                             required
+                            autoComplete="off"
                         />
                     </div>
                      {error && <p className={`text-sm text-red-600 opacity-0 animate-fadeInUp`} style={{ animationFillMode: 'forwards' }}>{error}</p>}

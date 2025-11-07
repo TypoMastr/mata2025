@@ -24,6 +24,7 @@ const InputField: React.FC<{ label: string, name: string, value: string, onChang
             className={`mt-1 block w-full px-3 py-2 bg-white border ${error ? 'border-red-500 text-red-900 placeholder-red-300' : 'border-zinc-300'} rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500 sm:text-sm`}
             aria-invalid={!!error}
             aria-describedby={error ? `${name}-error` : undefined}
+            autoComplete="off"
         />
         {error && <p id={`${name}-error`} className="mt-1 text-sm text-red-600 animate-fadeIn">{error}</p>}
     </div>
@@ -189,6 +190,7 @@ const AddAttendeeForm: React.FC<AddAttendeeFormProps> = ({ onAddAttendee, onUpda
                                 className={`block w-full pr-16 px-3 py-2 bg-white border ${errors.document ? 'border-red-500 text-red-900 placeholder-red-300' : 'border-zinc-300'} rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500 sm:text-sm`}
                                 aria-invalid={!!errors.document}
                                 aria-describedby={errors.document ? `document-error` : undefined}
+                                autoComplete="off"
                             />
                              {docType !== DocumentType.OUTRO && formState.document.length > 0 && (
                                 <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
@@ -204,7 +206,7 @@ const AddAttendeeForm: React.FC<AddAttendeeFormProps> = ({ onAddAttendee, onUpda
                     <InputField label="Telefone" name="phone" value={formState.phone} onChange={handleInputChange} error={errors.phone} placeholder="(00) 00000-0000" maxLength={15} delay={200} />
                     <div className="opacity-0 animate-fadeInUp" style={{ animationDelay: '250ms', animationFillMode: 'forwards' }}>
                         <label htmlFor="packageType" className="block text-sm font-medium text-zinc-700">Pacote</label>
-                        <select name="packageType" id="packageType" value={formState.packageType} onChange={handleInputChange} className="mt-1 block w-full px-3 py-2 bg-white border border-zinc-300 rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500 sm:text-sm">
+                        <select name="packageType" id="packageType" value={formState.packageType} onChange={handleInputChange} className="mt-1 block w-full px-3 py-2 bg-white border border-zinc-300 rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500 sm:text-sm" autoComplete="off">
                             <option value={PackageType.SITIO_BUS}>Sítio + Ônibus</option>
                             <option value={PackageType.SITIO_ONLY}>Apenas Sítio</option>
                         </select>
@@ -218,6 +220,7 @@ const AddAttendeeForm: React.FC<AddAttendeeFormProps> = ({ onAddAttendee, onUpda
                             value={formState.paymentAmount}
                             readOnly
                             className="mt-1 block w-full px-3 py-2 bg-zinc-100 border border-zinc-300 rounded-md shadow-sm focus:outline-none sm:text-sm text-zinc-500 cursor-not-allowed"
+                            autoComplete="off"
                         />
                     </div>
                     
@@ -248,6 +251,7 @@ const AddAttendeeForm: React.FC<AddAttendeeFormProps> = ({ onAddAttendee, onUpda
                                             onChange={handleInputChange}
                                             className="mt-1 block w-full px-3 py-2 bg-white border border-zinc-300 rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500 sm:text-sm"
                                             required
+                                            autoComplete="off"
                                         />
                                     </div>
                                     <div className="opacity-0 animate-fadeInUp" style={{ animationDelay: '100ms', animationFillMode: 'forwards' }}>
@@ -259,6 +263,7 @@ const AddAttendeeForm: React.FC<AddAttendeeFormProps> = ({ onAddAttendee, onUpda
                                             onChange={handleInputChange}
                                             className="mt-1 block w-full px-3 py-2 bg-white border border-zinc-300 rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500 sm:text-sm"
                                             required
+                                            autoComplete="off"
                                         >
                                             <option value={PaymentType.PIX_MAQUINA}>PIX (Máquina)</option>
                                             <option value={PaymentType.PIX_CONTA}>PIX (Conta)</option>

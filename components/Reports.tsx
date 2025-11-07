@@ -19,7 +19,7 @@ const ShareOptionsModal: React.FC<{
                         <span>Texto via WhatsApp</span>
                     </button>
                     <button onClick={onShareAsPdf} className="w-full bg-blue-500 text-white font-bold py-3 px-4 rounded-full hover:bg-blue-600 transition-colors shadow-sm flex items-center justify-center gap-2">
-                         <svg xmlns="http://www.w.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M5 4v3H4a2 2 0 00-2 2v3a2 2 0 002 2h1v-2a1 1 0 011-1h8a1 1 0 011 1v2h1a2 2 0 002-2v-3a2 2 0 00-2-2h-1V4a2 2 0 00-2-2H7a2 2 0 00-2 2zm8 0H7v3h6V4zm0 8H7v4h6v-4z" clipRule="evenodd" /></svg>
+                         <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M5 4v3H4a2 2 0 00-2 2v3a2 2 0 002 2h1v-2a1 1 0 011-1h8a1 1 0 011 1v2h1a2 2 0 002-2v-3a2 2 0 00-2-2h-1V4a2 2 0 00-2-2H7a2 2 0 00-2 2zm8 0H7v3h6V4zm0 8H7v4h6v-4z" clipRule="evenodd" /></svg>
                         <span>Compartilhar como PDF</span>
                     </button>
                 </div>
@@ -94,7 +94,7 @@ const InteractiveReportForm: React.FC<{ onGenerate: (config: ReportConfig) => vo
                          <div className="space-y-3 bg-white p-4 rounded-xl border border-zinc-200 shadow-sm">
                              <div>
                                  <label htmlFor="statusFilter" className="block text-sm font-medium text-zinc-700">Status do Pagamento</label>
-                                 <select id="statusFilter" value={statusFilter} onChange={e => setStatusFilter(e.target.value as any)} className="mt-1 block w-full px-3 py-2 bg-white border border-zinc-300 rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500 sm:text-sm">
+                                 <select id="statusFilter" value={statusFilter} onChange={e => setStatusFilter(e.target.value as any)} className="mt-1 block w-full px-3 py-2 bg-white border border-zinc-300 rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500 sm:text-sm" autoComplete="off">
                                      <option value="all">Todos</option>
                                      <option value={PaymentStatus.PAGO}>Pago</option>
                                      <option value={PaymentStatus.PENDENTE}>Pendente</option>
@@ -102,7 +102,7 @@ const InteractiveReportForm: React.FC<{ onGenerate: (config: ReportConfig) => vo
                              </div>
                              <div>
                                 <label htmlFor="packageFilter" className="block text-sm font-medium text-zinc-700">Tipo de Pacote</label>
-                                 <select id="packageFilter" value={packageFilter} onChange={e => setPackageFilter(e.target.value as any)} className="mt-1 block w-full px-3 py-2 bg-white border border-zinc-300 rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500 sm:text-sm">
+                                 <select id="packageFilter" value={packageFilter} onChange={e => setPackageFilter(e.target.value as any)} className="mt-1 block w-full px-3 py-2 bg-white border border-zinc-300 rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500 sm:text-sm" autoComplete="off">
                                      <option value="all">Todos</option>
                                      <option value={PackageType.SITIO_ONLY}>Apenas Sítio</option>
                                      <option value={PackageType.SITIO_BUS}>Sítio + Ônibus</option>
@@ -378,6 +378,7 @@ const ZeroDocListItem: React.FC<ZeroDocListItemProps> = ({ attendee, onUpdate })
                                 placeholder="Novo documento"
                                 disabled={!isIdle}
                                 className={`w-full pl-2 pr-10 py-1 bg-white border ${error ? 'border-red-500' : 'border-zinc-300'} rounded-md text-sm focus:outline-none focus:ring-1 focus:ring-green-500`}
+                                autoComplete="off"
                             />
                             {docType !== DocumentType.OUTRO && documentValue.length > 0 && (
                                 <div className="absolute inset-y-0 right-0 pr-2 flex items-center pointer-events-none">

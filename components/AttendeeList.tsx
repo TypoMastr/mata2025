@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import type { Attendee } from '../types';
 import AttendeeListItem from './AttendeeListItem';
 import { PaymentStatus, PackageType } from '../types';
@@ -8,6 +8,14 @@ interface AttendeeListProps {
     onSelectAttendee: (id: string) => void;
     onAddAttendee: () => void;
     onLogout: () => void;
+    searchQuery: string;
+    onSearchQueryChange: (query: string) => void;
+    statusFilter: 'all' | PaymentStatus;
+    onStatusFilterChange: (filter: 'all' | PaymentStatus) => void;
+    packageFilter: 'all' | PackageType;
+    onPackageFilterChange: (filter: 'all' | PackageType) => void;
+    scrollPosition: number;
+    onScrollPositionReset: () => void;
 }
 
 const FilterPill: React.FC<{ label: string; isActive: boolean; onClick: () => void; }> = ({ label, isActive, onClick }) => {
@@ -39,10 +47,31 @@ const StatusBadge: React.FC<{ status: PaymentStatus }> = ({ status }) => {
     );
 }
 
-const AttendeeList: React.FC<AttendeeListProps> = ({ attendees, onSelectAttendee, onAddAttendee, onLogout }) => {
-    const [searchQuery, setSearchQuery] = useState('');
-    const [statusFilter, setStatusFilter] = useState<'all' | PaymentStatus>('all');
-    const [packageFilter, setPackageFilter] = useState<'all' | PackageType>('all');
+const AttendeeList: React.FC<AttendeeListProps> = ({ 
+    attendees, 
+    onSelectAttendee, 
+    onAddAttendee, 
+    onLogout,
+    searchQuery,
+    onSearchQueryChange,
+    statusFilter,
+    onStatusFilterChange,
+    packageFilter,
+    onPackageFilterChange,
+    scrollPosition,
+    onScrollPositionReset
+}) => {
+
+    useEffect(() => {
+        if (scrollPosition > 0) {
+            // Use a timeout to ensure the DOM has rendered before scrolling
+            setTimeout(() => {
+                window.scrollTo({ top: scrollPosition, behavior: 'auto' });
+                onScrollPositionReset(); // Reset after scrolling to prevent re-scrolling
+            }, 0);
+        }
+    }, [scrollPosition, onScrollPositionReset]);
+
 
     const filteredAttendees = attendees
         .filter(attendee =>
@@ -85,7 +114,7 @@ const AttendeeList: React.FC<AttendeeListProps> = ({ attendees, onSelectAttendee
                         type="search"
                         placeholder="Buscar por nome..."
                         value={searchQuery}
-                        onChange={(e) => setSearchQuery(e.target.value)}
+                        onChange={(e) => onSearchQueryChange(e.target.value)}
                         className="w-full pl-10 pr-4 py-2 bg-zinc-100 border border-transparent rounded-full focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent"
                         autoComplete="off"
                     />
@@ -97,15 +126,15 @@ const AttendeeList: React.FC<AttendeeListProps> = ({ attendees, onSelectAttendee
                 <div className="space-y-3 md:flex md:space-y-0 md:gap-6">
                     <div className="flex gap-2 items-center overflow-x-auto pb-1">
                         <span className="text-sm font-medium text-zinc-500 flex-shrink-0">Status:</span>
-                        <FilterPill label="Todos" isActive={statusFilter === 'all'} onClick={() => setStatusFilter('all')} />
-                        <FilterPill label={PaymentStatus.PAGO} isActive={statusFilter === PaymentStatus.PAGO} onClick={() => setStatusFilter(PaymentStatus.PAGO)} />
-                        <FilterPill label={PaymentStatus.PENDENTE} isActive={statusFilter === PaymentStatus.PENDENTE} onClick={() => setStatusFilter(PaymentStatus.PENDENTE)} />
+                        <FilterPill label="Todos" isActive={statusFilter === 'all'} onClick={() => onStatusFilterChange('all')} />
+                        <FilterPill label={PaymentStatus.PAGO} isActive={statusFilter === PaymentStatus.PAGO} onClick={() => onStatusFilterChange(PaymentStatus.PAGO)} />
+                        <FilterPill label={PaymentStatus.PENDENTE} isActive={statusFilter === PaymentStatus.PENDENTE} onClick={() => onStatusFilterChange(PaymentStatus.PENDENTE)} />
                     </div>
                      <div className="flex gap-2 items-center overflow-x-auto pb-1">
                         <span className="text-sm font-medium text-zinc-500 flex-shrink-0">Pacote:</span>
-                        <FilterPill label="Todos" isActive={packageFilter === 'all'} onClick={() => setPackageFilter('all')} />
-                        <FilterPill label={PackageType.SITIO_ONLY} isActive={packageFilter === PackageType.SITIO_ONLY} onClick={() => setPackageFilter(PackageType.SITIO_ONLY)} />
-                        <FilterPill label={PackageType.SITIO_BUS} isActive={packageFilter === PackageType.SITIO_BUS} onClick={() => setPackageFilter(PackageType.SITIO_BUS)} />
+                        <FilterPill label="Todos" isActive={packageFilter === 'all'} onClick={() => onPackageFilterChange('all')} />
+                        <FilterPill label={PackageType.SITIO_ONLY} isActive={packageFilter === PackageType.SITIO_ONLY} onClick={() => onPackageFilterChange(PackageType.SITIO_ONLY)} />
+                        <FilterPill label={PackageType.SITIO_BUS} isActive={packageFilter === PackageType.SITIO_BUS} onClick={() => onPackageFilterChange(PackageType.SITIO_BUS)} />
                     </div>
                 </div>
 

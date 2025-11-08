@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { useAttendees } from './hooks/useAttendees';
 import type { View, Attendee, AttendeeFormData } from './types';
-import { PaymentStatus } from './types';
+import { PaymentStatus, PackageType } from './types';
 import AttendeeList from './components/AttendeeList';
 import AttendeeDetail from './components/AttendeeDetail';
 import AddAttendeeForm from './components/AddAttendeeForm';
@@ -21,6 +21,12 @@ const App: React.FC = () => {
     const [selectedAttendeeId, setSelectedAttendeeId] = useState<string | null>(null);
     const [attendeeToDelete, setAttendeeToDelete] = useState<Attendee | null>(null);
     const [attendeePaymentToDelete, setAttendeePaymentToDelete] = useState<Attendee | null>(null);
+
+    // State for list persistence
+    const [searchQuery, setSearchQuery] = useState('');
+    const [statusFilter, setStatusFilter] = useState<'all' | PaymentStatus>('all');
+    const [packageFilter, setPackageFilter] = useState<'all' | PackageType>('all');
+    const [scrollPosition, setScrollPosition] = useState(0);
 
     useEffect(() => {
         const loggedIn = sessionStorage.getItem('isAuthenticated') === 'true';
@@ -46,6 +52,7 @@ const App: React.FC = () => {
     }, [attendees, selectedAttendeeId]);
 
     const handleSelectAttendee = (id: string) => {
+        setScrollPosition(window.scrollY); // Store scroll position before navigating
         setSelectedAttendeeId(id);
         setView('detail');
     };
@@ -151,7 +158,22 @@ const App: React.FC = () => {
                 return <InfoPage onLogout={handleLogout} />;
             case 'list':
             default:
-                return <AttendeeList attendees={attendees} onSelectAttendee={handleSelectAttendee} onAddAttendee={handleAddAttendeeClick} onLogout={handleLogout} />;
+                return (
+                    <AttendeeList 
+                        attendees={attendees} 
+                        onSelectAttendee={handleSelectAttendee} 
+                        onAddAttendee={handleAddAttendeeClick} 
+                        onLogout={handleLogout}
+                        searchQuery={searchQuery}
+                        onSearchQueryChange={setSearchQuery}
+                        statusFilter={statusFilter}
+                        onStatusFilterChange={setStatusFilter}
+                        packageFilter={packageFilter}
+                        onPackageFilterChange={setPackageFilter}
+                        scrollPosition={scrollPosition}
+                        onScrollPositionReset={() => setScrollPosition(0)}
+                    />
+                );
         }
     };
 

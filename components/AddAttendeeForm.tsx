@@ -55,6 +55,7 @@ const AddAttendeeForm: React.FC<AddAttendeeFormProps> = ({ onAddAttendee, onUpda
                 paymentAmount: attendeeToEdit.payment.amount.toFixed(2),
                 registerPaymentNow: false,
                 paymentDate: new Date().toISOString().split('T')[0],
+                paymentDateNotInformed: false,
                 paymentType: PaymentType.PIX_CONTA,
             };
         }
@@ -66,6 +67,7 @@ const AddAttendeeForm: React.FC<AddAttendeeFormProps> = ({ onAddAttendee, onUpda
             paymentAmount: '120.00',
             registerPaymentNow: false,
             paymentDate: new Date().toISOString().split('T')[0],
+            paymentDateNotInformed: false,
             paymentType: PaymentType.PIX_CONTA,
         };
     });
@@ -260,11 +262,22 @@ const AddAttendeeForm: React.FC<AddAttendeeFormProps> = ({ onAddAttendee, onUpda
                                             name="paymentDate"
                                             value={formState.paymentDate}
                                             onChange={handleInputChange}
-                                            className="mt-1 block w-full px-3 py-2 bg-white border border-zinc-300 rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500 sm:text-sm"
-                                            required
+                                            className="mt-1 block w-full px-3 py-2 bg-white border border-zinc-300 rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500 sm:text-sm disabled:bg-zinc-100"
+                                            required={!formState.paymentDateNotInformed}
+                                            disabled={formState.paymentDateNotInformed}
                                             autoComplete="off"
                                         />
-                                        {formattedDisplayDate && (
+                                         <label className="flex items-center space-x-2 mt-2 cursor-pointer w-fit">
+                                            <input
+                                                type="checkbox"
+                                                name="paymentDateNotInformed"
+                                                checked={formState.paymentDateNotInformed}
+                                                onChange={handleInputChange}
+                                                className="h-4 w-4 rounded border-zinc-300 text-green-600 focus:ring-green-500"
+                                            />
+                                            <span className="text-sm text-zinc-700">Data não informada</span>
+                                        </label>
+                                        {formattedDisplayDate && !formState.paymentDateNotInformed && (
                                             <p className="mt-2 text-sm text-center text-zinc-600 bg-zinc-100 p-2 rounded-md border border-zinc-200">
                                                 Confirmação: <strong className="font-bold text-green-700">{formattedDisplayDate} (dd/mm/aaaa)</strong>
                                             </p>

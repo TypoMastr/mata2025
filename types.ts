@@ -49,6 +49,7 @@ export interface AttendeeFormData {
     paymentAmount: string;
     registerPaymentNow: boolean;
     paymentDate: string;
+    paymentDateNotInformed: boolean;
     paymentType: PaymentType;
 }
 

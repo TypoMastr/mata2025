@@ -24,6 +24,7 @@ const RegisterPaymentForm: React.FC<RegisterPaymentFormProps> = ({ attendee, onR
             ? new Date(attendee.payment.date).toISOString().split('T')[0] 
             : new Date().toISOString().split('T')[0]
     );
+    const [dateNotInformed, setDateNotInformed] = useState(isEditMode && !attendee.payment.date);
     const [paymentType, setPaymentType] = useState<PaymentType>(attendee.payment.type || PaymentType.PIX_CONTA);
     const [receipt, setReceipt] = useState<string | null>(attendee.payment.receiptUrl);
     const [fileName, setFileName] = useState<string>('');
@@ -71,7 +72,7 @@ const RegisterPaymentForm: React.FC<RegisterPaymentFormProps> = ({ attendee, onR
                 payment: {
                     ...attendee.payment,
                     status: PaymentStatus.PAGO,
-                    date: new Date(paymentDate + 'T00:00:00Z').toISOString(),
+                    date: dateNotInformed ? undefined : new Date(paymentDate + 'T00:00:00Z').toISOString(),
                     type: paymentType,
                     receiptUrl: receipt,
                 },
@@ -118,11 +119,21 @@ const RegisterPaymentForm: React.FC<RegisterPaymentFormProps> = ({ attendee, onR
                                 name="paymentDate"
                                 value={paymentDate}
                                 onChange={(e) => setPaymentDate(e.target.value)}
-                                className="mt-1 block w-full px-3 py-2 bg-white border border-zinc-300 rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500 sm:text-sm"
-                                required
+                                className="mt-1 block w-full px-3 py-2 bg-white border border-zinc-300 rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500 sm:text-sm disabled:bg-zinc-100"
+                                required={!dateNotInformed}
+                                disabled={dateNotInformed}
                                 autoComplete="off"
                             />
-                            {formattedDisplayDate && (
+                             <label className="flex items-center space-x-2 mt-2 cursor-pointer w-fit">
+                                <input
+                                    type="checkbox"
+                                    checked={dateNotInformed}
+                                    onChange={(e) => setDateNotInformed(e.target.checked)}
+                                    className="h-4 w-4 rounded border-zinc-300 text-green-600 focus:ring-green-500"
+                                />
+                                <span className="text-sm text-zinc-700">Data não informada</span>
+                            </label>
+                            {formattedDisplayDate && !dateNotInformed && (
                                 <p className="mt-2 text-sm text-center text-zinc-600 bg-zinc-100 p-2 rounded-md border border-zinc-200">
                                     Confirmação: <strong className="font-bold text-green-700">{formattedDisplayDate} (dd/mm/aaaa)</strong>
                                 </p>

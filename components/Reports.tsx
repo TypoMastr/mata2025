@@ -1,7 +1,9 @@
+
 import React, { useState, useMemo } from 'react';
 import type { Attendee, ReportConfig, ReportField } from '../types';
 import { PackageType, PaymentStatus, DocumentType, PaymentType } from '../types';
 import { formatDocument, getDocumentType } from '../utils/formatters';
+import { levenshteinDistance } from '../utils/stringSimilarity';
 
 // --- Componente: Modal de Opções de Compartilhamento ---
 const ShareOptionsModal: React.FC<{
@@ -450,9 +452,60 @@ const ZeroDocList: React.FC<ZeroDocListProps> = ({ attendees, onBack, onUpdateAt
     );
 };
 
+// --- Componente: Verificador de Duplicatas ---
+interface DuplicateCheckerViewProps {
+    groups: Attendee[][];
+    onBack: () => void;
+    onSelectAttendee: (id: string) => void;
+}
+
+const DuplicateCheckerView: React.FC<DuplicateCheckerViewProps> = ({ groups, onBack, onSelectAttendee }) => {
+    return (
+        <div className="animate-fadeIn">
+            <header className="sticky top-0 md:static bg-white z-10 p-4 md:pt-6 border-b border-zinc-200 flex items-center gap-4">
+                <button onClick={onBack} className="text-zinc-500 hover:text-zinc-800 p-1 rounded-full hover:bg-zinc-100">
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>
+                </button>
+                <h1 className="text-xl md:text-2xl font-bold text-zinc-800">Verificar Duplicatas ({groups.length})</h1>
+            </header>
+            <main className="p-4 space-y-4">
+                 <div className="bg-blue-50 border border-blue-200 text-blue-800 p-3 rounded-lg text-sm">
+                    <p>Foram encontrados {groups.length} grupos com nomes idênticos ou muito parecidos. Verifique se são inscrições duplicadas.</p>
+                </div>
+
+                {groups.length > 0 ? (
+                    groups.map((group, index) => (
+                         <div key={index} className="bg-white p-4 rounded-xl border border-zinc-200 shadow-sm opacity-0 animate-fadeInUp" style={{ animationDelay: `${index * 50}ms`, animationFillMode: 'forwards' }}>
+                            <h2 className="font-bold text-zinc-800 mb-2">Potencial Duplicidade #{index + 1}</h2>
+                            <div className="space-y-2">
+                                {group.map(attendee => (
+                                    <button key={attendee.id} onClick={() => onSelectAttendee(attendee.id)} className="w-full text-left p-3 bg-zinc-50 rounded-lg hover:bg-zinc-100 transition-colors flex justify-between items-center border border-zinc-200">
+                                        <div>
+                                            <p className="font-semibold text-zinc-900">{attendee.name}</p>
+                                            <p className="text-xs text-zinc-500 mt-1">{attendee.document} &bull; {attendee.phone}</p>
+                                        </div>
+                                        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-zinc-400" viewBox="0 0 20 20" fill="currentColor">
+                                            <path fillRule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clipRule="evenodd" />
+                                        </svg>
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+                    ))
+                ) : (
+                    <div className="text-center text-zinc-500 py-12">
+                        <p className="font-semibold">Nenhuma duplicidade encontrada!</p>
+                        <p className="mt-1 text-sm">Não foram encontrados nomes similares ou repetidos. ✨</p>
+                    </div>
+                )}
+            </main>
+        </div>
+    );
+};
+
 // --- Componente: Painel Principal de Relatórios ---
-const StatCard: React.FC<{ title: string; children: React.ReactNode; icon: React.ReactElement; className?: string, delay: number }> = ({ title, children, icon, className = '', delay }) => (
-    <div className={`bg-white p-4 rounded-xl border border-zinc-200 shadow-sm opacity-0 animate-fadeInUp ${className}`} style={{ animationDelay: `${delay}ms`, animationFillMode: 'forwards' }}>
+const StatCard: React.FC<{ title: string; children: React.ReactNode; icon: React.ReactElement; className?: string, delay: number, onClick?: () => void }> = ({ title, children, icon, className = '', delay, onClick }) => (
+    <div onClick={onClick} className={`bg-white p-4 rounded-xl border border-zinc-200 shadow-sm opacity-0 animate-fadeInUp ${className} ${onClick ? 'cursor-pointer hover:border-zinc-300 hover:bg-zinc-50 transition-colors' : ''}`} style={{ animationDelay: `${delay}ms`, animationFillMode: 'forwards' }}>
         <div className="flex items-center gap-3 mb-3"><div className="text-green-500">{icon}</div><h2 className="text-md font-bold text-zinc-800">{title}</h2></div>
         <div className="space-y-3">{children}</div>
     </div>
@@ -462,8 +515,8 @@ const ProgressBar: React.FC<{ value: number; max: number; colorClass?: string }>
     return (<div className="w-full bg-zinc-200 rounded-full h-2"><div className={`${colorClass} h-2 rounded-full transition-all duration-500`} style={{ width: `${percentage}%` }}></div></div>);
 };
 
-const ReportsDashboard: React.FC<{ attendees: Attendee[]; onGenerateReportClick: () => void; onLogout: () => void; onFixDocsClick: () => void; }> = ({ attendees, onGenerateReportClick, onLogout, onFixDocsClick }) => {
-    const { totalAttendees, paidCount, pendingCount, totalRevenue, pendingRevenue, totalPossibleRevenue, buses, sitioOnlyCount, zeroDocAttendees, paymentStats } = useMemo(() => {
+const ReportsDashboard: React.FC<{ attendees: Attendee[]; onGenerateReportClick: () => void; onLogout: () => void; onFixDocsClick: () => void; onCheckDuplicatesClick: () => void; zeroDocCount: number; duplicateGroupCount: number; }> = ({ attendees, onGenerateReportClick, onLogout, onFixDocsClick, onCheckDuplicatesClick, zeroDocCount, duplicateGroupCount }) => {
+    const { totalAttendees, paidCount, pendingCount, totalRevenue, pendingRevenue, totalPossibleRevenue, buses, sitioOnlyCount, paymentStats } = useMemo(() => {
         const busAttendees = attendees.filter(a => a.packageType === PackageType.SITIO_BUS);
         const BUS_CAPACITY = 50;
         const busCount = Math.ceil(busAttendees.length / BUS_CAPACITY) || (busAttendees.length > 0 ? 1 : 0);
@@ -471,13 +524,11 @@ const ReportsDashboard: React.FC<{ attendees: Attendee[]; onGenerateReportClick:
         const paidAttendees = attendees.filter(a => a.payment.status === PaymentStatus.PAGO);
         const paidCountValue = paidAttendees.length;
 
-        // Initialize stats for all possible payment types to ensure they all appear in the report.
         const calculatedPaymentStats = (Object.values(PaymentType) as PaymentType[]).reduce((acc, type) => {
             acc[type] = { count: 0, total: 0 };
             return acc;
         }, {} as Record<PaymentType, { count: number; total: number }>);
 
-        // Populate stats with actual payment data.
         paidAttendees
             .filter(a => a.payment.type && calculatedPaymentStats.hasOwnProperty(a.payment.type))
             .forEach(attendee => {
@@ -486,7 +537,6 @@ const ReportsDashboard: React.FC<{ attendees: Attendee[]; onGenerateReportClick:
                 calculatedPaymentStats[type].total += attendee.payment.amount;
             });
         
-        // Sort by count (desc), then by total amount (desc) for consistent ordering.
         const sortedPaymentStats = Object.entries(calculatedPaymentStats)
             .sort(([, a], [, b]) => {
                 const statsA = a as { count: number; total: number };
@@ -510,7 +560,6 @@ const ReportsDashboard: React.FC<{ attendees: Attendee[]; onGenerateReportClick:
                 return { busNumber: i + 1, filledSeats, remainingSeats: BUS_CAPACITY - filledSeats, capacity: BUS_CAPACITY };
             }),
             sitioOnlyCount: attendees.filter(a => a.packageType === PackageType.SITIO_ONLY).length,
-            zeroDocAttendees: attendees.filter(a => /^0+$/.test(a.document.replace(/[^\d]/g, ''))),
             paymentStats: sortedPaymentStats
         };
     }, [attendees]);
@@ -522,6 +571,7 @@ const ReportsDashboard: React.FC<{ attendees: Attendee[]; onGenerateReportClick:
     const IconClipboardList = <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" /></svg>;
     const IconWarning = <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>;
     const IconCreditCard = <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" /></svg>;
+    const IconDuplicate = <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" /></svg>;
     
     return (
         <div className="pb-4 animate-fadeIn">
@@ -547,19 +597,28 @@ const ReportsDashboard: React.FC<{ attendees: Attendee[]; onGenerateReportClick:
                 </StatCard>
                 <StatCard title="Financeiro" icon={IconDollar} delay={150}><div className="flex justify-between items-baseline"><span className="font-bold text-3xl text-zinc-800">R$ {totalRevenue.toFixed(2).replace('.',',')}</span><span className="text-sm font-semibold text-zinc-500">Arrecadado</span></div><ProgressBar value={totalRevenue} max={totalPossibleRevenue} /><div className="flex justify-between text-sm"><span className="font-semibold text-zinc-500">Pendente: R$ {pendingRevenue.toFixed(2).replace('.',',')}</span></div></StatCard>
                 
-                {zeroDocAttendees.length > 0 && (
-                    <div onClick={onFixDocsClick} className="cursor-pointer md:col-span-2 lg:col-span-1">
-                        <StatCard title="Documentos Pendentes" icon={IconWarning} delay={200} className="bg-yellow-50 border-yellow-300 h-full">
-                           <div className="flex justify-between items-baseline">
-                                <span className="font-bold text-3xl text-yellow-800">{zeroDocAttendees.length}</span>
-                                <span className="text-sm font-semibold text-yellow-700">{zeroDocAttendees.length === 1 ? 'Inscrito' : 'Inscritos'}</span>
-                            </div>
-                            <p className="text-xs text-yellow-700">Com documento '000...'. Clique aqui para corrigir.</p>
-                        </StatCard>
-                    </div>
+                {zeroDocCount > 0 && (
+                    <StatCard onClick={onFixDocsClick} title="Documentos Pendentes" icon={IconWarning} delay={200} className="bg-yellow-50 border-yellow-300 h-full">
+                        <div className="flex justify-between items-baseline">
+                            <span className="font-bold text-3xl text-yellow-800">{zeroDocCount}</span>
+                            <span className="text-sm font-semibold text-yellow-700">{zeroDocCount === 1 ? 'Inscrito' : 'Inscritos'}</span>
+                        </div>
+                        <p className="text-xs text-yellow-700">Com documento '000...'. Clique aqui para corrigir.</p>
+                    </StatCard>
                 )}
-                {buses.map((bus, index) => (<StatCard key={bus.busNumber} title={`Ônibus ${bus.busNumber}`} icon={IconBus} delay={225 + index * 50}><div className="flex justify-between items-baseline"><span className="font-bold text-3xl text-zinc-800">{bus.filledSeats}</span><span className="text-sm font-semibold text-zinc-500">/ {bus.capacity} vagas</span></div><ProgressBar value={bus.filledSeats} max={bus.capacity} colorClass="bg-blue-500" /><div className="flex justify-between text-sm"><span className="font-semibold text-blue-600">{bus.filledSeats} {bus.filledSeats === 1 ? 'Preenchida' : 'Preenchidas'}</span><span className="font-semibold text-zinc-500">{bus.remainingSeats} {bus.remainingSeats === 1 ? 'Restante' : 'Restantes'}</span></div></StatCard>))}
-                <StatCard title="Apenas Sítio" icon={IconHome} delay={225 + (buses.length * 50)}>
+
+                {duplicateGroupCount > 0 && (
+                     <StatCard onClick={onCheckDuplicatesClick} title="Nomes Duplicados" icon={IconDuplicate} delay={250} className="bg-blue-50 border-blue-300 h-full">
+                        <div className="flex justify-between items-baseline">
+                            <span className="font-bold text-3xl text-blue-800">{duplicateGroupCount}</span>
+                            <span className="text-sm font-semibold text-blue-700">{duplicateGroupCount === 1 ? 'Grupo' : 'Grupos'}</span>
+                        </div>
+                        <p className="text-xs text-blue-700">Nomes idênticos ou parecidos foram encontrados. Clique para verificar.</p>
+                    </StatCard>
+                )}
+
+                {buses.map((bus, index) => (<StatCard key={bus.busNumber} title={`Ônibus ${bus.busNumber}`} icon={IconBus} delay={300 + index * 50}><div className="flex justify-between items-baseline"><span className="font-bold text-3xl text-zinc-800">{bus.filledSeats}</span><span className="text-sm font-semibold text-zinc-500">/ {bus.capacity} vagas</span></div><ProgressBar value={bus.filledSeats} max={bus.capacity} colorClass="bg-blue-500" /><div className="flex justify-between text-sm"><span className="font-semibold text-blue-600">{bus.filledSeats} {bus.filledSeats === 1 ? 'Preenchida' : 'Preenchidas'}</span><span className="font-semibold text-zinc-500">{bus.remainingSeats} {bus.remainingSeats === 1 ? 'Restante' : 'Restantes'}</span></div></StatCard>))}
+                <StatCard title="Apenas Sítio" icon={IconHome} delay={325 + (buses.length * 50)}>
                     <div className="flex justify-between items-baseline">
                         <span className="font-bold text-3xl text-zinc-800">{sitioOnlyCount}</span>
                         <span className="text-sm font-semibold text-zinc-500">{sitioOnlyCount === 1 ? 'Inscrito' : 'Inscritos'}</span>
@@ -568,10 +627,9 @@ const ReportsDashboard: React.FC<{ attendees: Attendee[]; onGenerateReportClick:
                         Não há limite de vagas para este pacote.
                     </div>
                 </StatCard>
-                <StatCard title="Formas de Pagamento" icon={IconCreditCard} delay={250 + (buses.length * 50)}>
+                <StatCard title="Formas de Pagamento" icon={IconCreditCard} delay={350 + (buses.length * 50)}>
                     {paidCount > 0 ? (
                         <div className="space-y-3">
-                            {/* FIX: Cast the result of Object.entries to fix TypeScript errors where properties on `stats` are not found on type `unknown`. */}
                             {(Object.entries(paymentStats) as [string, { count: number; total: number }][]).map(([type, stats]) => (
                                 <div key={type} className="text-sm">
                                     <div className="flex justify-between font-semibold text-zinc-800 mb-1">
@@ -592,7 +650,7 @@ const ReportsDashboard: React.FC<{ attendees: Attendee[]; onGenerateReportClick:
                         </div>
                     )}
                 </StatCard>
-                <StatCard title="Relatórios Personalizados" icon={IconClipboardList} delay={300 + (buses.length * 50)} className="md:col-span-2 lg:col-span-3"><p className="text-sm text-zinc-600">Crie relatórios com filtros e campos específicos. Exporte em PDF, imprima ou compartilhe.</p><button onClick={onGenerateReportClick} className="mt-2 w-full bg-blue-500 text-white font-bold py-2 px-4 rounded-full hover:bg-blue-600 transition-colors shadow-sm flex items-center justify-center gap-2">Gerar Relatório</button></StatCard>
+                <StatCard title="Relatórios Personalizados" icon={IconClipboardList} delay={400 + (buses.length * 50)} className="md:col-span-2 lg:col-span-3"><p className="text-sm text-zinc-600">Crie relatórios com filtros e campos específicos. Exporte em PDF, imprima ou compartilhe.</p><button onClick={onGenerateReportClick} className="mt-2 w-full bg-blue-500 text-white font-bold py-2 px-4 rounded-full hover:bg-blue-600 transition-colors shadow-sm flex items-center justify-center gap-2">Gerar Relatório</button></StatCard>
             </div>
         </div>
     );
@@ -603,15 +661,49 @@ interface ReportsProps {
     attendees: Attendee[];
     onLogout: () => void;
     onUpdateAttendee: (attendee: Attendee) => Promise<void>;
+    onSelectAttendee: (id: string) => void;
 }
 
-const Reports: React.FC<ReportsProps> = ({ attendees, onLogout, onUpdateAttendee }) => {
-    const [mode, setMode] = useState<'dashboard' | 'form' | 'preview' | 'zeroDoc'>('dashboard');
+const Reports: React.FC<ReportsProps> = ({ attendees, onLogout, onUpdateAttendee, onSelectAttendee }) => {
+    const [mode, setMode] = useState<'dashboard' | 'form' | 'preview' | 'zeroDoc' | 'duplicateCheck'>('dashboard');
     const [reportConfig, setReportConfig] = useState<ReportConfig | null>(null);
     const [reportData, setReportData] = useState<Attendee[]>([]);
 
     const zeroDocAttendees = useMemo(() => {
         return attendees.filter(a => /^0+$/.test(a.document.replace(/[^\d]/g, '')));
+    }, [attendees]);
+
+    const potentialDuplicates = useMemo(() => {
+        if (attendees.length < 2) return [];
+
+        const normalize = (str: string) => str.toLowerCase().trim().replace(/\s+/g, ' ');
+
+        const groups: Attendee[][] = [];
+        const processedIds = new Set<string>();
+
+        for (let i = 0; i < attendees.length; i++) {
+            if (processedIds.has(attendees[i].id)) continue;
+
+            const currentGroup: Attendee[] = [attendees[i]];
+            const name1 = normalize(attendees[i].name);
+
+            for (let j = i + 1; j < attendees.length; j++) {
+                if (processedIds.has(attendees[j].id)) continue;
+
+                const name2 = normalize(attendees[j].name);
+                
+                // Group if names are identical or very similar (distance <= 2 for typos)
+                if (name1 === name2 || levenshteinDistance(name1, name2) <= 2) {
+                    currentGroup.push(attendees[j]);
+                }
+            }
+
+            if (currentGroup.length > 1) {
+                groups.push(currentGroup);
+                currentGroup.forEach(a => processedIds.add(a.id));
+            }
+        }
+        return groups;
     }, [attendees]);
 
     const handleGenerate = (config: ReportConfig) => {
@@ -637,7 +729,19 @@ const Reports: React.FC<ReportsProps> = ({ attendees, onLogout, onUpdateAttendee
         return <ZeroDocList attendees={zeroDocAttendees} onBack={() => setMode('dashboard')} onUpdateAttendee={onUpdateAttendee} />;
     }
 
-    return <ReportsDashboard attendees={attendees} onGenerateReportClick={() => setMode('form')} onLogout={onLogout} onFixDocsClick={() => setMode('zeroDoc')} />;
+    if (mode === 'duplicateCheck') {
+        return <DuplicateCheckerView groups={potentialDuplicates} onBack={() => setMode('dashboard')} onSelectAttendee={onSelectAttendee} />;
+    }
+
+    return <ReportsDashboard 
+        attendees={attendees} 
+        onGenerateReportClick={() => setMode('form')} 
+        onLogout={onLogout} 
+        onFixDocsClick={() => setMode('zeroDoc')}
+        onCheckDuplicatesClick={() => setMode('duplicateCheck')}
+        zeroDocCount={zeroDocAttendees.length}
+        duplicateGroupCount={potentialDuplicates.length}
+    />;
 };
 
 export default Reports;

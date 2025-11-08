@@ -1,3 +1,4 @@
+
 import React, { useState, useMemo, useEffect } from 'react';
 import { useAttendees } from './hooks/useAttendees';
 import type { View, Attendee, AttendeeFormData } from './types';
@@ -18,6 +19,7 @@ const App: React.FC = () => {
     const { attendees, isLoading, addAttendee, updateAttendee, deleteAttendee } = useAttendees();
     const [isAuthenticated, setIsAuthenticated] = useState(false);
     const [view, setView] = useState<View>('list');
+    const [previousView, setPreviousView] = useState<View>('list');
     const [selectedAttendeeId, setSelectedAttendeeId] = useState<string | null>(null);
     const [attendeeToDelete, setAttendeeToDelete] = useState<Attendee | null>(null);
     const [attendeePaymentToDelete, setAttendeePaymentToDelete] = useState<Attendee | null>(null);
@@ -52,19 +54,23 @@ const App: React.FC = () => {
     }, [attendees, selectedAttendeeId]);
 
     const handleSelectAttendee = (id: string) => {
+        if (view !== 'detail') {
+            setPreviousView(view);
+        }
         setScrollPosition(window.scrollY); // Store scroll position before navigating
         setSelectedAttendeeId(id);
         setView('detail');
     };
 
     const handleAddAttendeeClick = () => {
+        setPreviousView('list');
         setSelectedAttendeeId(null);
         setView('form');
     };
 
     const handleCancel = () => {
         setSelectedAttendeeId(null);
-        setView('list');
+        setView(previousView);
     };
     
     const handleEdit = () => {
@@ -153,7 +159,7 @@ const App: React.FC = () => {
             case 'editPayment':
                 return selectedAttendee && <RegisterPaymentForm attendee={selectedAttendee} onRegisterPayment={handleRegisterPayment} onCancel={() => setView('detail')} onDeletePayment={handleDeletePaymentRequest} />;
              case 'reports':
-                return <Reports attendees={attendees} onLogout={handleLogout} onUpdateAttendee={updateAttendee} />;
+                return <Reports attendees={attendees} onLogout={handleLogout} onUpdateAttendee={updateAttendee} onSelectAttendee={handleSelectAttendee} />;
              case 'info':
                 return <InfoPage onLogout={handleLogout} />;
             case 'list':

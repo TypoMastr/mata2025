@@ -55,7 +55,7 @@ const AddAttendeeForm: React.FC<AddAttendeeFormProps> = ({ onAddAttendee, onUpda
                 paymentAmount: attendeeToEdit.payment.amount.toFixed(2),
                 registerPaymentNow: false,
                 paymentDate: new Date().toISOString().split('T')[0],
-                paymentType: PaymentType.PIX_MAQUINA,
+                paymentType: PaymentType.PIX_CONTA,
             };
         }
         return {
@@ -66,7 +66,7 @@ const AddAttendeeForm: React.FC<AddAttendeeFormProps> = ({ onAddAttendee, onUpda
             paymentAmount: '120.00',
             registerPaymentNow: false,
             paymentDate: new Date().toISOString().split('T')[0],
-            paymentType: PaymentType.PIX_MAQUINA,
+            paymentType: PaymentType.PIX_CONTA,
         };
     });
 
@@ -281,10 +281,11 @@ const AddAttendeeForm: React.FC<AddAttendeeFormProps> = ({ onAddAttendee, onUpda
                                             required
                                             autoComplete="off"
                                         >
-                                            <option value={PaymentType.PIX_MAQUINA}>PIX (Máquina)</option>
                                             <option value={PaymentType.PIX_CONTA}>PIX (Conta)</option>
+                                            <option value={PaymentType.PIX_MAQUINA}>PIX (Máquina)</option>
                                             <option value={PaymentType.DEBITO}>Débito</option>
                                             <option value={PaymentType.CREDITO}>Crédito</option>
+                                            <option value={PaymentType.DINHEIRO}>Dinheiro</option>
                                         </select>
                                     </div>
                                 </div>

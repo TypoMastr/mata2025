@@ -471,21 +471,31 @@ const ReportsDashboard: React.FC<{ attendees: Attendee[]; onGenerateReportClick:
         const paidAttendees = attendees.filter(a => a.payment.status === PaymentStatus.PAGO);
         const paidCountValue = paidAttendees.length;
 
-        const calculatedPaymentStats = paidAttendees
-            .filter(a => a.payment.type) // Ensure payment type exists
-            .reduce((acc, attendee) => {
+        // Initialize stats for all possible payment types to ensure they all appear in the report.
+        const calculatedPaymentStats = (Object.values(PaymentType) as PaymentType[]).reduce((acc, type) => {
+            acc[type] = { count: 0, total: 0 };
+            return acc;
+        }, {} as Record<PaymentType, { count: number; total: number }>);
+
+        // Populate stats with actual payment data.
+        paidAttendees
+            .filter(a => a.payment.type && calculatedPaymentStats.hasOwnProperty(a.payment.type))
+            .forEach(attendee => {
                 const type = attendee.payment.type!;
-                if (!acc[type]) {
-                    acc[type] = { count: 0, total: 0 };
-                }
-                acc[type].count += 1;
-                acc[type].total += attendee.payment.amount;
-                return acc;
-            }, {} as Record<PaymentType, { count: number; total: number }>);
+                calculatedPaymentStats[type].count += 1;
+                calculatedPaymentStats[type].total += attendee.payment.amount;
+            });
         
-        // FIX: Cast `a` and `b` to fix TypeScript error where `count` property is not found on type `unknown`.
+        // Sort by count (desc), then by total amount (desc) for consistent ordering.
         const sortedPaymentStats = Object.entries(calculatedPaymentStats)
-            .sort(([, a], [, b]) => (b as { count: number }).count - (a as { count: number }).count)
+            .sort(([, a], [, b]) => {
+                const statsA = a as { count: number; total: number };
+                const statsB = b as { count: number; total: number };
+                if (statsB.count !== statsA.count) {
+                    return statsB.count - statsA.count;
+                }
+                return statsB.total - statsA.total;
+            })
             .reduce((r, [k, v]) => ({ ...r, [k as PaymentType]: v }), {} as Record<PaymentType, { count: number; total: number }>);
 
         return {
@@ -559,7 +569,7 @@ const ReportsDashboard: React.FC<{ attendees: Attendee[]; onGenerateReportClick:
                     </div>
                 </StatCard>
                 <StatCard title="Formas de Pagamento" icon={IconCreditCard} delay={250 + (buses.length * 50)}>
-                    {Object.keys(paymentStats).length > 0 ? (
+                    {paidCount > 0 ? (
                         <div className="space-y-3">
                             {/* FIX: Cast the result of Object.entries to fix TypeScript errors where properties on `stats` are not found on type `unknown`. */}
                             {(Object.entries(paymentStats) as [string, { count: number; total: number }][]).map(([type, stats]) => (

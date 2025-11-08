@@ -24,7 +24,7 @@ const RegisterPaymentForm: React.FC<RegisterPaymentFormProps> = ({ attendee, onR
             ? new Date(attendee.payment.date).toISOString().split('T')[0] 
             : new Date().toISOString().split('T')[0]
     );
-    const [paymentType, setPaymentType] = useState<PaymentType>(attendee.payment.type || PaymentType.PIX_MAQUINA);
+    const [paymentType, setPaymentType] = useState<PaymentType>(attendee.payment.type || PaymentType.PIX_CONTA);
     const [receipt, setReceipt] = useState<string | null>(attendee.payment.receiptUrl);
     const [fileName, setFileName] = useState<string>('');
     const [isSubmitting, setIsSubmitting] = useState(false);
@@ -139,10 +139,11 @@ const RegisterPaymentForm: React.FC<RegisterPaymentFormProps> = ({ attendee, onR
                                 required
                                 autoComplete="off"
                             >
-                                <option value={PaymentType.PIX_MAQUINA}>PIX (Máquina)</option>
                                 <option value={PaymentType.PIX_CONTA}>PIX (Conta)</option>
+                                <option value={PaymentType.PIX_MAQUINA}>PIX (Máquina)</option>
                                 <option value={PaymentType.DEBITO}>Débito</option>
                                 <option value={PaymentType.CREDITO}>Crédito</option>
+                                <option value={PaymentType.DINHEIRO}>Dinheiro</option>
                             </select>
                         </div>
                         <div className="opacity-0 animate-fadeInUp" style={getAnimationStyle(250)}>

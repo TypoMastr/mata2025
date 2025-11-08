@@ -19,6 +19,7 @@ export enum PaymentType {
     PIX_MAQUINA = 'PIX (Máquina)',
     DEBITO = 'Débito',
     CREDITO = 'Crédito',
+    DINHEIRO = 'Dinheiro',
 }
 
 export interface Payment {

@@ -670,7 +670,10 @@ const Reports: React.FC<ReportsProps> = ({ attendees, onLogout, onUpdateAttendee
     const [reportData, setReportData] = useState<Attendee[]>([]);
 
     const zeroDocAttendees = useMemo(() => {
-        return attendees.filter(a => /^0+$/.test(a.document.replace(/[^\d]/g, '')));
+        return attendees.filter(a =>
+            a.packageType === PackageType.SITIO_BUS &&
+            /^0+$/.test(a.document.replace(/[^\d]/g, ''))
+        );
     }, [attendees]);
 
     const potentialDuplicates = useMemo(() => {

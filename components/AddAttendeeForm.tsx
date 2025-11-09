@@ -79,6 +79,8 @@ const AddAttendeeForm: React.FC<AddAttendeeFormProps> = ({ onAddAttendee, onUpda
     const [submissionStatus, setSubmissionStatus] = useState<'idle' | 'submitting' | 'success' | 'error'>('idle');
     const [submissionError, setSubmissionError] = useState<string | null>(null);
 
+    const isDocumentRequired = useMemo(() => formState.packageType === PackageType.SITIO_BUS, [formState.packageType]);
+
     const formattedDisplayDate = useMemo(() => {
         if (!formState.paymentDate) return null;
         const [year, month, day] = formState.paymentDate.split('-').map(Number);
@@ -92,11 +94,22 @@ const AddAttendeeForm: React.FC<AddAttendeeFormProps> = ({ onAddAttendee, onUpda
     }, [formState.paymentDate]);
 
     useEffect(() => {
+        const updates: Partial<AttendeeFormData> = {};
         const newAmount = formState.packageType === PackageType.SITIO_ONLY ? '70.00' : '120.00';
+        
         if (formState.paymentAmount !== newAmount) {
-            setFormState(prev => ({ ...prev, paymentAmount: newAmount }));
+            updates.paymentAmount = newAmount;
         }
-    }, [formState.packageType, formState.paymentAmount]);
+        if (!isDocumentRequired && formState.document !== '') {
+            updates.document = '';
+            setDocType(DocumentType.OUTRO);
+        }
+
+        if (Object.keys(updates).length > 0) {
+            setFormState(prev => ({ ...prev, ...updates }));
+        }
+    }, [formState.packageType, formState.paymentAmount, formState.document, isDocumentRequired]);
+
 
     // FIX: Safely handle checkbox changes by checking the event target's type before accessing the `checked` property.
     // This resolves a TypeScript error and ensures correct type inference for the form state.
@@ -125,8 +138,10 @@ const AddAttendeeForm: React.FC<AddAttendeeFormProps> = ({ onAddAttendee, onUpda
         const newErrors: { [key: string]: string } = {};
         if (!formState.name.trim()) newErrors.name = 'Nome é obrigatório.';
         
-        const docInfo = getDocumentType(formState.document);
-        if (!docInfo.valid) newErrors.document = 'Documento inválido.';
+        if (isDocumentRequired) {
+            const docInfo = getDocumentType(formState.document);
+            if (!docInfo.valid) newErrors.document = 'Documento inválido.';
+        }
         
         if (formState.phone.replace(/[^\d]/g, '').length < 10) newErrors.phone = 'Telefone inválido.';
         
@@ -189,32 +204,35 @@ const AddAttendeeForm: React.FC<AddAttendeeFormProps> = ({ onAddAttendee, onUpda
                 <div className="space-y-4 md:space-y-0 md:grid md:grid-cols-2 md:gap-x-6 md:gap-y-4">
                     <InputField label="Nome Completo" name="name" value={formState.name} onChange={handleInputChange} error={errors.name} placeholder="Nome do participante" delay={100} />
                     
-                    <div className="opacity-0 animate-fadeInUp" style={{ animationDelay: '150ms', animationFillMode: 'forwards' }}>
-                        <label htmlFor="document" className="block text-sm font-medium text-zinc-700">Documento (CPF/RG)</label>
-                        <div className="mt-1 relative">
-                            <input
-                                type="text"
-                                id="document"
-                                name="document"
-                                value={formState.document}
-                                onChange={handleInputChange}
-                                placeholder="000.000.000-00"
-                                maxLength={18}
-                                className={`block w-full pr-16 px-3 py-2 bg-white border ${errors.document ? 'border-red-500 text-red-900 placeholder-red-300' : 'border-zinc-300'} rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500 sm:text-sm`}
-                                aria-invalid={!!errors.document}
-                                aria-describedby={errors.document ? `document-error` : undefined}
-                                autoComplete="off"
-                            />
-                             {docType !== DocumentType.OUTRO && formState.document.length > 0 && (
-                                <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
-                                    <span className="text-zinc-500 sm:text-sm font-semibold bg-zinc-100 px-2 py-0.5 rounded-md animate-fadeIn">
-                                        {docType}
-                                    </span>
-                                </div>
-                            )}
+                    {isDocumentRequired && (
+                        <div className="opacity-0 animate-fadeInUp" style={{ animationDelay: '150ms', animationFillMode: 'forwards' }}>
+                            <label htmlFor="document" className="block text-sm font-medium text-zinc-700">Documento (CPF/RG)</label>
+                            <div className="mt-1 relative">
+                                <input
+                                    type="text"
+                                    id="document"
+                                    name="document"
+                                    value={formState.document}
+                                    onChange={handleInputChange}
+                                    placeholder="000.000.000-00"
+                                    maxLength={18}
+                                    className={`block w-full pr-16 px-3 py-2 bg-white border ${errors.document ? 'border-red-500 text-red-900 placeholder-red-300' : 'border-zinc-300'} rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500 sm:text-sm`}
+                                    aria-invalid={!!errors.document}
+                                    aria-describedby={errors.document ? `document-error` : undefined}
+                                    autoComplete="off"
+                                />
+                                {docType !== DocumentType.OUTRO && formState.document.length > 0 && (
+                                    <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
+                                        <span className="text-zinc-500 sm:text-sm font-semibold bg-zinc-100 px-2 py-0.5 rounded-md animate-fadeIn">
+                                            {docType}
+                                        </span>
+                                    </div>
+                                )}
+                            </div>
+                            {errors.document && <p id={`document-error`} className="mt-1 text-sm text-red-600 animate-fadeIn">{errors.document}</p>}
                         </div>
-                        {errors.document && <p id={`document-error`} className="mt-1 text-sm text-red-600 animate-fadeIn">{errors.document}</p>}
-                    </div>
+                    )}
+
 
                     <InputField label="Telefone" name="phone" value={formState.phone} onChange={handleInputChange} error={errors.phone} placeholder="(00) 00000-0000" maxLength={15} delay={200} />
                     <div className="opacity-0 animate-fadeInUp" style={{ animationDelay: '250ms', animationFillMode: 'forwards' }}>

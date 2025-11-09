@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import type { Attendee } from '../types';
-import { PaymentStatus } from '../types';
+import { PaymentStatus, PackageType } from '../types';
 import ReceiptViewer from './ReceiptViewer';
 
 interface AttendeeDetailProps {
@@ -51,7 +51,9 @@ const AttendeeDetail: React.FC<AttendeeDetailProps> = ({ attendee, onBack, onEdi
                 <div className="md:grid md:grid-cols-2 md:gap-6 space-y-6 md:space-y-0">
                     <div className="bg-white p-4 rounded-xl border border-zinc-200 shadow-sm space-y-4 opacity-0 animate-fadeInUp" style={getAnimationStyle(100)}>
                         <DetailRow label="Nome" value={attendee.name} />
-                        <DetailRow label="Documento" value={`${attendee.document} (${attendee.documentType})`} />
+                        {attendee.packageType === PackageType.SITIO_BUS && (
+                             <DetailRow label="Documento" value={`${attendee.document} (${attendee.documentType})`} />
+                        )}
                         <DetailRow label="Telefone" value={attendee.phone} />
                         <DetailRow label="Pacote" value={attendee.packageType} />
                     </div>

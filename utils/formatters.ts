@@ -59,3 +59,16 @@ export const getDocumentType = (doc: string): { type: DocumentType, valid: boole
     }
     return { type: DocumentType.OUTRO, valid: false };
 };
+
+/**
+ * Normalizes a string by converting it to lowercase and removing diacritical marks (accents).
+ * This is useful for accent-insensitive searching.
+ * Example: "José" becomes "jose".
+ */
+export const normalizeString = (str: string): string => {
+    if (!str) return '';
+    return str
+        .toLowerCase()
+        .normalize('NFD') // Normalization Form Decomposed
+        .replace(/[\u0300-\u036f]/g, ''); // Remove combining diacritical marks
+};

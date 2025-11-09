@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import type { Attendee } from '../types';
 import AttendeeListItem from './AttendeeListItem';
 import { PaymentStatus, PackageType } from '../types';
+import { normalizeString } from '../utils/formatters';
 
 interface AttendeeListProps {
     attendees: Attendee[];
@@ -73,9 +74,10 @@ const AttendeeList: React.FC<AttendeeListProps> = ({
     }, [scrollPosition, onScrollPositionReset]);
 
 
+    const normalizedSearchQuery = normalizeString(searchQuery);
     const filteredAttendees = attendees
         .filter(attendee =>
-            attendee.name.toLowerCase().includes(searchQuery.toLowerCase())
+            normalizeString(attendee.name).includes(normalizedSearchQuery)
         )
         .filter(attendee =>
             statusFilter === 'all' || attendee.payment.status === statusFilter

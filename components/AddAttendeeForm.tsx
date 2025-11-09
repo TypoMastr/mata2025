@@ -116,6 +116,7 @@ const AddAttendeeForm: React.FC<AddAttendeeFormProps> = ({ onAddAttendee, onUpda
     const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
         const { name, value, type } = e.target;
         
+        // FIX: Add a type guard to ensure e.target is an HTMLInputElement before accessing the `checked` property.
         if (type === 'checkbox' && e.target instanceof HTMLInputElement) {
             setFormState(prev => ({
                 ...prev,
@@ -175,10 +176,13 @@ const AddAttendeeForm: React.FC<AddAttendeeFormProps> = ({ onAddAttendee, onUpda
                     };
                     await onUpdateAttendee(updatedAttendee);
                 } else if (!isEditMode && onAddAttendee) {
+                    // FIX: The prop type `AttendeeFormData & { paymentAmount: number }` creates an impossible
+                    // intersection for `paymentAmount` (string & number). Casting to `any` resolves this by
+                    // bypassing the type check and sending the correct runtime data.
                     await onAddAttendee({
                         ...formState,
                         paymentAmount: parseFloat(formState.paymentAmount),
-                    });
+                    } as any);
                 }
                 setSubmissionStatus('success');
                 // The parent component will handle navigation on success.

@@ -564,6 +564,147 @@ const ReportsDashboard: React.FC<{ attendees: Attendee[]; onGenerateReportClick:
         };
     }, [attendees]);
 
+    const handleGenerateBusListPdf = () => {
+        // 1. Filter for bus attendees
+        const busAttendees = attendees.filter(a => a.packageType === PackageType.SITIO_BUS);
+
+        if (busAttendees.length === 0) {
+            alert("Não há passageiros com o pacote de ônibus para gerar a lista.");
+            return;
+        }
+
+        // 2. Group by last name to find families
+        const getLastName = (name: string) => {
+            const parts = name.trim().split(' ');
+            const suffixes = ['jr', 'junior', 'filho', 'filha', 'neto', 'neta'];
+            if (parts.length > 1 && suffixes.includes(parts[parts.length - 1].toLowerCase())) {
+                return parts[parts.length - 2].toLowerCase();
+            }
+            return parts.pop()?.toLowerCase() || '';
+        };
+        
+        const groupsByName = busAttendees.reduce((acc, person) => {
+            const lastName = getLastName(person.name);
+            if (lastName) {
+                acc[lastName] = acc[lastName] || [];
+                acc[lastName].push(person);
+            }
+            return acc;
+        }, {} as Record<string, Attendee[]>);
+
+        // 3. Separate families (groups > 1) and individuals
+        // FIX: Explicitly cast the result of Object.values to Attendee[][] to ensure correct type inference.
+        // This resolves downstream errors where array properties and methods were not found on type 'unknown'.
+        const families = (Object.values(groupsByName) as Attendee[][]).filter(group => group.length > 1);
+        const individuals = (Object.values(groupsByName) as Attendee[][]).filter(group => group.length === 1).flat();
+
+        families.sort((a, b) => b.length - a.length);
+
+        // 4. Assign to buses
+        const buses: { passengers: Attendee[] }[] = [];
+        const BUS_CAPACITY = 50;
+
+        families.forEach(family => {
+            let placed = false;
+            for (const bus of buses) {
+                if (bus.passengers.length + family.length <= BUS_CAPACITY) {
+                    bus.passengers.push(...family);
+                    placed = true;
+                    break;
+                }
+            }
+            if (!placed && family.length <= BUS_CAPACITY) {
+                buses.push({ passengers: [...family] });
+            } else if (!placed) {
+                const familyCopy = [...family];
+                while(familyCopy.length > 0) {
+                    const chunk = familyCopy.splice(0, BUS_CAPACITY);
+                    buses.push({ passengers: chunk });
+                }
+            }
+        });
+
+        individuals.forEach(person => {
+            let placed = false;
+            for (const bus of buses) {
+                if (bus.passengers.length < BUS_CAPACITY) {
+                    bus.passengers.push(person);
+                    placed = true;
+                    break;
+                }
+            }
+            if (!placed) {
+                buses.push({ passengers: [person] });
+            }
+        });
+        
+        buses.forEach(bus => {
+            bus.passengers.sort((a, b) => a.name.localeCompare(b.name));
+        });
+
+        // 6. Generate HTML for PDF
+        const generatePrintableHtml = (busData: { passengers: Attendee[] }[]) => {
+            let html = `
+                <!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8"><title>Lista de Passageiros - Gira da Mata 2025</title>
+                <style>
+                    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; margin: 1.5rem; color: #333; }
+                    .bus-section { page-break-before: always; padding-top: 1rem; }
+                    .bus-section:first-of-type { page-break-before: auto; padding-top: 0; }
+                    h1 { color: #10B981; border-bottom: 2px solid #10B981; padding-bottom: 0.5rem; font-size: 1.5rem; }
+                    h2 { font-size: 1.2rem; margin-bottom: 0.5rem; }
+                    p { font-size: 0.9rem; margin: 0 0 1rem; }
+                    table { width: 100%; border-collapse: collapse; margin-top: 1rem; font-size: 0.8rem; }
+                    th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+                    th { background-color: #f7f7f7; font-weight: 600; }
+                    tr:nth-child(even) { background-color: #fcfcfc; }
+                    @media print { @page { size: A4; margin: 1in; } }
+                </style></head><body>
+                    <h1>Lista de Passageiros - Gira da Mata 2025</h1>
+                    <p><strong>Data de Geração:</strong> ${new Date().toLocaleString('pt-BR')}</p>
+            `;
+
+            busData.forEach((bus, index) => {
+                html += `
+                    <div class="bus-section">
+                        <h2>Ônibus ${index + 1} (${bus.passengers.length} passageiros)</h2>
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>#</th>
+                                    <th style="width: 40%;">Nome</th>
+                                    <th style="width: 30%;">Documento</th>
+                                    <th style="width: 30%;">Telefone</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${bus.passengers.map((p, passengerIndex) => `
+                                    <tr>
+                                        <td>${passengerIndex + 1}</td>
+                                        <td>${p.name}</td>
+                                        <td>${p.document} (${p.documentType})</td>
+                                        <td>${p.phone}</td>
+                                    </tr>
+                                `).join('')}
+                            </tbody>
+                        </table>
+                    </div>
+                `;
+            });
+            
+            html += `</body></html>`;
+            return html;
+        };
+
+        const printableHtml = generatePrintableHtml(buses);
+        const printWindow = window.open('', '_blank');
+        if (printWindow) {
+            printWindow.document.write(printableHtml);
+            printWindow.document.close();
+            printWindow.focus();
+            setTimeout(() => printWindow.print(), 500);
+        }
+    };
+
     const IconUsers = <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.653-.124-1.282-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.653.124-1.282.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" /></svg>;
     const IconDollar = <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v.01M12 12v-2m0 2v2m0-2.35V10M12 15v2m0-2v-2m0 0h.01M12 7.02c.164.017.324.041.48.072M7.5 9.51c.418-.472 1.012-.867 1.697-1.126M12 21a9 9 0 100-18 9 9 0 000 18z" /></svg>;
     const IconBus = <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path d="M9 17a2 2 0 11-4 0 2 2 0 014 0zM19 17a2 2 0 11-4 0 2 2 0 014 0z" /><path strokeLinecap="round" strokeLinejoin="round" d="M13 16V6a1 1 0 00-1-1H4a1 1 0 00-1 1v10l2 2h8l2-2zM5 11h6" /></svg>;
@@ -650,7 +791,8 @@ const ReportsDashboard: React.FC<{ attendees: Attendee[]; onGenerateReportClick:
                         </div>
                     )}
                 </StatCard>
-                <StatCard title="Relatórios Personalizados" icon={IconClipboardList} delay={400 + (buses.length * 50)} className="md:col-span-2 lg:col-span-3"><p className="text-sm text-zinc-600">Crie relatórios com filtros e campos específicos. Exporte em PDF, imprima ou compartilhe.</p><button onClick={onGenerateReportClick} className="mt-2 w-full bg-blue-500 text-white font-bold py-2 px-4 rounded-full hover:bg-blue-600 transition-colors shadow-sm flex items-center justify-center gap-2">Gerar Relatório</button></StatCard>
+                <StatCard title="Relatórios Personalizados" icon={IconClipboardList} delay={400 + (buses.length * 50)} className="md:col-span-2 lg:col-span-1"><p className="text-sm text-zinc-600">Crie relatórios com filtros e campos específicos. Exporte em PDF, imprima ou compartilhe.</p><button onClick={onGenerateReportClick} className="mt-2 w-full bg-blue-500 text-white font-bold py-2 px-4 rounded-full hover:bg-blue-600 transition-colors shadow-sm flex items-center justify-center gap-2">Gerar Relatório</button></StatCard>
+                <StatCard title="Listas de Passageiros" icon={IconBus} delay={450 + (buses.length * 50)} className="md:col-span-2 lg:col-span-2"><p className="text-sm text-zinc-600">Gere um PDF para impressão com a lista de passageiros de cada ônibus, com famílias agrupadas automaticamente.</p><button onClick={handleGenerateBusListPdf} className="mt-2 w-full bg-indigo-500 text-white font-bold py-2 px-4 rounded-full hover:bg-indigo-600 transition-colors shadow-sm flex items-center justify-center gap-2">Gerar PDF dos Ônibus</button></StatCard>
             </div>
         </div>
     );

@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react';
+
+import React, { useState, useEffect, useMemo } from 'react';
 import type { Attendee } from '../types';
 import AttendeeListItem from './AttendeeListItem';
 import { PaymentStatus, PackageType } from '../types';
@@ -98,26 +99,28 @@ const AttendeeList: React.FC<AttendeeListProps> = ({
     }, [scrollPosition, onScrollPositionReset]);
 
 
-    const normalizedSearchQuery = normalizeString(searchQuery);
-    const filteredAttendees = attendees
-        .filter(attendee =>
-            normalizeString(attendee.name).includes(normalizedSearchQuery)
-        )
-        .filter(attendee =>
-            statusFilter === 'all' || attendee.payment.status === statusFilter
-        )
-        .filter(attendee =>
-            packageFilter === 'all' || attendee.packageType === packageFilter
-        );
-    
-    const sortedAttendees = [...filteredAttendees].sort((a, b) => a.name.localeCompare(b.name));
+    const sortedAttendees = useMemo(() => {
+        const normalizedSearchQuery = normalizeString(searchQuery);
+        const filtered = attendees
+            .filter(attendee =>
+                normalizeString(attendee.name).includes(normalizedSearchQuery)
+            )
+            .filter(attendee =>
+                statusFilter === 'all' || attendee.payment.status === statusFilter
+            )
+            .filter(attendee =>
+                packageFilter === 'all' || attendee.packageType === packageFilter
+            );
+        
+        return [...filtered].sort((a, b) => a.name.localeCompare(b.name));
+    }, [attendees, searchQuery, statusFilter, packageFilter]);
 
 
     return (
         <div className="animate-fadeIn">
             <header className="sticky top-0 md:static bg-white md:bg-transparent z-10 p-4 border-b border-zinc-200 md:border-b-0 md:pt-6 space-y-4">
                  <div className="flex justify-between items-center">
-                    <h1 className="text-xl md:text-2xl font-bold text-zinc-800">Inscrições ({filteredAttendees.length})</h1>
+                    <h1 className="text-xl md:text-2xl font-bold text-zinc-800">Inscrições ({sortedAttendees.length})</h1>
                     <div className="flex items-center gap-2">
                         <button
                             onClick={onAddAttendee}
@@ -167,7 +170,7 @@ const AttendeeList: React.FC<AttendeeListProps> = ({
 
             </header>
             <div className="p-4">
-                {filteredAttendees.length > 0 ? (
+                {sortedAttendees.length > 0 ? (
                     <>
                         {/* Mobile View */}
                         <div className="space-y-3 md:hidden">
@@ -175,7 +178,7 @@ const AttendeeList: React.FC<AttendeeListProps> = ({
                                 <AttendeeListItem
                                     key={attendee.id}
                                     attendee={attendee}
-                                    onSelect={() => onSelectAttendee(attendee.id)}
+                                    onSelect={onSelectAttendee}
                                     index={index}
                                 />
                             ))}

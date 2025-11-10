@@ -1,10 +1,11 @@
+
 import React from 'react';
 import type { Attendee } from '../types';
 import { PaymentStatus, PackageType } from '../types';
 
 interface AttendeeListItemProps {
     attendee: Attendee;
-    onSelect: () => void;
+    onSelect: (id: string) => void;
     index: number;
 }
 
@@ -36,7 +37,7 @@ const AttendeeListItem: React.FC<AttendeeListItemProps> = ({ attendee, onSelect,
 
     return (
         <button 
-            onClick={onSelect} 
+            onClick={() => onSelect(attendee.id)} 
             className="w-full text-left p-4 bg-white rounded-xl border border-zinc-200 shadow-sm hover:bg-zinc-50 hover:border-zinc-300 transition-all duration-200 flex justify-between items-center opacity-0 animate-fadeInUp"
             style={{ animationDelay: `${index * 50}ms`, animationFillMode: 'forwards' }}
         >
@@ -66,4 +67,4 @@ const AttendeeListItem: React.FC<AttendeeListItemProps> = ({ attendee, onSelect,
     );
 };
 
-export default AttendeeListItem;
+export default React.memo(AttendeeListItem);

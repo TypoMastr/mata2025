@@ -1,5 +1,5 @@
 
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { useAttendees } from './hooks/useAttendees';
 import type { View, Attendee, AttendeeFormData } from './types';
 import { PaymentStatus, PackageType } from './types';
@@ -37,75 +37,75 @@ const App: React.FC = () => {
         }
     }, []);
 
-    const handleLoginSuccess = () => {
+    const handleLoginSuccess = useCallback(() => {
         sessionStorage.setItem('isAuthenticated', 'true');
         setIsAuthenticated(true);
-    };
+    }, []);
 
-    const handleLogout = () => {
+    const handleLogout = useCallback(() => {
         sessionStorage.removeItem('isAuthenticated');
         setIsAuthenticated(false);
         setView('list'); 
-    };
+    }, []);
 
 
     const selectedAttendee = useMemo(() => {
         return attendees.find(a => a.id === selectedAttendeeId) || null;
     }, [attendees, selectedAttendeeId]);
 
-    const handleSelectAttendee = (id: string) => {
+    const handleSelectAttendee = useCallback((id: string) => {
         if (view !== 'detail') {
             setPreviousView(view);
         }
         setScrollPosition(window.scrollY); // Store scroll position before navigating
         setSelectedAttendeeId(id);
         setView('detail');
-    };
+    }, [view]);
 
-    const handleAddAttendeeClick = () => {
+    const handleAddAttendeeClick = useCallback(() => {
         setPreviousView('list');
         setSelectedAttendeeId(null);
         setView('form');
-    };
+    }, []);
 
-    const handleCancel = () => {
+    const handleCancel = useCallback(() => {
         setSelectedAttendeeId(null);
         setView(previousView);
-    };
+    }, [previousView]);
     
-    const handleEdit = () => {
+    const handleEdit = useCallback(() => {
         setView('editForm');
-    };
+    }, []);
 
-    const handleShowPaymentForm = () => {
+    const handleShowPaymentForm = useCallback(() => {
         setView('payment');
-    };
+    }, []);
     
-    const handleEditPayment = () => {
+    const handleEditPayment = useCallback(() => {
         setView('editPayment');
-    };
+    }, []);
 
-    const handleDeleteRequest = (attendee: Attendee) => {
+    const handleDeleteRequest = useCallback((attendee: Attendee) => {
         setAttendeeToDelete(attendee);
-    };
+    }, []);
 
-    const handleConfirmDelete = async () => {
+    const handleConfirmDelete = useCallback(async () => {
         if (attendeeToDelete) {
             await deleteAttendee(attendeeToDelete.id);
             setAttendeeToDelete(null);
             setView('list');
         }
-    };
+    }, [attendeeToDelete, deleteAttendee]);
     
-    const handleCancelDelete = () => {
+    const handleCancelDelete = useCallback(() => {
         setAttendeeToDelete(null);
-    };
+    }, []);
 
-    const handleDeletePaymentRequest = (attendee: Attendee) => {
+    const handleDeletePaymentRequest = useCallback((attendee: Attendee) => {
         setAttendeePaymentToDelete(attendee);
-    };
+    }, []);
 
-    const handleConfirmDeletePayment = async () => {
+    const handleConfirmDeletePayment = useCallback(async () => {
         if (attendeePaymentToDelete) {
             const attendeeToUpdate: Attendee = {
                 ...attendeePaymentToDelete,
@@ -121,27 +121,27 @@ const App: React.FC = () => {
             setAttendeePaymentToDelete(null);
             setView('detail');
         }
-    };
+    }, [attendeePaymentToDelete, updateAttendee]);
     
-    const handleCancelDeletePayment = () => {
+    const handleCancelDeletePayment = useCallback(() => {
         setAttendeePaymentToDelete(null);
-    };
+    }, []);
 
 
-    const handleSaveAttendee = async (formData: AttendeeFormData & { paymentAmount: number }) => {
+    const handleSaveAttendee = useCallback(async (formData: AttendeeFormData & { paymentAmount: number }) => {
         await addAttendee(formData);
         setView('list');
-    };
+    }, [addAttendee]);
 
-    const handleUpdateAttendee = async (updatedAttendee: Attendee) => {
+    const handleUpdateAttendee = useCallback(async (updatedAttendee: Attendee) => {
         await updateAttendee(updatedAttendee);
         setView('detail');
-    };
+    }, [updateAttendee]);
 
-    const handleRegisterPayment = async (updatedAttendee: Attendee) => {
+    const handleRegisterPayment = useCallback(async (updatedAttendee: Attendee) => {
         await updateAttendee(updatedAttendee);
         setView('detail');
-    };
+    }, [updateAttendee]);
 
     const renderContent = () => {
         if (isLoading) {

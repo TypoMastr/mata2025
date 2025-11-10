@@ -20,7 +20,7 @@ const ShareOptionsModal: React.FC<{
                         <span>Texto via WhatsApp</span>
                     </button>
                     <button onClick={onShareAsPdf} className="w-full bg-blue-500 text-white font-bold py-3 px-4 rounded-full hover:bg-blue-600 transition-colors shadow-sm flex items-center justify-center gap-2">
-                         <svg xmlns="http://www.w.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M5 4v3H4a2 2 0 00-2 2v3a2 2 0 002 2h1v-2a1 1 0 011-1h8a1 1 0 011 1v2h1a2 2 0 002-2v-3a2 2 0 00-2-2h-1V4a2 2 0 00-2-2H7a2 2 0 00-2 2zm8 0H7v3h6V4zm0 8H7v4h6v-4z" clipRule="evenodd" /></svg>
+                         <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M5 4v3H4a2 2 0 00-2 2v3a2 2 0 002 2h1v-2a1 1 0 011-1h8a1 1 0 011 1v2h1a2 2 0 002-2v-3a2 2 0 00-2-2h-1V4a2 2 0 00-2-2H7a2 2 0 00-2 2zm8 0H7v3h6V4zm0 8H7v4h6v-4z" clipRule="evenodd" /></svg>
                         <span>Compartilhar como PDF</span>
                     </button>
                 </div>
@@ -119,6 +119,7 @@ const InteractiveReportForm: React.FC<{ onGenerate: (config: ReportConfig) => vo
                                         <option value="all">Todos</option>
                                         <option value={PaymentStatus.PAGO}>Pago</option>
                                         <option value={PaymentStatus.PENDENTE}>Pendente</option>
+                                        <option value={PaymentStatus.ISENTO}>Isento</option>
                                     </select>
                                 </div>
                                 <div>
@@ -164,6 +165,13 @@ const InteractiveReportPreview: React.FC<{ data: Attendee[] | Attendee[][]; conf
     };
     
     const handlePrintAndExport = () => {
+        const iframe = document.createElement('iframe');
+        iframe.style.position = 'absolute';
+        iframe.style.width = '0';
+        iframe.style.height = '0';
+        iframe.style.border = 'none';
+        document.body.appendChild(iframe);
+
         let printableHtml = '';
 
         if (config.type === 'busList') {
@@ -202,9 +210,10 @@ const InteractiveReportPreview: React.FC<{ data: Attendee[] | Attendee[][]; conf
                     h2 { font-size: 1.2rem; margin-top: 1.5rem; margin-bottom: 0.5rem; }
                     p { font-size: 0.9rem; margin-bottom: 1.5rem; }
                     table { width: 100%; border-collapse: separate; border-spacing: 0; margin-top: 1rem; font-size: 0.8rem; }
-                    th, td { padding: 8px; text-align: left; vertical-align: top; border-bottom: 1px solid #ddd; border-right: 1px solid #ddd; }
+                    th, td { padding: 8px; text-align: left; vertical-align: top; border-bottom: 1px solid #ddd; }
                     th { background-color: #f7f7f7; font-weight: 600; border-top: 1px solid #ddd; }
-                    td:first-child, th:first-child { border-left: 1px solid #ddd; }
+                    th:first-child, td:first-child { border-left: 1px solid #ddd; }
+                    th:last-child, td:last-child { border-right: 1px solid #ddd; }
                     tr:nth-child(even) { background-color: #fcfcfc; }
                     thead { display: table-header-group; }
                     tbody tr { page-break-inside: avoid; }
@@ -230,9 +239,10 @@ const InteractiveReportPreview: React.FC<{ data: Attendee[] | Attendee[][]; conf
                     body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; margin: 1.5rem; color: #333; }
                     h1 { color: #10B981; border-bottom: 2px solid #10B981; padding-bottom: 0.5rem; } p { font-size: 0.9rem; }
                     table { width: 100%; border-collapse: separate; border-spacing: 0; margin-top: 1rem; font-size: 0.8rem; }
-                    th, td { padding: 8px; text-align: left; vertical-align: top; border-bottom: 1px solid #ddd; border-right: 1px solid #ddd; }
+                    th, td { padding: 8px; text-align: left; vertical-align: top; border-bottom: 1px solid #ddd; }
                     th { background-color: #f7f7f7; font-weight: 600; border-top: 1px solid #ddd; }
-                    td:first-child, th:first-child { border-left: 1px solid #ddd; }
+                    th:first-child, td:first-child { border-left: 1px solid #ddd; }
+                    th:last-child, td:last-child { border-right: 1px solid #ddd; }
                     tr:nth-child(even) { background-color: #fcfcfc; }
                     thead { display: table-header-group; }
                     tbody tr { page-break-inside: avoid; }
@@ -246,13 +256,14 @@ const InteractiveReportPreview: React.FC<{ data: Attendee[] | Attendee[][]; conf
                 </body></html>`;
         }
 
-        const printWindow = window.open('', '_blank');
-        if (printWindow) {
-            printWindow.document.write(printableHtml);
-            printWindow.document.close();
-            printWindow.focus();
-            setTimeout(() => printWindow.print(), 500);
-        }
+        iframe.srcdoc = printableHtml;
+        iframe.onload = () => {
+            setTimeout(() => {
+                iframe.contentWindow?.focus();
+                iframe.contentWindow?.print();
+                document.body.removeChild(iframe);
+            }, 100);
+        };
     };
     
     const handleShareAsText = async () => {
@@ -651,13 +662,18 @@ const ProgressBar: React.FC<{ value: number; max: number; colorClass?: string }>
 };
 
 const ReportsDashboard: React.FC<{ attendees: Attendee[]; onGenerateReportClick: () => void; onLogout: () => void; onFixDocsClick: () => void; onCheckDuplicatesClick: () => void; zeroDocCount: number; duplicateGroupCount: number; }> = ({ attendees, onGenerateReportClick, onLogout, onFixDocsClick, onCheckDuplicatesClick, zeroDocCount, duplicateGroupCount }) => {
-    const { totalAttendees, paidCount, pendingCount, totalRevenue, pendingRevenue, totalPossibleRevenue, buses, sitioOnlyCount, paymentStats } = useMemo(() => {
+    const { totalAttendees, paidCount, pendingCount, isentoCount, totalRevenue, pendingRevenue, totalPossibleRevenue, buses, sitioOnlyCount, paymentStats } = useMemo(() => {
         const busAttendees = attendees.filter(a => a.packageType === PackageType.SITIO_BUS);
         const BUS_CAPACITY = 50;
         const busCount = Math.ceil(busAttendees.length / BUS_CAPACITY) || (busAttendees.length > 0 ? 1 : 0);
 
         const paidAttendees = attendees.filter(a => a.payment.status === PaymentStatus.PAGO);
+        const pendingAttendees = attendees.filter(a => a.payment.status === PaymentStatus.PENDENTE);
+        const isentoAttendees = attendees.filter(a => a.payment.status === PaymentStatus.ISENTO);
+
         const paidCountValue = paidAttendees.length;
+        const pendingCountValue = pendingAttendees.length;
+        const isentoCountValue = isentoAttendees.length;
 
         const calculatedPaymentStats = (Object.values(PaymentType) as PaymentType[]).reduce((acc, type) => {
             acc[type] = { count: 0, total: 0 };
@@ -686,10 +702,13 @@ const ReportsDashboard: React.FC<{ attendees: Attendee[]; onGenerateReportClick:
         return {
             totalAttendees: attendees.length,
             paidCount: paidCountValue,
-            pendingCount: attendees.filter(a => a.payment.status === PaymentStatus.PENDENTE).length,
+            pendingCount: pendingCountValue,
+            isentoCount: isentoCountValue,
             totalRevenue: paidAttendees.reduce((sum, a) => sum + a.payment.amount, 0),
-            pendingRevenue: attendees.filter(a => a.payment.status === PaymentStatus.PENDENTE).reduce((sum, a) => sum + a.payment.amount, 0),
-            totalPossibleRevenue: attendees.reduce((sum, a) => sum + a.payment.amount, 0),
+            pendingRevenue: pendingAttendees.reduce((sum, a) => sum + a.payment.amount, 0),
+            totalPossibleRevenue: attendees
+                .filter(a => a.payment.status !== PaymentStatus.ISENTO)
+                .reduce((sum, a) => sum + a.payment.amount, 0),
             buses: Array.from({ length: busCount }, (_, i) => {
                 const filledSeats = Math.min(BUS_CAPACITY, Math.max(0, busAttendees.length - (i * BUS_CAPACITY)));
                 return { busNumber: i + 1, filledSeats, remainingSeats: BUS_CAPACITY - filledSeats, capacity: BUS_CAPACITY };
@@ -724,10 +743,11 @@ const ReportsDashboard: React.FC<{ attendees: Attendee[]; onGenerateReportClick:
                         <span className="font-bold text-3xl text-zinc-800">{totalAttendees}</span>
                         <span className="text-sm font-semibold text-zinc-500">Total</span>
                     </div>
-                    <ProgressBar value={paidCount} max={totalAttendees} />
-                    <div className="flex justify-between text-sm">
+                    <ProgressBar value={paidCount} max={totalAttendees - isentoCount} />
+                    <div className="flex justify-between text-sm flex-wrap gap-x-2">
                         <span className="font-semibold text-green-600">{paidCount} {paidCount === 1 ? 'Pago' : 'Pagos'}</span>
                         <span className="font-semibold text-red-600">{pendingCount} {pendingCount === 1 ? 'Pendente' : 'Pendentes'}</span>
+                        {isentoCount > 0 && <span className="font-semibold text-blue-600">{isentoCount} {isentoCount === 1 ? 'Isento' : 'Isentos'}</span>}
                     </div>
                 </StatCard>
                 <StatCard title="Financeiro" icon={IconDollar} delay={150}><div className="flex justify-between items-baseline"><span className="font-bold text-3xl text-zinc-800">R$ {totalRevenue.toFixed(2).replace('.',',')}</span><span className="text-sm font-semibold text-zinc-500">Arrecadado</span></div><ProgressBar value={totalRevenue} max={totalPossibleRevenue} /><div className="flex justify-between text-sm"><span className="font-semibold text-zinc-500">Pendente: R$ {pendingRevenue.toFixed(2).replace('.',',')}</span></div></StatCard>

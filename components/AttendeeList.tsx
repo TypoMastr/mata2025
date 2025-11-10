@@ -37,10 +37,20 @@ const PackageIcon: React.FC<{ packageType: PackageType }> = ({ packageType }) =>
 }
 
 const StatusBadge: React.FC<{ status: PaymentStatus }> = ({ status }) => {
-    const isPaid = status === PaymentStatus.PAGO;
-    const statusClasses = isPaid
-        ? 'bg-green-100 text-green-800'
-        : 'bg-red-100 text-red-800';
+    let statusClasses = '';
+    switch (status) {
+        case PaymentStatus.PAGO:
+            statusClasses = 'bg-green-100 text-green-800';
+            break;
+        case PaymentStatus.PENDENTE:
+            statusClasses = 'bg-red-100 text-red-800';
+            break;
+        case PaymentStatus.ISENTO:
+            statusClasses = 'bg-blue-100 text-blue-800';
+            break;
+        default:
+            statusClasses = 'bg-zinc-100 text-zinc-800';
+    }
     return (
         <span className={`px-3 py-1 text-xs font-bold rounded-full ${statusClasses}`}>
             {status.toUpperCase()}
@@ -131,6 +141,7 @@ const AttendeeList: React.FC<AttendeeListProps> = ({
                         <FilterPill label="Todos" isActive={statusFilter === 'all'} onClick={() => onStatusFilterChange('all')} />
                         <FilterPill label={PaymentStatus.PAGO} isActive={statusFilter === PaymentStatus.PAGO} onClick={() => onStatusFilterChange(PaymentStatus.PAGO)} />
                         <FilterPill label={PaymentStatus.PENDENTE} isActive={statusFilter === PaymentStatus.PENDENTE} onClick={() => onStatusFilterChange(PaymentStatus.PENDENTE)} />
+                        <FilterPill label={PaymentStatus.ISENTO} isActive={statusFilter === PaymentStatus.ISENTO} onClick={() => onStatusFilterChange(PaymentStatus.ISENTO)} />
                     </div>
                      <div className="flex gap-2 items-center overflow-x-auto pb-1">
                         <span className="text-sm font-medium text-zinc-500 flex-shrink-0">Pacote:</span>

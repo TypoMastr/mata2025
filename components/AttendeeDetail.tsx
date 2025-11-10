@@ -21,7 +21,22 @@ const DetailRow: React.FC<{ label: string; value?: string; children?: React.Reac
 
 const AttendeeDetail: React.FC<AttendeeDetailProps> = ({ attendee, onBack, onEdit, onDelete, onRegisterPayment, onEditPayment }) => {
     const [showReceipt, setShowReceipt] = useState(false);
-    const isPaid = attendee.payment.status === PaymentStatus.PAGO;
+    const status = attendee.payment.status;
+
+    let statusClasses = '';
+    switch (status) {
+        case PaymentStatus.PAGO:
+            statusClasses = 'bg-green-100 text-green-800';
+            break;
+        case PaymentStatus.PENDENTE:
+            statusClasses = 'bg-red-100 text-red-800';
+            break;
+        case PaymentStatus.ISENTO:
+            statusClasses = 'bg-blue-100 text-blue-800';
+            break;
+        default:
+            statusClasses = 'bg-zinc-100 text-zinc-800';
+    }
 
     const formatDate = (dateString?: string) => {
         if (!dateString) return 'N/A';
@@ -62,12 +77,12 @@ const AttendeeDetail: React.FC<AttendeeDetailProps> = ({ attendee, onBack, onEdi
                         <h2 className="text-lg font-bold text-zinc-800 mb-3">Pagamento</h2>
                         <div className="space-y-4">
                             <DetailRow label="Status">
-                                 <span className={`px-3 py-1 text-sm font-bold rounded-full ${isPaid ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
+                                 <span className={`px-3 py-1 text-sm font-bold rounded-full ${statusClasses}`}>
                                     {attendee.payment.status}
                                 </span>
                             </DetailRow>
                             <DetailRow label="Valor" value={`R$ ${attendee.payment.amount.toFixed(2).replace('.', ',')}`} />
-                            {isPaid && (
+                            {status === PaymentStatus.PAGO && (
                                 <>
                                     <DetailRow label="Data do Pagamento" value={formatDate(attendee.payment.date)} />
                                     <DetailRow label="Tipo de Pagamento" value={attendee.payment.type || 'N/A'} />
@@ -82,14 +97,14 @@ const AttendeeDetail: React.FC<AttendeeDetailProps> = ({ attendee, onBack, onEdi
                     </div>
 
                     <div className="space-y-3 opacity-0 animate-fadeInUp md:col-span-2" style={getAnimationStyle(300)}>
-                         {!isPaid && (
+                         {status === PaymentStatus.PENDENTE && (
                             <button onClick={onRegisterPayment} className="w-full bg-green-500 text-white font-bold py-3 px-4 rounded-full hover:bg-green-600 transition-colors shadow-sm">
                                 Registrar Pagamento
                             </button>
                         )}
-                        {isPaid && (
+                        {(status === PaymentStatus.PAGO || status === PaymentStatus.ISENTO) && (
                              <button onClick={onEditPayment} className="w-full bg-blue-500 text-white font-bold py-3 px-4 rounded-full hover:bg-blue-600 transition-colors shadow-sm">
-                                Editar Pagamento
+                                {status === PaymentStatus.ISENTO ? 'Alterar Status do Pagamento' : 'Editar Pagamento'}
                             </button>
                         )}
                         <div className="flex flex-col md:flex-row gap-3">

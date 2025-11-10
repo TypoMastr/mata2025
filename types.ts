@@ -6,6 +6,7 @@ export enum PackageType {
 export enum PaymentStatus {
     PAGO = 'Pago',
     PENDENTE = 'Pendente',
+    ISENTO = 'Isento',
 }
 
 export enum DocumentType {

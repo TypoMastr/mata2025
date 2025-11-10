@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import type { Attendee } from '../types';
-import { PaymentStatus, PaymentType } from '../types';
+import { PaymentStatus, PaymentType, PackageType } from '../types';
 
 interface RegisterPaymentFormProps {
     attendee: Attendee;
@@ -17,14 +17,15 @@ const SpinnerIcon: React.FC = () => (
 );
 
 const RegisterPaymentForm: React.FC<RegisterPaymentFormProps> = ({ attendee, onRegisterPayment, onCancel, onDeletePayment }) => {
-    const isEditMode = attendee.payment.status === PaymentStatus.PAGO;
+    const isPaid = attendee.payment.status === PaymentStatus.PAGO;
+    const isExempt = attendee.payment.status === PaymentStatus.ISENTO;
 
     const [paymentDate, setPaymentDate] = useState(
         attendee.payment.date 
             ? new Date(attendee.payment.date).toISOString().split('T')[0] 
             : new Date().toISOString().split('T')[0]
     );
-    const [dateNotInformed, setDateNotInformed] = useState(isEditMode && !attendee.payment.date);
+    const [dateNotInformed, setDateNotInformed] = useState(isPaid && !attendee.payment.date);
     const [paymentType, setPaymentType] = useState<PaymentType>(attendee.payment.type || PaymentType.PIX_CONTA);
     const [receipt, setReceipt] = useState<string | null>(attendee.payment.receiptUrl);
     const [fileName, setFileName] = useState<string>('');
@@ -44,10 +45,10 @@ const RegisterPaymentForm: React.FC<RegisterPaymentFormProps> = ({ attendee, onR
     }, [paymentDate]);
 
     useEffect(() => {
-        if (isEditMode && receipt) {
+        if (isPaid && receipt) {
             setFileName("Comprovante salvo. Anexe um novo para substituir.");
         }
-    }, [isEditMode, receipt]);
+    }, [isPaid, receipt]);
 
 
     const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -86,6 +87,35 @@ const RegisterPaymentForm: React.FC<RegisterPaymentFormProps> = ({ attendee, onR
         }
     };
 
+    const handleToggleExemption = async () => {
+        setIsSubmitting(true);
+        setSubmissionError(null);
+        try {
+            const isCurrentlyExempt = attendee.payment.status === PaymentStatus.ISENTO;
+            const newStatus = isCurrentlyExempt ? PaymentStatus.PENDENTE : PaymentStatus.ISENTO;
+            const newAmount = isCurrentlyExempt
+                ? (attendee.packageType === PackageType.SITIO_BUS ? 120.00 : 70.00)
+                : 0;
+
+            const updatedAttendee: Attendee = {
+                ...attendee,
+                payment: {
+                    amount: newAmount,
+                    status: newStatus,
+                    date: undefined,
+                    type: undefined,
+                    receiptUrl: null,
+                },
+            };
+            await onRegisterPayment(updatedAttendee);
+        } catch (error) {
+            console.error("Failed to toggle exemption:", error);
+            setSubmissionError("Falha ao alterar status. Tente novamente.");
+            setIsSubmitting(false);
+        }
+    };
+
+
     const getAnimationStyle = (delay: number) => ({
         animationDelay: `${delay}ms`,
         animationFillMode: 'forwards',
@@ -97,7 +127,7 @@ const RegisterPaymentForm: React.FC<RegisterPaymentFormProps> = ({ attendee, onR
                 <button onClick={onCancel} className="text-zinc-500 hover:text-zinc-800 p-1 rounded-full hover:bg-zinc-100">
                      <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>
                 </button>
-                <h1 className="text-xl md:text-2xl font-bold text-zinc-800">{isEditMode ? 'Editar' : 'Registrar'} Pagamento</h1>
+                <h1 className="text-xl md:text-2xl font-bold text-zinc-800">{isPaid ? 'Editar' : (isExempt ? 'Alterar Status' : 'Registrar')} Pagamento</h1>
             </header>
             <form onSubmit={handleSubmit} className="p-4 space-y-4">
                 <div className="md:grid md:grid-cols-2 md:gap-6 space-y-4 md:space-y-0">
@@ -184,12 +214,12 @@ const RegisterPaymentForm: React.FC<RegisterPaymentFormProps> = ({ attendee, onR
                                 <span>Salvando...</span>
                             </>
                         ) : (
-                            isEditMode ? 'Salvar Alterações' : 'Confirmar Pagamento'
+                            isPaid ? 'Salvar Alterações' : 'Confirmar Pagamento'
                         )}
                     </button>
                 </div>
                  {submissionError && <p className="text-center text-sm text-red-600 animate-fadeIn">{submissionError}</p>}
-                 {isEditMode && (
+                 {isPaid && (
                     <div className="pt-2 opacity-0 animate-fadeInUp" style={getAnimationStyle(350)}>
                         <button
                             type="button"
@@ -200,6 +230,20 @@ const RegisterPaymentForm: React.FC<RegisterPaymentFormProps> = ({ attendee, onR
                         </button>
                     </div>
                 )}
+                <div className="pt-2 opacity-0 animate-fadeInUp" style={getAnimationStyle(isPaid ? 400 : 350)}>
+                    <button
+                        type="button"
+                        onClick={handleToggleExemption}
+                        disabled={isSubmitting}
+                        className={`w-full font-bold py-3 px-4 rounded-full transition-colors ${
+                            isExempt 
+                                ? 'text-zinc-700 bg-zinc-200 hover:bg-zinc-300'
+                                : 'text-blue-600 hover:bg-blue-50'
+                        }`}
+                    >
+                        {isExempt ? 'Remover Isenção (Status: Pendente)' : 'Marcar como Isento'}
+                    </button>
+                </div>
             </form>
         </div>
     );

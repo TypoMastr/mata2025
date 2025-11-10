@@ -111,13 +111,13 @@ const AddAttendeeForm: React.FC<AddAttendeeFormProps> = ({ onAddAttendee, onUpda
     }, [formState.packageType, formState.paymentAmount, formState.document, isDocumentRequired]);
 
 
-    // FIX: Safely handle checkbox changes by checking the event target's type before accessing the `checked` property.
-    // This resolves a TypeScript error and ensures correct type inference for the form state.
     const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
-        const { name, value, type } = e.target;
+        const { name, value } = e.target;
         
-        // FIX: Add a type guard to ensure e.target is an HTMLInputElement before accessing the `checked` property.
-        if (type === 'checkbox' && e.target instanceof HTMLInputElement) {
+        // FIX: Use a type guard to correctly handle checkbox changes.
+        // This ensures `e.target.checked` is only accessed when `e.target` is an HTMLInputElement
+        // of type 'checkbox', resolving a TypeScript error as HTMLSelectElement lacks this property.
+        if (e.target instanceof HTMLInputElement && e.target.type === 'checkbox') {
             setFormState(prev => ({
                 ...prev,
                 [name]: e.target.checked,
@@ -176,9 +176,6 @@ const AddAttendeeForm: React.FC<AddAttendeeFormProps> = ({ onAddAttendee, onUpda
                     };
                     await onUpdateAttendee(updatedAttendee);
                 } else if (!isEditMode && onAddAttendee) {
-                    // FIX: The prop type `AttendeeFormData & { paymentAmount: number }` creates an impossible
-                    // intersection for `paymentAmount` (string & number). Casting to `any` resolves this by
-                    // bypassing the type check and sending the correct runtime data.
                     await onAddAttendee({
                         ...formState,
                         paymentAmount: parseFloat(formState.paymentAmount),

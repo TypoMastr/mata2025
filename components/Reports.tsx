@@ -1,4 +1,3 @@
-
 import React, { useState, useMemo } from 'react';
 import type { Attendee, ReportConfig, ReportField } from '../types';
 import { PackageType, PaymentStatus, DocumentType, PaymentType } from '../types';
@@ -45,6 +44,7 @@ const InteractiveReportForm: React.FC<{ onGenerate: (config: ReportConfig) => vo
         { id: 'payment.amount', label: 'Valor' },
     ];
 
+    const [reportType, setReportType] = useState<'custom' | 'busList'>('custom');
     const [selectedFields, setSelectedFields] = useState<ReportField[]>(['name', 'phone', 'packageType', 'payment.status']);
     const [statusFilter, setStatusFilter] = useState<'all' | PaymentStatus>('all');
     const [packageFilter, setPackageFilter] = useState<'all' | PackageType>('all');
@@ -56,14 +56,18 @@ const InteractiveReportForm: React.FC<{ onGenerate: (config: ReportConfig) => vo
     };
 
     const handleGenerateClick = () => {
-        if (selectedFields.length > 0) {
-            onGenerate({
-                fields: selectedFields,
-                filters: { status: statusFilter, packageType: packageFilter }
-            });
+        if (reportType === 'custom' && selectedFields.length === 0) {
+            return; // Prevent generating empty report
         }
+        onGenerate({
+            type: reportType,
+            fields: reportType === 'busList' ? ['name', 'document', 'phone'] : selectedFields,
+            filters: { status: statusFilter, packageType: packageFilter }
+        });
     };
     
+    const isCustomMode = reportType === 'custom';
+
     return (
         <div className="animate-fadeIn">
             <header className="sticky top-0 md:static bg-white z-10 p-4 md:pt-6 border-b border-zinc-200 flex items-center gap-4">
@@ -73,50 +77,66 @@ const InteractiveReportForm: React.FC<{ onGenerate: (config: ReportConfig) => vo
                 <h1 className="text-xl md:text-2xl font-bold text-zinc-800">Gerar Relatório</h1>
             </header>
             <main className="p-4 space-y-6">
-                <div className="md:grid md:grid-cols-2 md:gap-6 space-y-6 md:space-y-0">
-                    <div className="opacity-0 animate-fadeInUp" style={{ animationFillMode: 'forwards', animationDelay: '100ms' }}>
-                        <h3 className="text-md font-semibold text-zinc-700 mb-2">1. Selecione os campos</h3>
-                        <div className="grid grid-cols-2 gap-2 bg-white p-4 rounded-xl border border-zinc-200 shadow-sm">
-                            {allFields.map(({ id, label }) => (
-                                <label key={id} className="flex items-center space-x-2 p-2 rounded-md hover:bg-zinc-50 cursor-pointer">
-                                    <input
-                                        type="checkbox"
-                                        checked={selectedFields.includes(id)}
-                                        onChange={() => handleFieldChange(id)}
-                                        className="h-4 w-4 rounded border-zinc-300 text-green-600 focus:ring-green-500"
-                                    />
-                                    <span className="text-sm text-zinc-700">{label}</span>
-                                </label>
-                            ))}
-                        </div>
-                    </div>
-
-                    <div className="opacity-0 animate-fadeInUp" style={{ animationFillMode: 'forwards', animationDelay: '200ms' }}>
-                         <h3 className="text-md font-semibold text-zinc-700 mb-2">2. Aplique filtros (opcional)</h3>
-                         <div className="space-y-3 bg-white p-4 rounded-xl border border-zinc-200 shadow-sm">
-                             <div>
-                                 <label htmlFor="statusFilter" className="block text-sm font-medium text-zinc-700">Status do Pagamento</label>
-                                 <select id="statusFilter" value={statusFilter} onChange={e => setStatusFilter(e.target.value as any)} className="mt-1 block w-full px-3 py-2 bg-white border border-zinc-300 rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500 sm:text-sm" autoComplete="off">
-                                     <option value="all">Todos</option>
-                                     <option value={PaymentStatus.PAGO}>Pago</option>
-                                     <option value={PaymentStatus.PENDENTE}>Pendente</option>
-                                 </select>
-                             </div>
-                             <div>
-                                <label htmlFor="packageFilter" className="block text-sm font-medium text-zinc-700">Tipo de Pacote</label>
-                                 <select id="packageFilter" value={packageFilter} onChange={e => setPackageFilter(e.target.value as any)} className="mt-1 block w-full px-3 py-2 bg-white border border-zinc-300 rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500 sm:text-sm" autoComplete="off">
-                                     <option value="all">Todos</option>
-                                     <option value={PackageType.SITIO_ONLY}>Apenas Sítio</option>
-                                     <option value={PackageType.SITIO_BUS}>Sítio + Ônibus</option>
-                                </select>
-                            </div>
-                         </div>
+                 <div className="opacity-0 animate-fadeInUp" style={{ animationFillMode: 'forwards', animationDelay: '100ms' }}>
+                    <h3 className="text-md font-semibold text-zinc-700 mb-2">1. Escolha o tipo de relatório</h3>
+                    <div className="grid grid-cols-2 gap-2 bg-white p-4 rounded-xl border border-zinc-200 shadow-sm">
+                        <label className="flex items-center space-x-2 p-2 rounded-md hover:bg-zinc-50 cursor-pointer">
+                            <input type="radio" name="reportType" value="custom" checked={isCustomMode} onChange={() => setReportType('custom')} className="h-4 w-4 text-green-600 focus:ring-green-500 border-zinc-300"/>
+                            <span className="text-sm text-zinc-700 font-medium">Lista Personalizada</span>
+                        </label>
+                        <label className="flex items-center space-x-2 p-2 rounded-md hover:bg-zinc-50 cursor-pointer">
+                            <input type="radio" name="reportType" value="busList" checked={!isCustomMode} onChange={() => setReportType('busList')} className="h-4 w-4 text-green-600 focus:ring-green-500 border-zinc-300"/>
+                            <span className="text-sm text-zinc-700 font-medium">Lista de Passageiros</span>
+                        </label>
                     </div>
                 </div>
 
-                 <div className="flex flex-col md:flex-row gap-3 pt-2 opacity-0 animate-fadeInUp" style={{ animationFillMode: 'forwards', animationDelay: '300ms' }}>
+                <div className={`transition-opacity duration-300 ${!isCustomMode ? 'opacity-50 pointer-events-none' : 'opacity-100'}`}>
+                    <div className="md:grid md:grid-cols-2 md:gap-6 space-y-6 md:space-y-0">
+                        <div className="opacity-0 animate-fadeInUp" style={{ animationFillMode: 'forwards', animationDelay: '200ms' }}>
+                            <h3 className="text-md font-semibold text-zinc-700 mb-2">2. Selecione os campos</h3>
+                            <div className="grid grid-cols-2 gap-2 bg-white p-4 rounded-xl border border-zinc-200 shadow-sm">
+                                {allFields.map(({ id, label }) => (
+                                    <label key={id} className="flex items-center space-x-2 p-2 rounded-md hover:bg-zinc-50 cursor-pointer">
+                                        <input
+                                            type="checkbox"
+                                            checked={selectedFields.includes(id)}
+                                            onChange={() => handleFieldChange(id)}
+                                            className="h-4 w-4 rounded border-zinc-300 text-green-600 focus:ring-green-500"
+                                        />
+                                        <span className="text-sm text-zinc-700">{label}</span>
+                                    </label>
+                                ))}
+                            </div>
+                        </div>
+
+                        <div className="opacity-0 animate-fadeInUp" style={{ animationFillMode: 'forwards', animationDelay: '300ms' }}>
+                            <h3 className="text-md font-semibold text-zinc-700 mb-2">3. Aplique filtros (opcional)</h3>
+                            <div className="space-y-3 bg-white p-4 rounded-xl border border-zinc-200 shadow-sm">
+                                <div>
+                                    <label htmlFor="statusFilter" className="block text-sm font-medium text-zinc-700">Status do Pagamento</label>
+                                    <select id="statusFilter" value={statusFilter} onChange={e => setStatusFilter(e.target.value as any)} className="mt-1 block w-full px-3 py-2 bg-white border border-zinc-300 rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500 sm:text-sm" autoComplete="off">
+                                        <option value="all">Todos</option>
+                                        <option value={PaymentStatus.PAGO}>Pago</option>
+                                        <option value={PaymentStatus.PENDENTE}>Pendente</option>
+                                    </select>
+                                </div>
+                                <div>
+                                <label htmlFor="packageFilter" className="block text-sm font-medium text-zinc-700">Tipo de Pacote</label>
+                                    <select id="packageFilter" value={packageFilter} onChange={e => setPackageFilter(e.target.value as any)} className="mt-1 block w-full px-3 py-2 bg-white border border-zinc-300 rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500 sm:text-sm" autoComplete="off">
+                                        <option value="all">Todos</option>
+                                        <option value={PackageType.SITIO_ONLY}>Apenas Sítio</option>
+                                        <option value={PackageType.SITIO_BUS}>Sítio + Ônibus</option>
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                 <div className="flex flex-col md:flex-row gap-3 pt-2 opacity-0 animate-fadeInUp" style={{ animationFillMode: 'forwards', animationDelay: '400ms' }}>
                     <button onClick={onCancel} className="w-full bg-zinc-200 text-zinc-800 font-bold py-3 px-4 rounded-full hover:bg-zinc-300 transition-colors">Cancelar</button>
-                    <button onClick={handleGenerateClick} disabled={selectedFields.length === 0} className="w-full bg-green-500 text-white font-bold py-3 px-4 rounded-full hover:bg-green-600 transition-colors shadow-sm disabled:bg-zinc-400 disabled:cursor-not-allowed">Gerar Relatório</button>
+                    <button onClick={handleGenerateClick} disabled={isCustomMode && selectedFields.length === 0} className="w-full bg-green-500 text-white font-bold py-3 px-4 rounded-full hover:bg-green-600 transition-colors shadow-sm disabled:bg-zinc-400 disabled:cursor-not-allowed">Gerar Relatório</button>
                 </div>
             </main>
         </div>
@@ -124,7 +144,7 @@ const InteractiveReportForm: React.FC<{ onGenerate: (config: ReportConfig) => vo
 };
 
 // --- Componente: Visualização do Relatório ---
-const InteractiveReportPreview: React.FC<{ data: Attendee[]; config: ReportConfig; onBack: () => void; }> = ({ data, config, onBack }) => {
+const InteractiveReportPreview: React.FC<{ data: Attendee[] | Attendee[][]; config: ReportConfig; onBack: () => void; }> = ({ data, config, onBack }) => {
     const [isShareModalOpen, setIsShareModalOpen] = useState(false);
     
     const fieldNames: Record<ReportField, string> = {
@@ -134,7 +154,7 @@ const InteractiveReportPreview: React.FC<{ data: Attendee[]; config: ReportConfi
 
     const getNestedProperty = (obj: any, path: string) => path.split('.').reduce((o, i) => (o ? o[i] : undefined), obj);
 
-    const formatValue = (attendee: Attendee, field: ReportField): string => {
+    const formatCustomValue = (attendee: Attendee, field: ReportField): string => {
         if (field === 'document') {
             return `${attendee.document} (${attendee.documentType})`;
         }
@@ -144,39 +164,80 @@ const InteractiveReportPreview: React.FC<{ data: Attendee[]; config: ReportConfi
     };
     
     const handlePrintAndExport = () => {
-        const tableHeaders = config.fields.map(field => `<th>${fieldNames[field]}</th>`).join('');
-        const tableRows = data.map(attendee => `<tr>${config.fields.map(field => `<td>${formatValue(attendee, field)}</td>`).join('')}</tr>`).join('');
-        const appliedFilters = `Status: ${config.filters.status}, Pacote: ${config.filters.packageType}`;
-        const printableHtml = `
-            <!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8"><title>Relatório Gira da Mata</title>
-            <style>
-                body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; margin: 1.5rem; color: #333; }
-                h1 { color: #10B981; border-bottom: 2px solid #10B981; padding-bottom: 0.5rem; }
-                p { font-size: 0.9rem; }
-                table { width: 100%; border-collapse: collapse; margin-top: 1rem; font-size: 0.8rem; }
-                th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
-                th { background-color: #f7f7f7; font-weight: 600; }
-                tr:nth-child(even) { background-color: #fcfcfc; }
-                .no-print {
-                    position: fixed; top: 1rem; right: 1rem;
-                    background-color: #333; color: white;
-                    padding: 0.5rem 1rem; border-radius: 9999px;
-                    border: none; font-weight: bold; cursor: pointer;
-                    box-shadow: 0 4px 6px rgba(0,0,0,0.1);
-                    z-index: 100;
-                }
-                @page { size: A4; margin: 1in; }
-                @media print {
-                    .no-print { display: none; }
-                }
-            </style></head><body>
-                <button class="no-print" onclick="window.close()">Fechar</button>
-                <h1>Relatório - Gira da Mata</h1>
-                <p><strong>Data de Geração:</strong> ${new Date().toLocaleString('pt-BR')}</p>
-                <p><strong>Filtros Aplicados:</strong> ${appliedFilters}</p>
-                <p><strong>Total de Registros:</strong> ${data.length}</p>
-                <table><thead><tr>${tableHeaders}</tr></thead><tbody>${tableRows}</tbody></table>
-            </body></html>`;
+        let printableHtml = '';
+
+        if (config.type === 'busList') {
+            const busData = data as Attendee[][];
+            const busSectionsHtml = busData.map((bus, index) => `
+                <div class="bus-section${index === 0 ? ' bus-section--first' : ''}">
+                    <h2>Ônibus ${index + 1} (${bus.length} passageiros)</h2>
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>#</th>
+                                <th>Nome</th>
+                                <th>Documento</th>
+                                <th>Telefone</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${bus.map((p, passengerIndex) => `
+                                <tr>
+                                    <td>${passengerIndex + 1}</td>
+                                    <td>${p.name}</td>
+                                    <td>${p.document} (${p.documentType})</td>
+                                    <td>${p.phone}</td>
+                                </tr>
+                            `).join('')}
+                        </tbody>
+                    </table>
+                </div>
+            `).join('');
+
+            printableHtml = `
+                <!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8"><title>Lista de Passageiros</title>
+                <style>
+                    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; margin: 1.5rem; color: #333; }
+                    h1 { color: #10B981; border-bottom: 2px solid #10B981; padding-bottom: 0.5rem; }
+                    h2 { font-size: 1.2rem; margin-top: 1.5rem; margin-bottom: 0.5rem; }
+                    p { font-size: 0.9rem; margin-bottom: 1.5rem; }
+                    table { width: 100%; border-collapse: collapse; margin-top: 1rem; font-size: 0.8rem; }
+                    th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+                    th { background-color: #f7f7f7; font-weight: 600; }
+                    tr:nth-child(even) { background-color: #fcfcfc; }
+                    .bus-section { page-break-inside: avoid; }
+                    .bus-section--first { page-break-inside: auto; }
+                    .bus-section + .bus-section { page-break-before: always; }
+                    @page { size: A4; margin: 1in; }
+                    @media print { body { margin: 0; } .bus-section + .bus-section { margin-top: 0; } }
+                </style></head><body>
+                    <h1>Lista de Passageiros</h1>
+                    <p><strong>Data de Geração:</strong> ${new Date().toLocaleString('pt-BR')}</p>
+                    ${busSectionsHtml}
+                </body></html>`;
+
+        } else { // Custom report
+            const customData = data as Attendee[];
+            const tableHeaders = config.fields.map(field => `<th>${fieldNames[field]}</th>`).join('');
+            const tableRows = customData.map(attendee => `<tr>${config.fields.map(field => `<td>${formatCustomValue(attendee, field)}</td>`).join('')}</tr>`).join('');
+            const appliedFilters = `Status: ${config.filters.status}, Pacote: ${config.filters.packageType}`;
+            printableHtml = `
+                <!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8"><title>Relatório Gira da Mata</title>
+                <style>
+                    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; margin: 1.5rem; color: #333; }
+                    h1 { color: #10B981; border-bottom: 2px solid #10B981; padding-bottom: 0.5rem; } p { font-size: 0.9rem; }
+                    table { width: 100%; border-collapse: collapse; margin-top: 1rem; font-size: 0.8rem; }
+                    th, td { border: 1px solid #ddd; padding: 8px; text-align: left; } th { background-color: #f7f7f7; font-weight: 600; }
+                    tr:nth-child(even) { background-color: #fcfcfc; }
+                    @page { size: A4; margin: 1in; }
+                </style></head><body>
+                    <h1>Relatório - Gira da Mata</h1>
+                    <p><strong>Data de Geração:</strong> ${new Date().toLocaleString('pt-BR')}</p>
+                    <p><strong>Filtros Aplicados:</strong> ${appliedFilters}</p>
+                    <p><strong>Total de Registros:</strong> ${customData.length}</p>
+                    <table><thead><tr>${tableHeaders}</tr></thead><tbody>${tableRows}</tbody></table>
+                </body></html>`;
+        }
 
         const printWindow = window.open('', '_blank');
         if (printWindow) {
@@ -189,24 +250,39 @@ const InteractiveReportPreview: React.FC<{ data: Attendee[]; config: ReportConfi
     
     const handleShareAsText = async () => {
         setIsShareModalOpen(false);
-        const title = `Relatório Gira da Mata (${data.length} registros)`;
-        let reportText = `${title}\n\n`;
-        data.forEach((attendee) => {
-            reportText += `*${formatValue(attendee, 'name')}*\n`;
-            config.fields.forEach(field => {
-                if (field !== 'name') {
-                    reportText += ` - ${fieldNames[field]}: ${formatValue(attendee, field)}\n`;
-                }
+        let reportText = '';
+        let title = '';
+
+        if (config.type === 'busList') {
+            const buses = data as Attendee[][];
+            title = `Lista de Passageiros - Gira da Mata 2025`;
+            reportText = `${title}\n\n`;
+            buses.forEach((bus, index) => {
+                reportText += `*ÔNIBUS ${index + 1} (${bus.length} passageiros)*\n`;
+                bus.forEach(p => {
+                    reportText += `- ${p.name} (${p.document})\n`;
+                });
+                reportText += '\n';
             });
-            reportText += '\n';
-        });
+
+        } else { // Custom report
+            const customData = data as Attendee[];
+            title = `Relatório Gira da Mata (${customData.length} registros)`;
+            reportText = `${title}\n\n`;
+            customData.forEach((attendee) => {
+                reportText += `*${formatCustomValue(attendee, 'name')}*\n`;
+                config.fields.forEach(field => {
+                    if (field !== 'name') {
+                        reportText += ` - ${fieldNames[field]}: ${formatCustomValue(attendee, field)}\n`;
+                    }
+                });
+                reportText += '\n';
+            });
+        }
 
         if (navigator.share) {
             try {
-                await navigator.share({
-                    title: title,
-                    text: reportText,
-                });
+                await navigator.share({ title, text: reportText });
             } catch (error) {
                 console.error('Error sharing text:', error);
             }
@@ -229,7 +305,9 @@ const InteractiveReportPreview: React.FC<{ data: Attendee[]; config: ReportConfi
                     <button onClick={onBack} className="text-zinc-500 hover:text-zinc-800 p-1 rounded-full hover:bg-zinc-100">
                         <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>
                     </button>
-                    <h1 className="text-xl md:text-2xl font-bold text-zinc-800">Relatório ({data.length})</h1>
+                    <h1 className="text-xl md:text-2xl font-bold text-zinc-800">
+                        {config.type === 'busList' ? 'Lista de Passageiros' : `Relatório (${(data as any[]).flat().length})`}
+                    </h1>
                 </div>
                 <div className="flex items-center gap-2">
                     <button onClick={() => setIsShareModalOpen(true)} className="p-2 rounded-full text-zinc-700 bg-zinc-200 hover:bg-zinc-300 transition-colors" aria-label="Compartilhar">
@@ -241,28 +319,60 @@ const InteractiveReportPreview: React.FC<{ data: Attendee[]; config: ReportConfi
                 </div>
             </header>
             <main className="flex-grow p-4 space-y-4">
-                {data.length > 0 ? (
+                {config.type === 'busList' ? (
+                    (data as Attendee[][]).map((bus, index) => (
+                        <div key={index} className="bg-white p-4 rounded-xl border border-zinc-200 shadow-sm opacity-0 animate-fadeInUp" style={{ animationDelay: `${index * 50}ms`, animationFillMode: 'forwards' }}>
+                            <h2 className="font-bold text-lg text-zinc-800 mb-3">Ônibus {index + 1} ({bus.length} passageiros)</h2>
+                            <div className="overflow-x-auto">
+                                <table className="min-w-full text-sm">
+                                    <thead>
+                                        <tr className="border-b border-zinc-200">
+                                            <th className="py-2 pr-2 text-left font-semibold text-zinc-500 w-8">#</th>
+                                            <th className="py-2 px-2 text-left font-semibold text-zinc-500">Nome</th>
+                                            <th className="py-2 px-2 text-left font-semibold text-zinc-500">Documento</th>
+                                            <th className="py-2 px-2 text-left font-semibold text-zinc-500">Telefone</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {bus.map((p, pIndex) => (
+                                            <tr key={p.id} className="border-b border-zinc-100 last:border-b-0">
+                                                <td className="py-2 pr-2 text-zinc-600">{pIndex + 1}</td>
+                                                <td className="py-2 px-2 text-zinc-800 font-medium">{p.name}</td>
+                                                <td className="py-2 px-2 text-zinc-600">{`${p.document} (${p.documentType})`}</td>
+                                                <td className="py-2 px-2 text-zinc-600">{p.phone}</td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    ))
+                ) : (
                     <>
-                        <div className="md:hidden space-y-3">
-                            {data.map((attendee, index) => (
-                                <div key={attendee.id} className="bg-white p-4 rounded-xl border border-zinc-200 shadow-sm opacity-0 animate-fadeInUp" style={{ animationDelay: `${index * 50}ms`, animationFillMode: 'forwards' }}>
-                                    {config.fields.map(field => (
-                                        <div key={field} className="flex justify-between items-start py-1 border-b border-zinc-100 last:border-b-0">
-                                            <span className="text-sm font-semibold text-zinc-500">{fieldNames[field]}</span>
-                                            <span className="text-sm text-zinc-800 text-right">{formatValue(attendee, field)}</span>
+                        {(data as Attendee[]).length > 0 ? (
+                            <>
+                                <div className="md:hidden space-y-3">
+                                    {(data as Attendee[]).map((attendee, index) => (
+                                        <div key={attendee.id} className="bg-white p-4 rounded-xl border border-zinc-200 shadow-sm opacity-0 animate-fadeInUp" style={{ animationDelay: `${index * 50}ms`, animationFillMode: 'forwards' }}>
+                                            {config.fields.map(field => (
+                                                <div key={field} className="flex justify-between items-start py-1 border-b border-zinc-100 last:border-b-0">
+                                                    <span className="text-sm font-semibold text-zinc-500">{fieldNames[field]}</span>
+                                                    <span className="text-sm text-zinc-800 text-right">{formatCustomValue(attendee, field)}</span>
+                                                </div>
+                                            ))}
                                         </div>
                                     ))}
                                 </div>
-                            ))}
-                        </div>
-                        <div className="hidden md:block bg-white border border-zinc-200 rounded-xl shadow-sm overflow-hidden">
-                            <table className="min-w-full divide-y divide-zinc-200">
-                                <thead className="bg-zinc-50"><tr >{config.fields.map(field => <th key={field} className="px-4 py-3 text-left text-xs font-bold text-zinc-500 uppercase tracking-wider">{fieldNames[field]}</th>)}</tr></thead>
-                                <tbody className="bg-white divide-y divide-zinc-200">{data.map(attendee => (<tr key={attendee.id}>{config.fields.map(field => <td key={`${attendee.id}-${field}`} className="px-4 py-3 whitespace-nowrap text-sm text-zinc-700">{formatValue(attendee, field)}</td>)}</tr>))}</tbody>
-                            </table>
-                        </div>
+                                <div className="hidden md:block bg-white border border-zinc-200 rounded-xl shadow-sm overflow-hidden">
+                                    <table className="min-w-full divide-y divide-zinc-200">
+                                        <thead className="bg-zinc-50"><tr >{config.fields.map(field => <th key={field} className="px-4 py-3 text-left text-xs font-bold text-zinc-500 uppercase tracking-wider">{fieldNames[field]}</th>)}</tr></thead>
+                                        <tbody className="bg-white divide-y divide-zinc-200">{(data as Attendee[]).map(attendee => (<tr key={attendee.id}>{config.fields.map(field => <td key={`${attendee.id}-${field}`} className="px-4 py-3 whitespace-nowrap text-sm text-zinc-700">{formatCustomValue(attendee, field)}</td>)}</tr>))}</tbody>
+                                    </table>
+                                </div>
+                            </>
+                        ) : <p className="text-center text-zinc-500 animate-fadeIn">Nenhum registro encontrado para os filtros selecionados.</p>}
                     </>
-                ) : <p className="text-center text-zinc-500 animate-fadeIn">Nenhum registro encontrado para os filtros selecionados.</p>}
+                )}
             </main>
             {isShareModalOpen && (
                 <ShareOptionsModal
@@ -564,147 +674,6 @@ const ReportsDashboard: React.FC<{ attendees: Attendee[]; onGenerateReportClick:
         };
     }, [attendees]);
 
-    const handleGenerateBusListPdf = () => {
-        // 1. Filter for bus attendees
-        const busAttendees = attendees.filter(a => a.packageType === PackageType.SITIO_BUS);
-
-        if (busAttendees.length === 0) {
-            alert("Não há passageiros com o pacote de ônibus para gerar a lista.");
-            return;
-        }
-
-        // 2. Group by last name to find families
-        const getLastName = (name: string) => {
-            const parts = name.trim().split(' ');
-            const suffixes = ['jr', 'junior', 'filho', 'filha', 'neto', 'neta'];
-            if (parts.length > 1 && suffixes.includes(parts[parts.length - 1].toLowerCase())) {
-                return parts[parts.length - 2].toLowerCase();
-            }
-            return parts.pop()?.toLowerCase() || '';
-        };
-        
-        const groupsByName = busAttendees.reduce((acc, person) => {
-            const lastName = getLastName(person.name);
-            if (lastName) {
-                acc[lastName] = acc[lastName] || [];
-                acc[lastName].push(person);
-            }
-            return acc;
-        }, {} as Record<string, Attendee[]>);
-
-        // 3. Separate families (groups > 1) and individuals
-        // FIX: Explicitly cast the result of Object.values to Attendee[][] to ensure correct type inference.
-        // This resolves downstream errors where array properties and methods were not found on type 'unknown'.
-        const families = (Object.values(groupsByName) as Attendee[][]).filter(group => group.length > 1);
-        const individuals = (Object.values(groupsByName) as Attendee[][]).filter(group => group.length === 1).flat();
-
-        families.sort((a, b) => b.length - a.length);
-
-        // 4. Assign to buses
-        const buses: { passengers: Attendee[] }[] = [];
-        const BUS_CAPACITY = 50;
-
-        families.forEach(family => {
-            let placed = false;
-            for (const bus of buses) {
-                if (bus.passengers.length + family.length <= BUS_CAPACITY) {
-                    bus.passengers.push(...family);
-                    placed = true;
-                    break;
-                }
-            }
-            if (!placed && family.length <= BUS_CAPACITY) {
-                buses.push({ passengers: [...family] });
-            } else if (!placed) {
-                const familyCopy = [...family];
-                while(familyCopy.length > 0) {
-                    const chunk = familyCopy.splice(0, BUS_CAPACITY);
-                    buses.push({ passengers: chunk });
-                }
-            }
-        });
-
-        individuals.forEach(person => {
-            let placed = false;
-            for (const bus of buses) {
-                if (bus.passengers.length < BUS_CAPACITY) {
-                    bus.passengers.push(person);
-                    placed = true;
-                    break;
-                }
-            }
-            if (!placed) {
-                buses.push({ passengers: [person] });
-            }
-        });
-        
-        buses.forEach(bus => {
-            bus.passengers.sort((a, b) => a.name.localeCompare(b.name));
-        });
-
-        // 6. Generate HTML for PDF
-        const generatePrintableHtml = (busData: { passengers: Attendee[] }[]) => {
-            let html = `
-                <!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8"><title>Lista de Passageiros - Gira da Mata 2025</title>
-                <style>
-                    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; margin: 1.5rem; color: #333; }
-                    .bus-section { page-break-before: always; padding-top: 1rem; }
-                    .bus-section:first-of-type { page-break-before: auto; padding-top: 0; }
-                    h1 { color: #10B981; border-bottom: 2px solid #10B981; padding-bottom: 0.5rem; font-size: 1.5rem; }
-                    h2 { font-size: 1.2rem; margin-bottom: 0.5rem; }
-                    p { font-size: 0.9rem; margin: 0 0 1rem; }
-                    table { width: 100%; border-collapse: collapse; margin-top: 1rem; font-size: 0.8rem; }
-                    th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
-                    th { background-color: #f7f7f7; font-weight: 600; }
-                    tr:nth-child(even) { background-color: #fcfcfc; }
-                    @media print { @page { size: A4; margin: 1in; } }
-                </style></head><body>
-                    <h1>Lista de Passageiros - Gira da Mata 2025</h1>
-                    <p><strong>Data de Geração:</strong> ${new Date().toLocaleString('pt-BR')}</p>
-            `;
-
-            busData.forEach((bus, index) => {
-                html += `
-                    <div class="bus-section">
-                        <h2>Ônibus ${index + 1} (${bus.passengers.length} passageiros)</h2>
-                        <table>
-                            <thead>
-                                <tr>
-                                    <th>#</th>
-                                    <th style="width: 40%;">Nome</th>
-                                    <th style="width: 30%;">Documento</th>
-                                    <th style="width: 30%;">Telefone</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                ${bus.passengers.map((p, passengerIndex) => `
-                                    <tr>
-                                        <td>${passengerIndex + 1}</td>
-                                        <td>${p.name}</td>
-                                        <td>${p.document} (${p.documentType})</td>
-                                        <td>${p.phone}</td>
-                                    </tr>
-                                `).join('')}
-                            </tbody>
-                        </table>
-                    </div>
-                `;
-            });
-            
-            html += `</body></html>`;
-            return html;
-        };
-
-        const printableHtml = generatePrintableHtml(buses);
-        const printWindow = window.open('', '_blank');
-        if (printWindow) {
-            printWindow.document.write(printableHtml);
-            printWindow.document.close();
-            printWindow.focus();
-            setTimeout(() => printWindow.print(), 500);
-        }
-    };
-
     const IconUsers = <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.653-.124-1.282-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.653.124-1.282.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" /></svg>;
     const IconDollar = <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v.01M12 12v-2m0 2v2m0-2.35V10M12 15v2m0-2v-2m0 0h.01M12 7.02c.164.017.324.041.48.072M7.5 9.51c.418-.472 1.012-.867 1.697-1.126M12 21a9 9 0 100-18 9 9 0 000 18z" /></svg>;
     const IconBus = <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path d="M9 17a2 2 0 11-4 0 2 2 0 014 0zM19 17a2 2 0 11-4 0 2 2 0 014 0z" /><path strokeLinecap="round" strokeLinejoin="round" d="M13 16V6a1 1 0 00-1-1H4a1 1 0 00-1 1v10l2 2h8l2-2zM5 11h6" /></svg>;
@@ -791,8 +760,12 @@ const ReportsDashboard: React.FC<{ attendees: Attendee[]; onGenerateReportClick:
                         </div>
                     )}
                 </StatCard>
-                <StatCard title="Relatórios Personalizados" icon={IconClipboardList} delay={400 + (buses.length * 50)} className="md:col-span-2 lg:col-span-1"><p className="text-sm text-zinc-600">Crie relatórios com filtros e campos específicos. Exporte em PDF, imprima ou compartilhe.</p><button onClick={onGenerateReportClick} className="mt-2 w-full bg-blue-500 text-white font-bold py-2 px-4 rounded-full hover:bg-blue-600 transition-colors shadow-sm flex items-center justify-center gap-2">Gerar Relatório</button></StatCard>
-                <StatCard title="Listas de Passageiros" icon={IconBus} delay={450 + (buses.length * 50)} className="md:col-span-2 lg:col-span-2"><p className="text-sm text-zinc-600">Gere um PDF para impressão com a lista de passageiros de cada ônibus, com famílias agrupadas automaticamente.</p><button onClick={handleGenerateBusListPdf} className="mt-2 w-full bg-indigo-500 text-white font-bold py-2 px-4 rounded-full hover:bg-indigo-600 transition-colors shadow-sm flex items-center justify-center gap-2">Gerar PDF dos Ônibus</button></StatCard>
+                <StatCard title="Gerador de Relatórios" icon={IconClipboardList} delay={400 + (buses.length * 50)} className="md:col-span-full lg:col-span-1">
+                    <p className="text-sm text-zinc-600">Crie listas personalizadas ou gere a lista de passageiros para os ônibus. Exporte em PDF, imprima ou compartilhe.</p>
+                    <button onClick={onGenerateReportClick} className="mt-2 w-full bg-blue-500 text-white font-bold py-2 px-4 rounded-full hover:bg-blue-600 transition-colors shadow-sm flex items-center justify-center gap-2">
+                        Gerar Relatório
+                    </button>
+                </StatCard>
             </div>
         </div>
     );
@@ -809,7 +782,7 @@ interface ReportsProps {
 const Reports: React.FC<ReportsProps> = ({ attendees, onLogout, onUpdateAttendee, onSelectAttendee }) => {
     const [mode, setMode] = useState<'dashboard' | 'form' | 'preview' | 'zeroDoc' | 'duplicateCheck'>('dashboard');
     const [reportConfig, setReportConfig] = useState<ReportConfig | null>(null);
-    const [reportData, setReportData] = useState<Attendee[]>([]);
+    const [reportData, setReportData] = useState<Attendee[] | Attendee[][]>([]);
 
     const zeroDocAttendees = useMemo(() => {
         return attendees.filter(a =>
@@ -852,14 +825,112 @@ const Reports: React.FC<ReportsProps> = ({ attendees, onLogout, onUpdateAttendee
     }, [attendees]);
 
     const handleGenerate = (config: ReportConfig) => {
-        const filteredData = attendees.filter(attendee => {
-            const statusMatch = config.filters.status === 'all' || attendee.payment.status === config.filters.status;
-            const packageMatch = config.filters.packageType === 'all' || attendee.packageType === config.filters.packageType;
-            return statusMatch && packageMatch;
-        });
-        setReportConfig(config);
-        setReportData(filteredData);
-        setMode('preview');
+        if (config.type === 'busList') {
+            const busAttendees = attendees.filter(a => a.packageType === PackageType.SITIO_BUS);
+
+            const getLastName = (name: string) => {
+                const parts = name.trim().split(' ');
+                const suffixes = ['jr', 'junior', 'filho', 'filha', 'neto', 'neta'];
+                if (parts.length > 1 && suffixes.includes(parts[parts.length - 1].toLowerCase())) {
+                    return parts[parts.length - 2].toLowerCase();
+                }
+                return parts.pop()?.toLowerCase() || '';
+            };
+
+            const groupsByLastName = busAttendees.reduce((acc, person) => {
+                const lastName = getLastName(person.name);
+                if (lastName) {
+                    acc[lastName] = acc[lastName] || [];
+                    acc[lastName].push(person);
+                }
+                return acc;
+            }, {} as Record<string, Attendee[]>);
+            
+            const lastNames = Object.keys(groupsByLastName);
+            const mergedGroups: Record<string, Attendee[]> = {};
+            const processedLastNames = new Set<string>();
+
+            for (const lastName1 of lastNames) {
+                if (processedLastNames.has(lastName1)) continue;
+                let currentGroup = [...groupsByLastName[lastName1]];
+                processedLastNames.add(lastName1);
+
+                for (const lastName2 of lastNames) {
+                    if (processedLastNames.has(lastName2)) continue;
+                    if (levenshteinDistance(lastName1, lastName2) <= 2) {
+                        currentGroup.push(...groupsByLastName[lastName2]);
+                        processedLastNames.add(lastName2);
+                    }
+                }
+                mergedGroups[lastName1] = currentGroup;
+            }
+
+            const families = Object.values(mergedGroups).filter(group => group.length > 1);
+            const individuals = Object.values(mergedGroups).filter(group => group.length === 1).flat();
+            families.sort((a, b) => b.length - a.length);
+
+            const buses: Attendee[][] = [];
+            const BUS_CAPACITY = 50;
+
+            families.forEach(family => {
+                let placed = false;
+                for (const bus of buses) {
+                    if (bus.length + family.length <= BUS_CAPACITY) {
+                        bus.push(...family);
+                        placed = true;
+                        break;
+                    }
+                }
+                if (!placed) {
+                     let remainingFamily = [...family];
+                    while (remainingFamily.length > 0) {
+                        const newBus: Attendee[] = [];
+                        let spaceOnNewBus = BUS_CAPACITY;
+                        if (remainingFamily.length <= spaceOnNewBus) {
+                            newBus.push(...remainingFamily);
+                            remainingFamily = [];
+                        } else {
+                            newBus.push(...remainingFamily.splice(0, spaceOnNewBus));
+                        }
+                        if (newBus.length > 0) buses.push(newBus);
+                    }
+                }
+            });
+
+            individuals.forEach(person => {
+                let placed = false;
+                for (const bus of buses) {
+                    if (bus.length < BUS_CAPACITY) {
+                        bus.push(person);
+                        placed = true;
+                        break;
+                    }
+                }
+                if (!placed) {
+                    buses.push([person]);
+                }
+            });
+            
+            buses.forEach(bus => {
+                bus.sort((a, b) => a.name.localeCompare(b.name));
+            });
+
+            setReportConfig(config);
+            setReportData(buses);
+            setMode('preview');
+        } else {
+            const filteredData = attendees.filter(attendee => {
+                const statusMatch = config.filters.status === 'all' || attendee.payment.status === config.filters.status;
+                const packageMatch = config.filters.packageType === 'all' || attendee.packageType === config.filters.packageType;
+                return statusMatch && packageMatch;
+            });
+
+            const sortedData = [...filteredData].sort((a, b) => a.name.localeCompare(b.name));
+
+            setReportConfig(config);
+            setReportData(sortedData);
+            setMode('preview');
+        }
     };
 
     if (mode === 'form') {

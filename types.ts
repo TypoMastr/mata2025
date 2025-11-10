@@ -56,6 +56,7 @@ export interface AttendeeFormData {
 export type ReportField = 'name' | 'document' | 'phone' | 'packageType' | 'payment.status' | 'payment.amount';
 
 export interface ReportConfig {
+    type: 'custom' | 'busList';
     fields: ReportField[];
     filters: {
         status: 'all' | PaymentStatus;

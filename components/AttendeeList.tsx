@@ -36,8 +36,10 @@ const PackageIcon: React.FC<{ packageType: PackageType }> = ({ packageType }) =>
         : <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-1.5 text-zinc-400 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" /></svg>;
 }
 
-const StatusBadge: React.FC<{ status: PaymentStatus }> = ({ status }) => {
+const StatusBadge: React.FC<{ attendee: Attendee }> = ({ attendee }) => {
     let statusClasses = '';
+    const { status, sitePaymentDetails, busPaymentDetails } = attendee.payment;
+    
     switch (status) {
         case PaymentStatus.PAGO:
             statusClasses = 'bg-green-100 text-green-800';
@@ -51,10 +53,22 @@ const StatusBadge: React.FC<{ status: PaymentStatus }> = ({ status }) => {
         default:
             statusClasses = 'bg-zinc-100 text-zinc-800';
     }
+    
+    const isPartiallyPaid = attendee.packageType === PackageType.SITIO_BUS &&
+                            status === PaymentStatus.PENDENTE &&
+                            (sitePaymentDetails?.isPaid || busPaymentDetails?.isPaid);
+
     return (
-        <span className={`px-3 py-1 text-xs font-bold rounded-full ${statusClasses}`}>
-            {status.toUpperCase()}
-        </span>
+        <div className="flex items-center gap-2">
+            <span className={`px-3 py-1 text-xs font-bold rounded-full ${statusClasses}`}>
+                {status.toUpperCase()}
+            </span>
+            {isPartiallyPaid && (
+                 <span className="px-3 py-1 text-xs font-bold rounded-full bg-yellow-100 text-yellow-800">
+                    PARCIAL
+                </span>
+            )}
+        </div>
     );
 }
 
@@ -183,7 +197,7 @@ const AttendeeList: React.FC<AttendeeListProps> = ({
                                         <tr key={attendee.id} onClick={() => onSelectAttendee(attendee.id)} className="hover:bg-zinc-50 cursor-pointer transition-colors">
                                             <td className="px-6 py-4 whitespace-nowrap"><div className="text-sm font-medium text-zinc-900">{attendee.name}</div></td>
                                             <td className="px-6 py-4 whitespace-nowrap"><div className="flex items-center text-sm text-zinc-500"><PackageIcon packageType={attendee.packageType} />{attendee.packageType}</div></td>
-                                            <td className="px-6 py-4 whitespace-nowrap"><StatusBadge status={attendee.payment.status} /></td>
+                                            <td className="px-6 py-4 whitespace-nowrap"><StatusBadge attendee={attendee} /></td>
                                             <td className="px-6 py-4 whitespace-nowrap text-sm text-zinc-500">{attendee.phone}</td>
                                             <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                                                 <span className="text-green-600 hover:text-green-900 flex items-center justify-end">

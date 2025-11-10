@@ -23,12 +23,24 @@ export enum PaymentType {
     DINHEIRO = 'Dinheiro',
 }
 
-export interface Payment {
-    amount: number;
-    status: PaymentStatus;
+export interface PartialPaymentDetails {
+    isPaid: boolean;
     date?: string;
     type?: PaymentType;
     receiptUrl: string | null;
+}
+
+
+export interface Payment {
+    amount: number;
+    status: PaymentStatus;
+    // Legacy/single payment fields
+    date?: string;
+    type?: PaymentType;
+    receiptUrl: string | null;
+    // New fields for multi-part payments
+    sitePaymentDetails?: PartialPaymentDetails | null;
+    busPaymentDetails?: PartialPaymentDetails | null;
 }
 
 export interface Attendee {

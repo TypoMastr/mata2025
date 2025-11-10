@@ -51,14 +51,14 @@ const BiometricsCard: React.FC = () => {
 
     if (!isSupported) {
         return (
-            <InfoCard icon={IconFingerPrint} title="Acesso Rápido" delay={50}>
+            <InfoCard icon={IconFingerPrint} title="Acesso Rápido" delay={100}>
                 <p className="text-sm text-zinc-500">Seu navegador ou dispositivo não é compatível com login por biometria (Face ID/Touch ID).</p>
             </InfoCard>
         );
     }
 
     return (
-        <InfoCard icon={IconFingerPrint} title="Acesso Rápido com Biometria" delay={50}>
+        <InfoCard icon={IconFingerPrint} title="Acesso Rápido com Biometria" delay={100}>
             {isEnabled ? (
                 <>
                     <p className="text-sm text-green-700 font-semibold">Login por biometria está ativado.</p>
@@ -115,20 +115,20 @@ const InfoPage: React.FC<{ onLogout: () => void; }> = ({ onLogout }) => {
             </header>
             <main className="p-4 space-y-4 md:grid md:grid-cols-2 md:gap-4 md:space-y-0">
                 <BiometricsCard />
-                <InfoCard icon={IconCalendar} title="Gira da Mata 2025" delay={100}>
+                <InfoCard icon={IconCalendar} title="Gira da Mata 2025" delay={150}>
                     <InfoItem label="Data"><Highlight>06/12/2025</Highlight></InfoItem>
                     <InfoItem label="Local"><p>Maricá</p></InfoItem>
                     <InfoItem label="Horário das atividades"><p>9:30 às 18:00</p></InfoItem>
                 </InfoCard>
 
-                <InfoCard icon={IconDollar} title="Valores e Pagamento" delay={150}>
+                <InfoCard icon={IconDollar} title="Valores e Pagamento" delay={200}>
                     <InfoItem label="Entrada (Sítio + Tenda)"><p><Highlight>R$ 70,00</Highlight> por pessoa. Menores de 14 anos não pagam.</p></InfoItem>
                     <InfoItem label="Formas de Pagamento"><p>Cartão de Débito/Crédito e PIX.</p><p className="mt-1 p-2 bg-zinc-100 rounded-md text-center font-mono">Chave Pix: <Highlight>teuco@teuco.com.br</Highlight></p></InfoItem>
                     <InfoItem label="Condição Especial (Médiuns)"><p>Pagamento parcelado em 2x (outubro e novembro) incluindo o ônibus.</p></InfoItem>
                     <InfoItem label="Local de Pagamento"><p>Todos os pagamentos devem ser feitos no Bazar, apresentando o comprovante PIX. Não pagar na cantina.</p></InfoItem>
                 </InfoCard>
                 
-                <InfoCard icon={IconBus} title="Ônibus Fretado" delay={200}>
+                <InfoCard icon={IconBus} title="Ônibus Fretado" delay={250}>
                     <InfoItem label="Valor"><p><Highlight>R$ 50,00</Highlight> por pessoa. Crianças até 6 anos, no colo, não pagam.</p></InfoItem>
                     <InfoItem label="Saída"><p>T.E.U.CO. às <Highlight>7:30</Highlight> (chegar com 20 min de antecedência). <strong className="text-red-600">Sem tolerância de atraso.</strong></p></InfoItem>
                     <InfoItem label="Retorno"><p><Highlight>19:00</Highlight>, com desembarque apenas na T.E.U.CO.</p></InfoItem>
@@ -136,7 +136,7 @@ const InfoPage: React.FC<{ onLogout: () => void; }> = ({ onLogout }) => {
                     <InfoItem label="Obrigatório"><p>Informar nome completo e RG/CPF de todos os passageiros para o seguro e levar documento com foto no dia.</p></InfoItem>
                 </InfoCard>
 
-                <InfoCard icon={IconClipboard} title="Orientações e Recomendações" delay={250}>
+                <InfoCard icon={IconClipboard} title="Orientações e Recomendações" delay={300}>
                     <InfoItem label="Transporte Individual"><p>É de responsabilidade de cada um. Há estacionamento na rua e opções de transporte público/Uber.</p></InfoItem>
                     <InfoItem label="Alimentação"><p>Haverá venda de bebidas, lanches e almoço. O almoço deve ser reservado com antecedência na cantina.</p></InfoItem>
                     <InfoItem label="Crianças"><p>A responsabilidade é dos responsáveis. <strong className="text-red-600">O uso da piscina não é permitido.</strong></p></InfoItem>
@@ -144,7 +144,7 @@ const InfoPage: React.FC<{ onLogout: () => void; }> = ({ onLogout }) => {
                     <InfoItem label="Importante"><p>Não será permitido fazer oferendas no sítio.</p></InfoItem>
                 </InfoCard>
 
-                <div className="text-center text-sm text-zinc-600 bg-green-50 p-4 rounded-xl border border-green-200 opacity-0 animate-fadeInUp md:col-span-2" style={{ animationDelay: '300ms', animationFillMode: 'forwards' }}>
+                <div className="text-center text-sm text-zinc-600 bg-green-50 p-4 rounded-xl border border-green-200 opacity-0 animate-fadeInUp md:col-span-2" style={{ animationDelay: '350ms', animationFillMode: 'forwards' }}>
                     <p className="leading-relaxed">Quaisquer fatores que impossibilitem o pagamento do Sítio e/ou transporte, procurem o Pai Carlinhos para expor a situação. Lembrem-se sempre, Nossa Casa é do Caboclo de Oxóssi e nunca deixamos um filho(a) desamparado.</p>
                     <p className="font-bold mt-3 text-green-700">Axé!</p>
                 </div>

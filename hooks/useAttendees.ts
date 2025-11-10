@@ -1,8 +1,8 @@
 import { useState, useEffect, useCallback } from 'react';
-import type { Attendee, AttendeeFormData } from '../types';
+import type { Attendee, AttendeeFormData, Payment } from '../types';
 import * as api from '../services/api';
 import { getDocumentType } from '../utils/formatters';
-import { PaymentStatus } from '../types';
+import { PaymentStatus, PackageType } from '../types';
 
 export const useAttendees = () => {
     const [attendees, setAttendees] = useState<Attendee[]>([]);
@@ -30,19 +30,32 @@ export const useAttendees = () => {
     const addAttendee = async (formData: AttendeeFormData & { paymentAmount: number }) => {
         const { type: documentType } = getDocumentType(formData.document);
 
-        const paymentDetails = formData.registerPaymentNow
-            ? {
-                amount: formData.paymentAmount,
-                status: PaymentStatus.PAGO,
-                date: formData.paymentDateNotInformed ? undefined : new Date(formData.paymentDate + 'T00:00:00Z').toISOString(),
-                type: formData.paymentType,
-            }
-            : {
-                amount: formData.paymentAmount,
-                status: PaymentStatus.PENDENTE,
-            };
+        const isBusPackage = formData.packageType === PackageType.SITIO_BUS;
 
-        const newAttendeeData: Omit<Attendee, 'id' | 'registrationDate' | 'payment'> & { payment: Omit<Attendee['payment'], 'receiptUrl'> } = {
+        const paymentDetails: Payment = {
+                amount: formData.paymentAmount,
+                status: formData.registerPaymentNow ? PaymentStatus.PAGO : PaymentStatus.PENDENTE,
+                receiptUrl: null, // Ensure the object conforms to the Payment type
+        };
+
+        if (formData.registerPaymentNow) {
+            paymentDetails.date = formData.paymentDateNotInformed ? undefined : new Date(formData.paymentDate + 'T00:00:00Z').toISOString();
+            paymentDetails.type = formData.paymentType;
+        }
+
+        if (isBusPackage) {
+             const paid = formData.registerPaymentNow;
+             const paymentPart = {
+                isPaid: paid,
+                date: paid ? paymentDetails.date : undefined,
+                type: paid ? paymentDetails.type : undefined,
+                receiptUrl: null
+             };
+             paymentDetails.sitePaymentDetails = { ...paymentPart };
+             paymentDetails.busPaymentDetails = { ...paymentPart };
+        }
+
+        const newAttendeeData: Omit<Attendee, 'id' | 'registrationDate'> = {
             name: formData.name,
             document: formData.document,
             documentType: documentType,

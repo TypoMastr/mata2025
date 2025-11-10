@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import type { Attendee } from '../types';
+import type { Attendee, PartialPaymentDetails } from '../types';
 import { PaymentStatus, PackageType } from '../types';
 import ReceiptViewer from './ReceiptViewer';
 
@@ -8,8 +8,7 @@ interface AttendeeDetailProps {
     onBack: () => void;
     onEdit: () => void;
     onDelete: (attendee: Attendee) => void;
-    onRegisterPayment: () => void;
-    onEditPayment: () => void;
+    onManagePayment: () => void;
 }
 
 const DetailRow: React.FC<{ label: string; value?: string; children?: React.ReactNode }> = ({ label, value, children }) => (
@@ -19,8 +18,52 @@ const DetailRow: React.FC<{ label: string; value?: string; children?: React.Reac
     </div>
 );
 
-const AttendeeDetail: React.FC<AttendeeDetailProps> = ({ attendee, onBack, onEdit, onDelete, onRegisterPayment, onEditPayment }) => {
-    const [showReceipt, setShowReceipt] = useState(false);
+const formatDate = (dateString?: string) => {
+    if (!dateString) return 'N/A';
+    return new Date(dateString).toLocaleDateString('pt-BR', {
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric',
+        timeZone: 'UTC',
+    });
+};
+
+const PartialPaymentDetail: React.FC<{
+    title: string;
+    amount: number;
+    details: PartialPaymentDetails | null | undefined;
+    onViewReceipt: (url: string) => void;
+}> = ({ title, amount, details, onViewReceipt }) => {
+    const isPaid = details?.isPaid || false;
+    return (
+        <div className={`p-3 rounded-lg border ${isPaid ? 'bg-green-50 border-green-200' : 'bg-red-50 border-red-200'}`}>
+            <div className="flex justify-between items-center">
+                <h3 className="font-bold text-zinc-800">{title}</h3>
+                <span className={`px-2 py-0.5 text-xs font-bold rounded-full ${isPaid ? 'bg-green-200 text-green-800' : 'bg-red-200 text-red-800'}`}>
+                    {isPaid ? 'PAGO' : 'PENDENTE'}
+                </span>
+            </div>
+            <div className="text-sm text-zinc-600 mt-2 space-y-2">
+                <div className="flex justify-between"><span className="font-medium">Valor:</span><span>R$ {amount.toFixed(2).replace('.', ',')}</span></div>
+                {isPaid && (
+                    <>
+                        <div className="flex justify-between"><span className="font-medium">Data:</span><span>{formatDate(details?.date)}</span></div>
+                        <div className="flex justify-between"><span className="font-medium">Tipo:</span><span>{details?.type || 'N/A'}</span></div>
+                        {details?.receiptUrl && (
+                             <button onClick={() => onViewReceipt(details.receiptUrl!)} className="text-sm font-semibold text-green-600 hover:underline pt-1">
+                                Ver Comprovante
+                            </button>
+                        )}
+                    </>
+                )}
+            </div>
+        </div>
+    )
+};
+
+
+const AttendeeDetail: React.FC<AttendeeDetailProps> = ({ attendee, onBack, onEdit, onDelete, onManagePayment }) => {
+    const [receiptToView, setReceiptToView] = useState<string | null>(null);
     const status = attendee.payment.status;
 
     let statusClasses = '';
@@ -37,21 +80,17 @@ const AttendeeDetail: React.FC<AttendeeDetailProps> = ({ attendee, onBack, onEdi
         default:
             statusClasses = 'bg-zinc-100 text-zinc-800';
     }
-
-    const formatDate = (dateString?: string) => {
-        if (!dateString) return 'N/A';
-        return new Date(dateString).toLocaleDateString('pt-BR', {
-            day: '2-digit',
-            month: '2-digit',
-            year: 'numeric',
-            timeZone: 'UTC',
-        });
-    };
     
     const getAnimationStyle = (delay: number) => ({
         animationDelay: `${delay}ms`,
         animationFillMode: 'forwards',
     });
+
+    const isMultiPayment = attendee.packageType === PackageType.SITIO_BUS;
+    const isPartiallyPaid = isMultiPayment &&
+                            status === PaymentStatus.PENDENTE &&
+                            (attendee.payment.sitePaymentDetails?.isPaid || attendee.payment.busPaymentDetails?.isPaid);
+
 
     return (
         <div className="animate-fadeIn">
@@ -76,18 +115,26 @@ const AttendeeDetail: React.FC<AttendeeDetailProps> = ({ attendee, onBack, onEdi
                     <div className="bg-white p-4 rounded-xl border border-zinc-200 shadow-sm opacity-0 animate-fadeInUp" style={getAnimationStyle(200)}>
                         <h2 className="text-lg font-bold text-zinc-800 mb-3">Pagamento</h2>
                         <div className="space-y-4">
-                            <DetailRow label="Status">
-                                 <span className={`px-3 py-1 text-sm font-bold rounded-full ${statusClasses}`}>
-                                    {attendee.payment.status}
-                                </span>
+                            <DetailRow label="Status Geral">
+                                <div className="flex items-center gap-2">
+                                     <span className={`px-3 py-1 text-sm font-bold rounded-full ${statusClasses}`}>
+                                        {attendee.payment.status}
+                                    </span>
+                                    {isPartiallyPaid && (
+                                         <span className="px-3 py-1 text-sm font-bold rounded-full bg-yellow-100 text-yellow-800">
+                                            PARCIAL
+                                        </span>
+                                    )}
+                                </div>
                             </DetailRow>
-                            <DetailRow label="Valor" value={`R$ ${attendee.payment.amount.toFixed(2).replace('.', ',')}`} />
-                            {status === PaymentStatus.PAGO && (
+                            <DetailRow label="Valor Total" value={`R$ ${attendee.payment.amount.toFixed(2).replace('.', ',')}`} />
+                            
+                            {!isMultiPayment && status === PaymentStatus.PAGO && (
                                 <>
                                     <DetailRow label="Data do Pagamento" value={formatDate(attendee.payment.date)} />
                                     <DetailRow label="Tipo de Pagamento" value={attendee.payment.type || 'N/A'} />
                                     {attendee.payment.receiptUrl && (
-                                         <button onClick={() => setShowReceipt(true)} className="text-sm font-semibold text-green-600 hover:underline">
+                                         <button onClick={() => setReceiptToView(attendee.payment.receiptUrl)} className="text-sm font-semibold text-green-600 hover:underline">
                                             Ver Comprovante
                                         </button>
                                     )}
@@ -95,18 +142,19 @@ const AttendeeDetail: React.FC<AttendeeDetailProps> = ({ attendee, onBack, onEdi
                             )}
                         </div>
                     </div>
+                    
+                    {isMultiPayment && (
+                        <div className="bg-white p-4 rounded-xl border border-zinc-200 shadow-sm space-y-3 opacity-0 animate-fadeInUp md:col-span-2" style={getAnimationStyle(250)}>
+                            <PartialPaymentDetail title="Pagamento Sítio" amount={70} details={attendee.payment.sitePaymentDetails} onViewReceipt={setReceiptToView} />
+                            <PartialPaymentDetail title="Pagamento Ônibus" amount={50} details={attendee.payment.busPaymentDetails} onViewReceipt={setReceiptToView} />
+                        </div>
+                    )}
 
                     <div className="space-y-3 opacity-0 animate-fadeInUp md:col-span-2" style={getAnimationStyle(300)}>
-                         {status === PaymentStatus.PENDENTE && (
-                            <button onClick={onRegisterPayment} className="w-full bg-green-500 text-white font-bold py-3 px-4 rounded-full hover:bg-green-600 transition-colors shadow-sm">
-                                Registrar Pagamento
-                            </button>
-                        )}
-                        {(status === PaymentStatus.PAGO || status === PaymentStatus.ISENTO) && (
-                             <button onClick={onEditPayment} className="w-full bg-blue-500 text-white font-bold py-3 px-4 rounded-full hover:bg-blue-600 transition-colors shadow-sm">
-                                {status === PaymentStatus.ISENTO ? 'Alterar Status do Pagamento' : 'Editar Pagamento'}
-                            </button>
-                        )}
+                        <button onClick={onManagePayment} className="w-full bg-blue-500 text-white font-bold py-3 px-4 rounded-full hover:bg-blue-600 transition-colors shadow-sm">
+                            Gerenciar Pagamentos
+                        </button>
+                        
                         <div className="flex flex-col md:flex-row gap-3">
                             <button onClick={onEdit} className="w-full bg-zinc-200 text-zinc-800 font-bold py-3 px-4 rounded-full hover:bg-zinc-300 transition-colors">
                                 Editar Inscrição
@@ -119,8 +167,8 @@ const AttendeeDetail: React.FC<AttendeeDetailProps> = ({ attendee, onBack, onEdi
                 </div>
             </div>
             
-            {showReceipt && attendee.payment.receiptUrl && (
-                <ReceiptViewer receiptUrl={attendee.payment.receiptUrl} onClose={() => setShowReceipt(false)} />
+            {receiptToView && (
+                <ReceiptViewer receiptUrl={receiptToView} onClose={() => setReceiptToView(null)} />
             )}
         </div>
     );

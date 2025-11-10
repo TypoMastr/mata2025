@@ -680,14 +680,29 @@ const ReportsDashboard: React.FC<{ attendees: Attendee[]; onGenerateReportClick:
             acc[type] = { count: 0, total: 0 };
             return acc;
         }, {} as Record<PaymentType, { count: number; total: number }>);
+        
+        const allPaidOrPartiallyPaid = attendees.filter(a => a.payment.status === PaymentStatus.PAGO || (a.payment.sitePaymentDetails?.isPaid || a.payment.busPaymentDetails?.isPaid));
 
-        paidAttendees
-            .filter(a => a.payment.type && calculatedPaymentStats.hasOwnProperty(a.payment.type))
-            .forEach(attendee => {
-                const type = attendee.payment.type!;
-                calculatedPaymentStats[type].count += 1;
-                calculatedPaymentStats[type].total += attendee.payment.amount;
-            });
+        allPaidOrPartiallyPaid.forEach(attendee => {
+            if (attendee.packageType === PackageType.SITIO_BUS) {
+                if (attendee.payment.sitePaymentDetails?.isPaid && attendee.payment.sitePaymentDetails.type) {
+                    const type = attendee.payment.sitePaymentDetails.type;
+                    calculatedPaymentStats[type].count += 1;
+                    calculatedPaymentStats[type].total += 70;
+                }
+                 if (attendee.payment.busPaymentDetails?.isPaid && attendee.payment.busPaymentDetails.type) {
+                    const type = attendee.payment.busPaymentDetails.type;
+                    calculatedPaymentStats[type].count += 1;
+                    calculatedPaymentStats[type].total += 50;
+                }
+            } else { // Single payment package
+                if (attendee.payment.status === PaymentStatus.PAGO && attendee.payment.type) {
+                    const type = attendee.payment.type;
+                    calculatedPaymentStats[type].count += 1;
+                    calculatedPaymentStats[type].total += attendee.payment.amount;
+                }
+            }
+        });
         
         const sortedPaymentStats = Object.entries(calculatedPaymentStats)
             .sort(([, a], [, b]) => {
@@ -699,17 +714,34 @@ const ReportsDashboard: React.FC<{ attendees: Attendee[]; onGenerateReportClick:
                 return statsB.total - statsA.total;
             })
             .reduce((r, [k, v]) => ({ ...r, [k as PaymentType]: v }), {} as Record<PaymentType, { count: number; total: number }>);
+            
+        const calculatedTotalRevenue = attendees
+            .filter(a => a.payment.status !== PaymentStatus.ISENTO)
+            .reduce((sum, a) => {
+                if (a.payment.status === PaymentStatus.PAGO) {
+                    return sum + a.payment.amount;
+                }
+                if (a.packageType === PackageType.SITIO_BUS) {
+                    let partialSum = 0;
+                    if (a.payment.sitePaymentDetails?.isPaid) partialSum += 70;
+                    if (a.payment.busPaymentDetails?.isPaid) partialSum += 50;
+                    return sum + partialSum;
+                }
+                return sum;
+            }, 0);
+        
+        const calculatedTotalPossibleRevenue = attendees
+                .filter(a => a.payment.status !== PaymentStatus.ISENTO)
+                .reduce((sum, a) => sum + a.payment.amount, 0);
 
         return {
             totalAttendees: attendees.length,
             paidCount: paidCountValue,
             pendingCount: pendingCountValue,
             isentoCount: isentoCountValue,
-            totalRevenue: paidAttendees.reduce((sum, a) => sum + a.payment.amount, 0),
-            pendingRevenue: pendingAttendees.reduce((sum, a) => sum + a.payment.amount, 0),
-            totalPossibleRevenue: attendees
-                .filter(a => a.payment.status !== PaymentStatus.ISENTO)
-                .reduce((sum, a) => sum + a.payment.amount, 0),
+            totalRevenue: calculatedTotalRevenue,
+            totalPossibleRevenue: calculatedTotalPossibleRevenue,
+            pendingRevenue: calculatedTotalPossibleRevenue - calculatedTotalRevenue,
             buses: Array.from({ length: busCount }, (_, i) => {
                 const filledSeats = Math.min(BUS_CAPACITY, Math.max(0, busAttendees.length - (i * BUS_CAPACITY)));
                 return { busNumber: i + 1, filledSeats, remainingSeats: BUS_CAPACITY - filledSeats, capacity: BUS_CAPACITY };
@@ -784,18 +816,18 @@ const ReportsDashboard: React.FC<{ attendees: Attendee[]; onGenerateReportClick:
                     </div>
                 </StatCard>
                 <StatCard title="Formas de Pagamento" icon={IconCreditCard} delay={350 + (buses.length * 50)}>
-                    {paidCount > 0 ? (
+                    {paidCount > 0 || Object.values(paymentStats).some(s => s.count > 0) ? (
                         <div className="space-y-3">
                             {(Object.entries(paymentStats) as [string, { count: number; total: number }][]).map(([type, stats]) => (
+                                stats.count > 0 &&
                                 <div key={type} className="text-sm">
                                     <div className="flex justify-between font-semibold text-zinc-800 mb-1">
                                         <span>{type}</span>
-                                        <span>{paidCount > 0 ? `${((stats.count / paidCount) * 100).toFixed(0)}%` : '0%'}</span>
+                                        <span className="font-medium">R$ {stats.total.toFixed(2).replace('.', ',')}</span>
                                     </div>
-                                    <ProgressBar value={stats.count} max={paidCount} colorClass="bg-emerald-400" />
+                                    <ProgressBar value={stats.total} max={totalRevenue} colorClass="bg-emerald-400" />
                                     <div className="flex justify-between items-center text-xs text-zinc-500 mt-1">
                                         <span>{stats.count} {stats.count === 1 ? 'pagamento' : 'pagamentos'}</span>
-                                        <span className="font-medium">R$ {stats.total.toFixed(2).replace('.', ',')}</span>
                                     </div>
                                 </div>
                             ))}

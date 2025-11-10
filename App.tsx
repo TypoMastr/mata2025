@@ -1,4 +1,3 @@
-
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { useAttendees } from './hooks/useAttendees';
 import type { View, Attendee, AttendeeFormData } from './types';
@@ -128,7 +127,9 @@ const App: React.FC = () => {
     }, []);
 
 
-    const handleSaveAttendee = useCallback(async (formData: AttendeeFormData & { paymentAmount: number }) => {
+    // FIX: Changed the type of `formData` to correctly override `paymentAmount` from string to number.
+    // The previous type `AttendeeFormData & { paymentAmount: number }` resulted in `paymentAmount: never`.
+    const handleSaveAttendee = useCallback(async (formData: Omit<AttendeeFormData, 'paymentAmount'> & { paymentAmount: number }) => {
         await addAttendee(formData);
         setView('list');
     }, [addAttendee]);

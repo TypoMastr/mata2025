@@ -54,6 +54,13 @@ export interface Attendee {
     payment: Payment;
 }
 
+export interface PartialPaymentFormDetails {
+    isPaid: boolean;
+    date: string;
+    dateNotInformed: boolean;
+    type: PaymentType;
+}
+
 export interface AttendeeFormData {
     name: string;
     document: string;
@@ -61,9 +68,15 @@ export interface AttendeeFormData {
     packageType: PackageType;
     paymentAmount: string;
     registerPaymentNow: boolean;
+    
+    // For single payment
     paymentDate: string;
     paymentDateNotInformed: boolean;
     paymentType: PaymentType;
+
+    // For multi-payment
+    sitePayment: PartialPaymentFormDetails;
+    busPayment: PartialPaymentFormDetails;
 }
 
 export type ReportField = 'name' | 'document' | 'phone' | 'packageType' | 'payment.status' | 'payment.amount';

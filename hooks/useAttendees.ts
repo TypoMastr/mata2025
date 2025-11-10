@@ -27,33 +27,52 @@ export const useAttendees = () => {
         fetchAttendees();
     }, [fetchAttendees]);
 
-    const addAttendee = async (formData: AttendeeFormData & { paymentAmount: number }) => {
+    // FIX: Changed the type of `formData` to correctly override `paymentAmount` from string to number.
+    // The previous type `AttendeeFormData & { paymentAmount: number }` resulted in `paymentAmount: never`.
+    const addAttendee = async (formData: Omit<AttendeeFormData, 'paymentAmount'> & { paymentAmount: number }) => {
         const { type: documentType } = getDocumentType(formData.document);
-
         const isBusPackage = formData.packageType === PackageType.SITIO_BUS;
 
         const paymentDetails: Payment = {
-                amount: formData.paymentAmount,
-                status: formData.registerPaymentNow ? PaymentStatus.PAGO : PaymentStatus.PENDENTE,
-                receiptUrl: null, // Ensure the object conforms to the Payment type
+            amount: formData.paymentAmount,
+            status: PaymentStatus.PENDENTE, // Default, will be updated based on registration details
+            receiptUrl: null,
         };
 
         if (formData.registerPaymentNow) {
-            paymentDetails.date = formData.paymentDateNotInformed ? undefined : new Date(formData.paymentDate + 'T00:00:00Z').toISOString();
-            paymentDetails.type = formData.paymentType;
+            if (isBusPackage) {
+                const sitePaid = formData.sitePayment.isPaid;
+                const busPaid = formData.busPayment.isPaid;
+                
+                // Overall status is PAGO only if both parts are paid
+                paymentDetails.status = (sitePaid && busPaid) ? PaymentStatus.PAGO : PaymentStatus.PENDENTE;
+
+                paymentDetails.sitePaymentDetails = {
+                    isPaid: sitePaid,
+                    date: sitePaid && !formData.sitePayment.dateNotInformed ? new Date(formData.sitePayment.date + 'T00:00:00Z').toISOString() : undefined,
+                    type: sitePaid ? formData.sitePayment.type : undefined,
+                    receiptUrl: null,
+                };
+
+                paymentDetails.busPaymentDetails = {
+                    isPaid: busPaid,
+                    date: busPaid && !formData.busPayment.dateNotInformed ? new Date(formData.busPayment.date + 'T00:00:00Z').toISOString() : undefined,
+                    type: busPaid ? formData.busPayment.type : undefined,
+                    receiptUrl: null,
+                };
+            } else { // Single payment package
+                paymentDetails.status = PaymentStatus.PAGO;
+                paymentDetails.date = formData.paymentDateNotInformed ? undefined : new Date(formData.paymentDate + 'T00:00:00Z').toISOString();
+                paymentDetails.type = formData.paymentType;
+            }
+        } else {
+             paymentDetails.status = PaymentStatus.PENDENTE;
+             if (isBusPackage) {
+                paymentDetails.sitePaymentDetails = { isPaid: false, receiptUrl: null };
+                paymentDetails.busPaymentDetails = { isPaid: false, receiptUrl: null };
+             }
         }
 
-        if (isBusPackage) {
-             const paid = formData.registerPaymentNow;
-             const paymentPart = {
-                isPaid: paid,
-                date: paid ? paymentDetails.date : undefined,
-                type: paid ? paymentDetails.type : undefined,
-                receiptUrl: null
-             };
-             paymentDetails.sitePaymentDetails = { ...paymentPart };
-             paymentDetails.busPaymentDetails = { ...paymentPart };
-        }
 
         const newAttendeeData: Omit<Attendee, 'id' | 'registrationDate'> = {
             name: formData.name,

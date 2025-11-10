@@ -1,10 +1,12 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import type { AttendeeFormData, Attendee } from '../types';
+import type { AttendeeFormData, Attendee, PartialPaymentFormDetails } from '../types';
 import { PackageType, DocumentType, PaymentType } from '../types';
 import { formatPhoneNumber, formatDocument, getDocumentType } from '../utils/formatters';
 
 interface AddAttendeeFormProps {
-    onAddAttendee?: (data: AttendeeFormData & { paymentAmount: number }) => Promise<void>;
+    // FIX: Changed the type of `data` to correctly override `paymentAmount` from string to number.
+    // The previous type `AttendeeFormData & { paymentAmount: number }` resulted in `paymentAmount: never`.
+    onAddAttendee?: (data: Omit<AttendeeFormData, 'paymentAmount'> & { paymentAmount: number }) => Promise<void>;
     onUpdateAttendee?: (data: Attendee) => Promise<void>;
     onCancel: () => void;
     attendeeToEdit?: Attendee;
@@ -41,6 +43,99 @@ const SuccessIcon: React.FC = () => (
      <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-white" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" /></svg>
 );
 
+const PartialPaymentCreator: React.FC<{
+    title: string;
+    amount: number;
+    paymentData: PartialPaymentFormDetails;
+    onUpdate: (updates: Partial<PartialPaymentFormDetails>) => void;
+    delay: number;
+}> = ({ title, amount, paymentData, onUpdate, delay }) => {
+    
+    const formattedDisplayDate = useMemo(() => {
+        if (!paymentData.date) return null;
+        const [year, month, day] = paymentData.date.split('-').map(Number);
+        const date = new Date(Date.UTC(year, month - 1, day));
+        return new Intl.DateTimeFormat('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric', timeZone: 'UTC' }).format(date);
+    }, [paymentData.date]);
+
+    return (
+        <div className="bg-white p-4 rounded-xl border border-zinc-200 shadow-sm space-y-3 opacity-0 animate-fadeInUp" style={{ animationDelay: `${delay}ms`, animationFillMode: 'forwards' }}>
+            <div className="flex justify-between items-start">
+                <div>
+                    <h3 className="text-lg font-bold text-zinc-800">{title}</h3>
+                    <p className="font-semibold text-green-600">R$ {amount.toFixed(2).replace('.', ',')}</p>
+                </div>
+                <button
+                    type="button"
+                    onClick={() => onUpdate({ isPaid: !paymentData.isPaid })}
+                    className={`px-3 py-1 text-sm font-bold rounded-full transition-colors ${paymentData.isPaid ? 'bg-green-100 text-green-800' : 'bg-zinc-100 text-zinc-700'}`}
+                >
+                    {paymentData.isPaid ? 'Pago' : 'Marcar como Pago'}
+                </button>
+            </div>
+            {paymentData.isPaid && (
+                <div className="space-y-3 animate-fadeIn border-t border-zinc-200 pt-3">
+                    <div>
+                        <label className="block text-sm font-medium text-zinc-700">Data do Pagamento</label>
+                        <input
+                            type="date"
+                            value={paymentData.date}
+                            onChange={(e) => onUpdate({ date: e.target.value })}
+                            className="mt-1 block w-full px-3 py-2 bg-white border border-zinc-300 rounded-md shadow-sm sm:text-sm disabled:bg-zinc-100"
+                            required={!paymentData.dateNotInformed}
+                            disabled={paymentData.dateNotInformed}
+                            autoComplete="off"
+                        />
+                         <label className="flex items-center space-x-2 mt-2 cursor-pointer w-fit">
+                            <input
+                                type="checkbox"
+                                checked={paymentData.dateNotInformed}
+                                onChange={(e) => onUpdate({ dateNotInformed: e.target.checked })}
+                                className="h-4 w-4 rounded border-zinc-300 text-green-600 focus:ring-green-500"
+                            />
+                            <span className="text-sm text-zinc-700">Data não informada</span>
+                        </label>
+                         {formattedDisplayDate && !paymentData.dateNotInformed && (
+                            <p className="mt-2 text-sm text-center text-zinc-600 bg-zinc-100 p-2 rounded-md border border-zinc-200">
+                                <strong className="font-bold text-green-700">{formattedDisplayDate}</strong>
+                            </p>
+                        )}
+                    </div>
+                     <div>
+                        <label className="block text-sm font-medium text-zinc-700">Tipo de Pagamento</label>
+                        <select
+                            value={paymentData.type}
+                            onChange={(e) => onUpdate({ type: e.target.value as PaymentType })}
+                            className="mt-1 block w-full px-3 py-2 bg-white border border-zinc-300 rounded-md shadow-sm sm:text-sm"
+                            autoComplete="off"
+                        >
+                            <option value={PaymentType.PIX_CONTA}>PIX (Conta)</option>
+                            <option value={PaymentType.PIX_MAQUINA}>PIX (Máquina)</option>
+                            <option value={PaymentType.DEBITO}>Débito</option>
+                            <option value={PaymentType.CREDITO}>Crédito</option>
+                            <option value={PaymentType.DINHEIRO}>Dinheiro</option>
+                        </select>
+                    </div>
+                     <button
+                        type="button"
+                        onClick={() => {
+                            onUpdate({
+                                isPaid: false,
+                                date: new Date().toISOString().split('T')[0],
+                                dateNotInformed: false,
+                                type: PaymentType.PIX_CONTA,
+                            });
+                        }}
+                        className="w-full text-red-600 font-semibold text-sm py-2 rounded-lg hover:bg-red-50"
+                    >
+                        Limpar Pagamento
+                    </button>
+                </div>
+            )}
+        </div>
+    );
+};
+
 
 const AddAttendeeForm: React.FC<AddAttendeeFormProps> = ({ onAddAttendee, onUpdateAttendee, onCancel, attendeeToEdit }) => {
     const isEditMode = !!attendeeToEdit;
@@ -53,10 +148,12 @@ const AddAttendeeForm: React.FC<AddAttendeeFormProps> = ({ onAddAttendee, onUpda
                 phone: attendeeToEdit.phone,
                 packageType: attendeeToEdit.packageType,
                 paymentAmount: attendeeToEdit.payment.amount.toFixed(2),
-                registerPaymentNow: false,
+                registerPaymentNow: false, // Not applicable in edit mode from this form
                 paymentDate: new Date().toISOString().split('T')[0],
                 paymentDateNotInformed: false,
                 paymentType: PaymentType.PIX_CONTA,
+                sitePayment: { isPaid: false, date: new Date().toISOString().split('T')[0], dateNotInformed: false, type: PaymentType.PIX_CONTA },
+                busPayment: { isPaid: false, date: new Date().toISOString().split('T')[0], dateNotInformed: false, type: PaymentType.PIX_CONTA },
             };
         }
         return {
@@ -69,6 +166,8 @@ const AddAttendeeForm: React.FC<AddAttendeeFormProps> = ({ onAddAttendee, onUpda
             paymentDate: new Date().toISOString().split('T')[0],
             paymentDateNotInformed: false,
             paymentType: PaymentType.PIX_CONTA,
+            sitePayment: { isPaid: false, date: new Date().toISOString().split('T')[0], dateNotInformed: false, type: PaymentType.PIX_CONTA },
+            busPayment: { isPaid: false, date: new Date().toISOString().split('T')[0], dateNotInformed: false, type: PaymentType.PIX_CONTA },
         };
     });
 
@@ -80,6 +179,7 @@ const AddAttendeeForm: React.FC<AddAttendeeFormProps> = ({ onAddAttendee, onUpda
     const [submissionError, setSubmissionError] = useState<string | null>(null);
 
     const isDocumentRequired = useMemo(() => formState.packageType === PackageType.SITIO_BUS, [formState.packageType]);
+    const isMultiPaymentPackage = useMemo(() => formState.packageType === PackageType.SITIO_BUS, [formState.packageType]);
 
     const formattedDisplayDate = useMemo(() => {
         if (!formState.paymentDate) return null;
@@ -112,9 +212,6 @@ const AddAttendeeForm: React.FC<AddAttendeeFormProps> = ({ onAddAttendee, onUpda
 
 
     const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
-        // FIX: The type checker can fail to narrow `e.target` correctly. By storing it in a local `const`,
-        // we help the compiler's control flow analysis. This resolves the error where `checked` was not
-        // found on the union type that includes `HTMLSelectElement`.
         const target = e.target;
         const name = target.name;
 
@@ -181,10 +278,9 @@ const AddAttendeeForm: React.FC<AddAttendeeFormProps> = ({ onAddAttendee, onUpda
                     await onAddAttendee({
                         ...formState,
                         paymentAmount: parseFloat(formState.paymentAmount),
-                    } as any);
+                    });
                 }
                 setSubmissionStatus('success');
-                // The parent component will handle navigation on success.
             } catch (error) {
                 console.error("Submission failed:", error);
                 setSubmissionStatus('error');
@@ -274,55 +370,76 @@ const AddAttendeeForm: React.FC<AddAttendeeFormProps> = ({ onAddAttendee, onUpda
                             </div>
                             
                             {formState.registerPaymentNow && (
-                                <div className="md:grid md:grid-cols-2 md:gap-x-6 md:gap-y-4 space-y-4 md:space-y-0 animate-fadeIn">
-                                    <div className="opacity-0 animate-fadeInUp" style={{ animationDelay: '50ms', animationFillMode: 'forwards' }}>
-                                        <label htmlFor="paymentDate" className="block text-sm font-medium text-zinc-700">Data do Pagamento</label>
-                                        <input
-                                            type="date"
-                                            id="paymentDate"
-                                            name="paymentDate"
-                                            value={formState.paymentDate}
-                                            onChange={handleInputChange}
-                                            className="mt-1 block w-full px-3 py-2 bg-white border border-zinc-300 rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500 sm:text-sm disabled:bg-zinc-100"
-                                            required={!formState.paymentDateNotInformed}
-                                            disabled={formState.paymentDateNotInformed}
-                                            autoComplete="off"
-                                        />
-                                         <label className="flex items-center space-x-2 mt-2 cursor-pointer w-fit">
-                                            <input
-                                                type="checkbox"
-                                                name="paymentDateNotInformed"
-                                                checked={formState.paymentDateNotInformed}
-                                                onChange={handleInputChange}
-                                                className="h-4 w-4 rounded border-zinc-300 text-green-600 focus:ring-green-500"
+                                <>
+                                    {isMultiPaymentPackage ? (
+                                        <div className="md:col-span-2 md:grid md:grid-cols-2 gap-4 animate-fadeIn">
+                                            <PartialPaymentCreator
+                                                title="Pagamento Sítio"
+                                                amount={70}
+                                                paymentData={formState.sitePayment}
+                                                onUpdate={(updates) => setFormState(prev => ({...prev, sitePayment: {...prev.sitePayment, ...updates}}))}
+                                                delay={50}
                                             />
-                                            <span className="text-sm text-zinc-700">Data não informada</span>
-                                        </label>
-                                        {formattedDisplayDate && !formState.paymentDateNotInformed && (
-                                            <p className="mt-2 text-sm text-center text-zinc-600 bg-zinc-100 p-2 rounded-md border border-zinc-200">
-                                                Confirmação: <strong className="font-bold text-green-700">{formattedDisplayDate} (dd/mm/aaaa)</strong>
-                                            </p>
-                                        )}
-                                    </div>
-                                    <div className="opacity-0 animate-fadeInUp" style={{ animationDelay: '100ms', animationFillMode: 'forwards' }}>
-                                        <label htmlFor="paymentType" className="block text-sm font-medium text-zinc-700">Tipo de Pagamento</label>
-                                        <select
-                                            id="paymentType"
-                                            name="paymentType"
-                                            value={formState.paymentType}
-                                            onChange={handleInputChange}
-                                            className="mt-1 block w-full px-3 py-2 bg-white border border-zinc-300 rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500 sm:text-sm"
-                                            required
-                                            autoComplete="off"
-                                        >
-                                            <option value={PaymentType.PIX_CONTA}>PIX (Conta)</option>
-                                            <option value={PaymentType.PIX_MAQUINA}>PIX (Máquina)</option>
-                                            <option value={PaymentType.DEBITO}>Débito</option>
-                                            <option value={PaymentType.CREDITO}>Crédito</option>
-                                            <option value={PaymentType.DINHEIRO}>Dinheiro</option>
-                                        </select>
-                                    </div>
-                                </div>
+                                            <PartialPaymentCreator
+                                                title="Pagamento Ônibus"
+                                                amount={50}
+                                                paymentData={formState.busPayment}
+                                                onUpdate={(updates) => setFormState(prev => ({...prev, busPayment: {...prev.busPayment, ...updates}}))}
+                                                delay={100}
+                                            />
+                                        </div>
+                                    ) : (
+                                        <div className="md:grid md:grid-cols-2 md:gap-x-6 md:gap-y-4 space-y-4 md:space-y-0 animate-fadeIn">
+                                            <div className="opacity-0 animate-fadeInUp" style={{ animationDelay: '50ms', animationFillMode: 'forwards' }}>
+                                                <label htmlFor="paymentDate" className="block text-sm font-medium text-zinc-700">Data do Pagamento</label>
+                                                <input
+                                                    type="date"
+                                                    id="paymentDate"
+                                                    name="paymentDate"
+                                                    value={formState.paymentDate}
+                                                    onChange={handleInputChange}
+                                                    className="mt-1 block w-full px-3 py-2 bg-white border border-zinc-300 rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500 sm:text-sm disabled:bg-zinc-100"
+                                                    required={!formState.paymentDateNotInformed}
+                                                    disabled={formState.paymentDateNotInformed}
+                                                    autoComplete="off"
+                                                />
+                                                 <label className="flex items-center space-x-2 mt-2 cursor-pointer w-fit">
+                                                    <input
+                                                        type="checkbox"
+                                                        name="paymentDateNotInformed"
+                                                        checked={formState.paymentDateNotInformed}
+                                                        onChange={handleInputChange}
+                                                        className="h-4 w-4 rounded border-zinc-300 text-green-600 focus:ring-green-500"
+                                                    />
+                                                    <span className="text-sm text-zinc-700">Data não informada</span>
+                                                </label>
+                                                {formattedDisplayDate && !formState.paymentDateNotInformed && (
+                                                    <p className="mt-2 text-sm text-center text-zinc-600 bg-zinc-100 p-2 rounded-md border border-zinc-200">
+                                                        Confirmação: <strong className="font-bold text-green-700">{formattedDisplayDate} (dd/mm/aaaa)</strong>
+                                                    </p>
+                                                )}
+                                            </div>
+                                            <div className="opacity-0 animate-fadeInUp" style={{ animationDelay: '100ms', animationFillMode: 'forwards' }}>
+                                                <label htmlFor="paymentType" className="block text-sm font-medium text-zinc-700">Tipo de Pagamento</label>
+                                                <select
+                                                    id="paymentType"
+                                                    name="paymentType"
+                                                    value={formState.paymentType}
+                                                    onChange={handleInputChange}
+                                                    className="mt-1 block w-full px-3 py-2 bg-white border border-zinc-300 rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500 sm:text-sm"
+                                                    required
+                                                    autoComplete="off"
+                                                >
+                                                    <option value={PaymentType.PIX_CONTA}>PIX (Conta)</option>
+                                                    <option value={PaymentType.PIX_MAQUINA}>PIX (Máquina)</option>
+                                                    <option value={PaymentType.DEBITO}>Débito</option>
+                                                    <option value={PaymentType.CREDITO}>Crédito</option>
+                                                    <option value={PaymentType.DINHEIRO}>Dinheiro</option>
+                                                </select>
+                                            </div>
+                                        </div>
+                                    )}
+                                </>
                             )}
                          </div>
                     )}

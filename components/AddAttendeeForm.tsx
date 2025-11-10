@@ -114,9 +114,7 @@ const AddAttendeeForm: React.FC<AddAttendeeFormProps> = ({ onAddAttendee, onUpda
     const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
         const { name, value } = e.target;
         
-        // FIX: Use a type guard to correctly handle checkbox changes.
-        // This ensures `e.target.checked` is only accessed when `e.target` is an HTMLInputElement
-        // of type 'checkbox', resolving a TypeScript error as HTMLSelectElement lacks this property.
+        // FIX: Use a type guard to ensure `e.target` is an `HTMLInputElement` before accessing `type` and `checked`. This resolves a TypeScript error as `HTMLSelectElement` lacks these properties.
         if (e.target instanceof HTMLInputElement && e.target.type === 'checkbox') {
             setFormState(prev => ({
                 ...prev,

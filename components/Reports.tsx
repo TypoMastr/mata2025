@@ -20,7 +20,7 @@ const ShareOptionsModal: React.FC<{
                         <span>Texto via WhatsApp</span>
                     </button>
                     <button onClick={onShareAsPdf} className="w-full bg-blue-500 text-white font-bold py-3 px-4 rounded-full hover:bg-blue-600 transition-colors shadow-sm flex items-center justify-center gap-2">
-                         <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M5 4v3H4a2 2 0 00-2 2v3a2 2 0 002 2h1v-2a1 1 0 011-1h8a1 1 0 011 1v2h1a2 2 0 002-2v-3a2 2 0 00-2-2h-1V4a2 2 0 00-2-2H7a2 2 0 00-2 2zm8 0H7v3h6V4zm0 8H7v4h6v-4z" clipRule="evenodd" /></svg>
+                         <svg xmlns="http://www.w.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M5 4v3H4a2 2 0 00-2 2v3a2 2 0 002 2h1v-2a1 1 0 011-1h8a1 1 0 011 1v2h1a2 2 0 002-2v-3a2 2 0 00-2-2h-1V4a2 2 0 00-2-2H7a2 2 0 00-2 2zm8 0H7v3h6V4zm0 8H7v4h6v-4z" clipRule="evenodd" /></svg>
                         <span>Compartilhar como PDF</span>
                     </button>
                 </div>
@@ -185,7 +185,7 @@ const InteractiveReportPreview: React.FC<{ data: Attendee[] | Attendee[][]; conf
                                 <tr>
                                     <td>${passengerIndex + 1}</td>
                                     <td>${p.name}</td>
-                                    <td>${p.document} (${p.documentType})</td>
+                                    <td>${p.document}<br><span style="font-size:0.9em; color:#555;">(${p.documentType})</span></td>
                                     <td>${p.phone}</td>
                                 </tr>
                             `).join('')}
@@ -201,10 +201,13 @@ const InteractiveReportPreview: React.FC<{ data: Attendee[] | Attendee[][]; conf
                     h1 { color: #10B981; border-bottom: 2px solid #10B981; padding-bottom: 0.5rem; }
                     h2 { font-size: 1.2rem; margin-top: 1.5rem; margin-bottom: 0.5rem; }
                     p { font-size: 0.9rem; margin-bottom: 1.5rem; }
-                    table { width: 100%; border-collapse: collapse; margin-top: 1rem; font-size: 0.8rem; }
-                    th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
-                    th { background-color: #f7f7f7; font-weight: 600; }
+                    table { width: 100%; border-collapse: separate; border-spacing: 0; margin-top: 1rem; font-size: 0.8rem; }
+                    th, td { padding: 8px; text-align: left; vertical-align: top; border-bottom: 1px solid #ddd; border-right: 1px solid #ddd; }
+                    th { background-color: #f7f7f7; font-weight: 600; border-top: 1px solid #ddd; }
+                    td:first-child, th:first-child { border-left: 1px solid #ddd; }
                     tr:nth-child(even) { background-color: #fcfcfc; }
+                    thead { display: table-header-group; }
+                    tbody tr { page-break-inside: avoid; }
                     .bus-section { page-break-inside: avoid; }
                     .bus-section--first { page-break-inside: auto; }
                     .bus-section + .bus-section { page-break-before: always; }
@@ -226,9 +229,13 @@ const InteractiveReportPreview: React.FC<{ data: Attendee[] | Attendee[][]; conf
                 <style>
                     body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; margin: 1.5rem; color: #333; }
                     h1 { color: #10B981; border-bottom: 2px solid #10B981; padding-bottom: 0.5rem; } p { font-size: 0.9rem; }
-                    table { width: 100%; border-collapse: collapse; margin-top: 1rem; font-size: 0.8rem; }
-                    th, td { border: 1px solid #ddd; padding: 8px; text-align: left; } th { background-color: #f7f7f7; font-weight: 600; }
+                    table { width: 100%; border-collapse: separate; border-spacing: 0; margin-top: 1rem; font-size: 0.8rem; }
+                    th, td { padding: 8px; text-align: left; vertical-align: top; border-bottom: 1px solid #ddd; border-right: 1px solid #ddd; }
+                    th { background-color: #f7f7f7; font-weight: 600; border-top: 1px solid #ddd; }
+                    td:first-child, th:first-child { border-left: 1px solid #ddd; }
                     tr:nth-child(even) { background-color: #fcfcfc; }
+                    thead { display: table-header-group; }
+                    tbody tr { page-break-inside: avoid; }
                     @page { size: A4; margin: 1in; }
                 </style></head><body>
                     <h1>Relatório - Gira da Mata</h1>
@@ -323,7 +330,25 @@ const InteractiveReportPreview: React.FC<{ data: Attendee[] | Attendee[][]; conf
                     (data as Attendee[][]).map((bus, index) => (
                         <div key={index} className="bg-white p-4 rounded-xl border border-zinc-200 shadow-sm opacity-0 animate-fadeInUp" style={{ animationDelay: `${index * 50}ms`, animationFillMode: 'forwards' }}>
                             <h2 className="font-bold text-lg text-zinc-800 mb-3">Ônibus {index + 1} ({bus.length} passageiros)</h2>
-                            <div className="overflow-x-auto">
+                            
+                            {/* Mobile View - Cards */}
+                            <div className="md:hidden space-y-2">
+                                {bus.map((p, pIndex) => (
+                                    <div key={p.id} className="bg-zinc-50 p-3 rounded-lg border border-zinc-200">
+                                        <div className="flex justify-between items-start">
+                                            <p className="font-bold text-zinc-800 mr-2">{p.name}</p>
+                                            <p className="text-sm font-semibold text-zinc-500 flex-shrink-0">#{pIndex + 1}</p>
+                                        </div>
+                                        <div className="mt-1 text-sm text-zinc-600 space-y-1">
+                                            <p>{`${p.document} (${p.documentType})`}</p>
+                                            <p>{p.phone}</p>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+
+                            {/* Desktop View - Table */}
+                            <div className="hidden md:block overflow-x-auto">
                                 <table className="min-w-full text-sm">
                                     <thead>
                                         <tr className="border-b border-zinc-200">

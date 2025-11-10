@@ -53,6 +53,12 @@
       .animate-shake { animation: shake 0.5s ease-in-out; }
       .animate-fadeIn { animation: fadeIn 0.3s ease-in-out; }
       .animate-popIn { animation: popIn 0.3s ease-out; }
+
+      /* Custom class to fix 100vh issue on mobile browsers */
+      .min-h-screen-mobile {
+        min-height: 100vh; /* Fallback */
+        min-height: calc(var(--vh, 1vh) * 100);
+      }
     </style>
 <script type="importmap">
 {
@@ -68,6 +74,16 @@
 </head>
 <body class="bg-zinc-50 antialiased">
     <div id="root"></div>
+    <script>
+      // Fix for 100vh on mobile browsers
+      function setVh() {
+        let vh = window.innerHeight * 0.01;
+        document.documentElement.style.setProperty('--vh', `${vh}px`);
+      }
+      window.addEventListener('resize', setVh);
+      window.addEventListener('orientationchange', setVh);
+      setVh();
+    </script>
     <script type="module" src="/index.tsx"></script>
 </body>
 </html>

@@ -190,7 +190,7 @@ const App: React.FC = () => {
     return (
         <div className="bg-zinc-50 font-sans md:max-w-7xl md:mx-auto md:my-8 md:rounded-2xl md:shadow-2xl md:flex flex-grow w-full">
              <SideNav currentView={view} setView={setView} />
-            <div className="flex-grow min-h-screen relative pb-20 md:pb-0 md:min-h-0">
+            <div className="flex-grow min-h-screen-mobile relative pb-20 md:pb-0 md:min-h-0">
                 <main key={view}>
                     {renderContent()}
                 </main>

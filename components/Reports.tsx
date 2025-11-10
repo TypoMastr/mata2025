@@ -165,13 +165,6 @@ const InteractiveReportPreview: React.FC<{ data: Attendee[] | Attendee[][]; conf
     };
     
     const handlePrintAndExport = () => {
-        const iframe = document.createElement('iframe');
-        iframe.style.position = 'absolute';
-        iframe.style.width = '0';
-        iframe.style.height = '0';
-        iframe.style.border = 'none';
-        document.body.appendChild(iframe);
-
         let printableHtml = '';
 
         if (config.type === 'busList') {
@@ -256,14 +249,22 @@ const InteractiveReportPreview: React.FC<{ data: Attendee[] | Attendee[][]; conf
                 </body></html>`;
         }
 
-        iframe.srcdoc = printableHtml;
-        iframe.onload = () => {
+        // For iOS PWA compatibility, open a new window to print.
+        // This is more reliable than using a hidden iframe which can result in blank pages.
+        const printWindow = window.open('', '_blank');
+        if (printWindow) {
+            printWindow.document.write(printableHtml);
+            printWindow.document.close();
+            // Use a timeout to allow content to render before triggering print
             setTimeout(() => {
-                iframe.contentWindow?.focus();
-                iframe.contentWindow?.print();
-                document.body.removeChild(iframe);
-            }, 100);
-        };
+                printWindow.focus(); // focus is needed for some browsers
+                printWindow.print();
+                // We don't close the window automatically, allowing users to save as PDF or interact with the print preview.
+            }, 250);
+        } else {
+            // This will be triggered if a popup blocker is active.
+            alert('A janela de impressão foi bloqueada. Por favor, habilite pop-ups para este site e tente novamente.');
+        }
     };
     
     const handleShareAsText = async () => {

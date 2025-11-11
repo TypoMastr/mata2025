@@ -60,7 +60,7 @@ const StatusBadge: React.FC<{ attendee: Attendee }> = ({ attendee }) => {
                             (sitePaymentDetails?.isPaid || busPaymentDetails?.isPaid);
 
     return (
-        <div className="flex items-center gap-2">
+        <div className="flex items-center flex-wrap gap-2">
             <span className={`px-3 py-1 text-xs font-bold rounded-full ${statusClasses}`}>
                 {status.toUpperCase()}
             </span>
@@ -152,15 +152,15 @@ const AttendeeList: React.FC<AttendeeListProps> = ({
                     </div>
                 </div>
                 
-                <div className="space-y-3 md:flex md:space-y-0 md:gap-6">
-                    <div className="flex gap-2 items-center overflow-x-auto pb-1">
+                <div className="space-y-3 lg:flex lg:justify-between lg:items-center lg:space-y-0 lg:gap-6">
+                    <div className="flex flex-wrap gap-2 items-center">
                         <span className="text-sm font-medium text-zinc-500 flex-shrink-0">Status:</span>
                         <FilterPill label="Todos" isActive={statusFilter === 'all'} onClick={() => onStatusFilterChange('all')} />
                         <FilterPill label={PaymentStatus.PAGO} isActive={statusFilter === PaymentStatus.PAGO} onClick={() => onStatusFilterChange(PaymentStatus.PAGO)} />
                         <FilterPill label={PaymentStatus.PENDENTE} isActive={statusFilter === PaymentStatus.PENDENTE} onClick={() => onStatusFilterChange(PaymentStatus.PENDENTE)} />
                         <FilterPill label={PaymentStatus.ISENTO} isActive={statusFilter === PaymentStatus.ISENTO} onClick={() => onStatusFilterChange(PaymentStatus.ISENTO)} />
                     </div>
-                     <div className="flex gap-2 items-center overflow-x-auto pb-1">
+                     <div className="flex flex-wrap gap-2 items-center">
                         <span className="text-sm font-medium text-zinc-500 flex-shrink-0">Pacote:</span>
                         <FilterPill label="Todos" isActive={packageFilter === 'all'} onClick={() => onPackageFilterChange('all')} />
                         <FilterPill label={PackageType.SITIO_ONLY} isActive={packageFilter === PackageType.SITIO_ONLY} onClick={() => onPackageFilterChange(PackageType.SITIO_ONLY)} />
@@ -184,7 +184,7 @@ const AttendeeList: React.FC<AttendeeListProps> = ({
                             ))}
                         </div>
                         {/* Desktop View */}
-                        <div className="hidden md:block bg-white border border-zinc-200 rounded-xl shadow-sm overflow-hidden">
+                        <div className="hidden md:block bg-white border border-zinc-200 rounded-xl shadow-sm overflow-x-auto">
                             <table className="min-w-full divide-y divide-zinc-200">
                                 <thead className="bg-zinc-50">
                                     <tr>
@@ -198,10 +198,10 @@ const AttendeeList: React.FC<AttendeeListProps> = ({
                                 <tbody className="bg-white divide-y divide-zinc-200">
                                     {sortedAttendees.map((attendee) => (
                                         <tr key={attendee.id} onClick={() => onSelectAttendee(attendee.id)} className="hover:bg-zinc-50 cursor-pointer transition-colors">
-                                            <td className="px-6 py-4 whitespace-nowrap"><div className="text-sm font-medium text-zinc-900">{attendee.name}</div></td>
-                                            <td className="px-6 py-4 whitespace-nowrap"><div className="flex items-center text-sm text-zinc-500"><PackageIcon packageType={attendee.packageType} />{attendee.packageType}</div></td>
-                                            <td className="px-6 py-4 whitespace-nowrap"><StatusBadge attendee={attendee} /></td>
-                                            <td className="px-6 py-4 whitespace-nowrap text-sm text-zinc-500">{attendee.phone}</td>
+                                            <td className="px-6 py-4"><div className="text-sm font-medium text-zinc-900">{attendee.name}</div></td>
+                                            <td className="px-6 py-4"><div className="flex items-center text-sm text-zinc-500"><PackageIcon packageType={attendee.packageType} />{attendee.packageType}</div></td>
+                                            <td className="px-6 py-4"><StatusBadge attendee={attendee} /></td>
+                                            <td className="px-6 py-4 text-sm text-zinc-500">{attendee.phone}</td>
                                             <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                                                 <span className="text-green-600 hover:text-green-900 flex items-center justify-end">
                                                    Ver

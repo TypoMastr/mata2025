@@ -151,7 +151,7 @@ const App: React.FC = () => {
 
         switch (view) {
             case 'detail':
-                return selectedAttendee && <AttendeeDetail attendee={selectedAttendee} onBack={handleCancel} onEdit={handleEdit} onDelete={handleDeleteRequest} onManagePayment={handleShowPaymentForm} />;
+                return selectedAttendee && <AttendeeDetail attendee={selectedAttendee} onBack={handleCancel} onEdit={handleEdit} onDelete={handleDeleteRequest} onManagePayment={handleShowPaymentForm} onUpdateAttendee={handleUpdateAttendee} />;
             case 'form':
                 return <AddAttendeeForm onAddAttendee={handleSaveAttendee} onCancel={handleCancel} />;
             case 'editForm':

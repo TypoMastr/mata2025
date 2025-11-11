@@ -32,6 +32,23 @@ const InputField: React.FC<{ label: string, name: string, value: string, onChang
     </div>
 );
 
+const TextAreaField: React.FC<{ label: string, name: string, value: string, onChange: (e: React.ChangeEvent<HTMLTextAreaElement>) => void, placeholder?: string, delay?: number, rows?: number }> = ({ label, name, value, onChange, placeholder, delay = 0, rows = 3 }) => (
+    <div className="opacity-0 animate-fadeInUp" style={{ animationDelay: `${delay}ms`, animationFillMode: 'forwards' }}>
+        <label htmlFor={name} className="block text-sm font-medium text-zinc-700">{label}</label>
+        <textarea
+            id={name}
+            name={name}
+            value={value}
+            onChange={onChange}
+            placeholder={placeholder}
+            rows={rows}
+            className="mt-1 block w-full px-3 py-2 bg-white border border-zinc-300 rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500 sm:text-sm"
+            autoComplete="off"
+        />
+    </div>
+);
+
+
 const SpinnerIcon: React.FC = () => (
     <svg className="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
         <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
@@ -149,6 +166,7 @@ const AddAttendeeForm: React.FC<AddAttendeeFormProps> = ({ onAddAttendee, onUpda
                 packageType: attendeeToEdit.packageType,
                 paymentAmount: attendeeToEdit.payment.amount.toFixed(2),
                 registerPaymentNow: false, // Not applicable in edit mode from this form
+                notes: attendeeToEdit.notes || '',
                 paymentDate: new Date().toISOString().split('T')[0],
                 paymentDateNotInformed: false,
                 paymentType: PaymentType.PIX_CONTA,
@@ -163,6 +181,7 @@ const AddAttendeeForm: React.FC<AddAttendeeFormProps> = ({ onAddAttendee, onUpda
             packageType: PackageType.SITIO_BUS,
             paymentAmount: '120.00',
             registerPaymentNow: false,
+            notes: '',
             paymentDate: new Date().toISOString().split('T')[0],
             paymentDateNotInformed: false,
             paymentType: PaymentType.PIX_CONTA,
@@ -211,7 +230,7 @@ const AddAttendeeForm: React.FC<AddAttendeeFormProps> = ({ onAddAttendee, onUpda
     }, [formState.packageType, formState.paymentAmount, formState.document, isDocumentRequired]);
 
 
-    const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+    const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
         const target = e.target;
         const name = target.name;
 
@@ -268,6 +287,7 @@ const AddAttendeeForm: React.FC<AddAttendeeFormProps> = ({ onAddAttendee, onUpda
                         documentType: docType,
                         phone: formState.phone,
                         packageType: formState.packageType,
+                        notes: formState.notes,
                         payment: {
                             ...attendeeToEdit.payment,
                             amount: parseFloat(formState.paymentAmount),
@@ -351,6 +371,18 @@ const AddAttendeeForm: React.FC<AddAttendeeFormProps> = ({ onAddAttendee, onUpda
                             readOnly
                             className="mt-1 block w-full px-3 py-2 bg-zinc-100 border border-zinc-300 rounded-md shadow-sm focus:outline-none sm:text-sm text-zinc-500 cursor-not-allowed"
                             autoComplete="off"
+                        />
+                    </div>
+                    
+                    <div className="md:col-span-2">
+                        <TextAreaField
+                            label="Observações"
+                            name="notes"
+                            value={formState.notes}
+                            onChange={handleInputChange}
+                            placeholder="Alergias, restrições alimentares, etc."
+                            delay={325}
+                            rows={4}
                         />
                     </div>
                     

@@ -81,6 +81,7 @@ export const useAttendees = () => {
             phone: formData.phone,
             packageType: formData.packageType,
             payment: paymentDetails,
+            notes: formData.notes,
         };
         
         try {

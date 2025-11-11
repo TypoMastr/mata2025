@@ -9,7 +9,16 @@ interface AttendeeDetailProps {
     onEdit: () => void;
     onDelete: (attendee: Attendee) => void;
     onManagePayment: () => void;
+    onUpdateAttendee: (attendee: Attendee) => Promise<void>;
 }
+
+const SpinnerIcon: React.FC = () => (
+    <svg className="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+    </svg>
+);
+
 
 const DetailRow: React.FC<{ label: string; value?: string; children?: React.ReactNode }> = ({ label, value, children }) => (
     <div>
@@ -62,8 +71,12 @@ const PartialPaymentDetail: React.FC<{
 };
 
 
-const AttendeeDetail: React.FC<AttendeeDetailProps> = ({ attendee, onBack, onEdit, onDelete, onManagePayment }) => {
+const AttendeeDetail: React.FC<AttendeeDetailProps> = ({ attendee, onBack, onEdit, onDelete, onManagePayment, onUpdateAttendee }) => {
     const [receiptToView, setReceiptToView] = useState<string | null>(null);
+    const [isEditingNotes, setIsEditingNotes] = useState(false);
+    const [editedNotes, setEditedNotes] = useState(attendee.notes || '');
+    const [isSaving, setIsSaving] = useState(false);
+
     const status = attendee.payment.status;
 
     let statusClasses = '';
@@ -90,6 +103,32 @@ const AttendeeDetail: React.FC<AttendeeDetailProps> = ({ attendee, onBack, onEdi
     const isPartiallyPaid = isMultiPayment &&
                             status === PaymentStatus.PENDENTE &&
                             (attendee.payment.sitePaymentDetails?.isPaid || attendee.payment.busPaymentDetails?.isPaid);
+
+    const handleEditNotesClick = () => {
+        setEditedNotes(attendee.notes || '');
+        setIsEditingNotes(true);
+    };
+
+    const handleCancelEdit = () => {
+        setIsEditingNotes(false);
+    };
+
+    const handleSaveNotes = async () => {
+        if (isSaving) return;
+        setIsSaving(true);
+        try {
+            await onUpdateAttendee({
+                ...attendee,
+                notes: editedNotes.trim(),
+            });
+            setIsEditingNotes(false);
+        } catch (error) {
+            console.error("Failed to save notes:", error);
+            // Optionally show an error to the user
+        } finally {
+            setIsSaving(false);
+        }
+    };
 
 
     return (
@@ -150,7 +189,44 @@ const AttendeeDetail: React.FC<AttendeeDetailProps> = ({ attendee, onBack, onEdi
                         </div>
                     )}
 
-                    <div className="space-y-3 opacity-0 animate-fadeInUp md:col-span-2" style={getAnimationStyle(300)}>
+                    <div className="bg-white p-4 rounded-xl border border-zinc-200 shadow-sm space-y-3 opacity-0 animate-fadeInUp md:col-span-2" style={getAnimationStyle(300)}>
+                        <div className="flex justify-between items-center">
+                            <h2 className="text-lg font-bold text-zinc-800">Observações</h2>
+                            {!isEditingNotes && (
+                                <button onClick={handleEditNotesClick} className="text-sm font-semibold text-green-600 hover:text-green-800 transition-colors px-3 py-1 rounded-lg hover:bg-green-50">
+                                    {attendee.notes ? 'Editar' : 'Adicionar'}
+                                </button>
+                            )}
+                        </div>
+                        {isEditingNotes ? (
+                            <div className="animate-fadeIn">
+                                <textarea
+                                    value={editedNotes}
+                                    onChange={(e) => setEditedNotes(e.target.value)}
+                                    className="mt-1 block w-full px-3 py-2 bg-white border border-zinc-300 rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500 sm:text-sm"
+                                    rows={4}
+                                    placeholder="Alergias, restrições alimentares, etc."
+                                    autoFocus
+                                />
+                                <div className="flex gap-2 mt-2 justify-end">
+                                    <button onClick={handleCancelEdit} className="px-4 py-2 text-sm font-bold text-zinc-700 bg-zinc-100 hover:bg-zinc-200 rounded-full transition-colors">
+                                        Cancelar
+                                    </button>
+                                    <button onClick={handleSaveNotes} disabled={isSaving} className="px-4 py-2 text-sm font-bold text-white bg-green-500 hover:bg-green-600 rounded-full flex items-center justify-center gap-2 disabled:bg-green-400 w-28 transition-colors">
+                                        {isSaving ? <SpinnerIcon /> : 'Salvar'}
+                                    </button>
+                                </div>
+                            </div>
+                        ) : (
+                            attendee.notes ? (
+                                <p className="font-normal text-zinc-700 whitespace-pre-wrap pt-1">{attendee.notes}</p>
+                            ) : (
+                                <p className="text-sm text-zinc-500 italic pt-1">Nenhuma observação adicionada.</p>
+                            )
+                        )}
+                    </div>
+
+                    <div className="space-y-3 opacity-0 animate-fadeInUp md:col-span-2" style={getAnimationStyle(350)}>
                         <button onClick={onManagePayment} className="w-full bg-blue-500 text-white font-bold py-3 px-4 rounded-full hover:bg-blue-600 transition-colors shadow-sm">
                             Gerenciar Pagamentos
                         </button>

@@ -52,6 +52,7 @@ export interface Attendee {
     packageType: PackageType;
     registrationDate: string;
     payment: Payment;
+    notes?: string;
 }
 
 export interface PartialPaymentFormDetails {
@@ -68,6 +69,7 @@ export interface AttendeeFormData {
     packageType: PackageType;
     paymentAmount: string;
     registerPaymentNow: boolean;
+    notes: string;
     
     // For single payment
     paymentDate: string;

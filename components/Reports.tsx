@@ -3,6 +3,7 @@ import type { Attendee, ReportConfig, ReportField } from '../types';
 import { PackageType, PaymentStatus, DocumentType, PaymentType } from '../types';
 import { formatDocument, getDocumentType } from '../utils/formatters';
 import { levenshteinDistance } from '../utils/stringSimilarity';
+import { useToast } from '../contexts/ToastContext';
 
 // --- Componente: Modal de Opções de Compartilhamento ---
 const ShareOptionsModal: React.FC<{
@@ -175,7 +176,8 @@ const InteractiveReportPreview: React.FC<{ data: Attendee[] | Attendee[][]; conf
                     <table>
                         <thead>
                             <tr>
-                                <th>#</th>
+                                <th style="width: 30px; text-align: center;">#</th>
+                                <th style="width: 70px; text-align: center;">Check-in</th>
                                 <th>Nome</th>
                                 <th>Documento</th>
                                 <th>Telefone</th>
@@ -184,7 +186,8 @@ const InteractiveReportPreview: React.FC<{ data: Attendee[] | Attendee[][]; conf
                         <tbody>
                             ${bus.map((p, passengerIndex) => `
                                 <tr>
-                                    <td>${passengerIndex + 1}</td>
+                                    <td style="text-align: center;">${passengerIndex + 1}</td>
+                                    <td style="font-family: 'DejaVu Sans', sans-serif; font-size: 1.5rem; text-align: center; vertical-align: middle; padding: 4px;">&#9744;</td>
                                     <td>${p.name}</td>
                                     <td>${p.document}<br><span style="font-size:0.9em; color:#555;">(${p.documentType})</span></td>
                                     <td>${p.phone}</td>
@@ -468,6 +471,7 @@ interface ZeroDocListItemProps {
 }
 
 const ZeroDocListItem: React.FC<ZeroDocListItemProps> = ({ attendee, onUpdate }) => {
+    const { addToast } = useToast();
     const [documentValue, setDocumentValue] = useState(attendee.document);
     const [docType, setDocType] = useState<DocumentType>(() => getDocumentType(attendee.document).type);
     const [error, setError] = useState('');
@@ -502,9 +506,10 @@ const ZeroDocListItem: React.FC<ZeroDocListItemProps> = ({ attendee, onUpdate })
             };
             await onUpdate(updatedAttendee);
             setStatus('success');
+            addToast(`Documento de ${attendee.name} salvo.`, 'success');
         } catch (err) {
             console.error(err);
-            setError('Falha ao salvar. Tente novamente.');
+            addToast('Falha ao salvar. Tente novamente.', 'error');
             setStatus('idle');
         } finally {
             setIsConfirming(false);

@@ -2,6 +2,8 @@ import React, { useState } from 'react';
 import type { Attendee, PartialPaymentDetails } from '../types';
 import { PaymentStatus, PackageType } from '../types';
 import ReceiptViewer from './ReceiptViewer';
+import { useToast } from '../contexts/ToastContext';
+import { getWhatsAppUrl } from '../utils/formatters';
 
 interface AttendeeDetailProps {
     attendee: Attendee;
@@ -25,6 +27,12 @@ const DetailRow: React.FC<{ label: string; value?: string; children?: React.Reac
         <p className="text-sm text-zinc-500">{label}</p>
         {children || <p className="font-semibold text-zinc-800">{value}</p>}
     </div>
+);
+
+const CopyIcon: React.FC<{ className?: string }> = ({ className }) => (
+    <svg xmlns="http://www.w3.org/2000/svg" className={`h-5 w-5 ${className}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+        <path strokeLinecap="round" strokeLinejoin="round" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+    </svg>
 );
 
 const formatDate = (dateString?: string) => {
@@ -70,12 +78,26 @@ const PartialPaymentDetail: React.FC<{
     )
 };
 
-
 const AttendeeDetail: React.FC<AttendeeDetailProps> = ({ attendee, onBack, onEdit, onDelete, onManagePayment, onUpdateAttendee }) => {
+    const { addToast } = useToast();
     const [receiptToView, setReceiptToView] = useState<string | null>(null);
     const [isEditingNotes, setIsEditingNotes] = useState(false);
     const [editedNotes, setEditedNotes] = useState(attendee.notes || '');
     const [isSaving, setIsSaving] = useState(false);
+
+    const handleCopyToClipboard = async (text: string, label: string) => {
+        if (!navigator.clipboard) {
+            addToast('A cópia não é suportada neste navegador.', 'error');
+            return;
+        }
+        try {
+            await navigator.clipboard.writeText(text);
+            addToast(`${label} copiado!`, 'success');
+        } catch (err) {
+            console.error('Failed to copy text: ', err);
+            addToast(`Falha ao copiar ${label.toLowerCase()}.`, 'error');
+        }
+    };
 
     const status = attendee.payment.status;
 
@@ -122,9 +144,10 @@ const AttendeeDetail: React.FC<AttendeeDetailProps> = ({ attendee, onBack, onEdi
                 notes: editedNotes.trim(),
             });
             setIsEditingNotes(false);
+            addToast('Observações salvas com sucesso.', 'success');
         } catch (error) {
             console.error("Failed to save notes:", error);
-            // Optionally show an error to the user
+            addToast('Falha ao salvar observações.', 'error');
         } finally {
             setIsSaving(false);
         }
@@ -143,11 +166,58 @@ const AttendeeDetail: React.FC<AttendeeDetailProps> = ({ attendee, onBack, onEdi
             <div className="p-4">
                 <div className="md:grid md:grid-cols-2 md:gap-6 space-y-6 md:space-y-0">
                     <div className="bg-white p-4 rounded-xl border border-zinc-200 shadow-sm space-y-4 opacity-0 animate-fadeInUp" style={getAnimationStyle(100)}>
-                        <DetailRow label="Nome" value={attendee.name} />
+                        <DetailRow label="Nome">
+                            <div className="flex items-center justify-between">
+                                <p className="font-semibold text-zinc-800">{attendee.name}</p>
+                                <button
+                                    onClick={() => handleCopyToClipboard(attendee.name, 'Nome')}
+                                    className="p-1.5 text-zinc-400 rounded-full hover:bg-zinc-100 hover:text-zinc-600 transition-colors"
+                                    aria-label="Copiar nome"
+                                >
+                                    <CopyIcon />
+                                </button>
+                            </div>
+                        </DetailRow>
                         {attendee.packageType === PackageType.SITIO_BUS && (
-                             <DetailRow label="Documento" value={`${attendee.document} (${attendee.documentType})`} />
+                            <DetailRow label="Documento">
+                                <div className="flex items-center justify-between">
+                                    <p className="font-semibold text-zinc-800">{`${attendee.document} (${attendee.documentType})`}</p>
+                                    <button
+                                        onClick={() => handleCopyToClipboard(attendee.document, 'Documento')}
+                                        className="p-1.5 text-zinc-400 rounded-full hover:bg-zinc-100 hover:text-zinc-600 transition-colors"
+                                        aria-label="Copiar documento"
+                                    >
+                                        <CopyIcon />
+                                    </button>
+                                </div>
+                            </DetailRow>
                         )}
-                        <DetailRow label="Telefone" value={attendee.phone} />
+                        <DetailRow label="Telefone">
+                            <div className="flex flex-col items-start gap-2">
+                                <div className="flex items-center justify-between w-full">
+                                    <p className="font-semibold text-zinc-800">{attendee.phone}</p>
+                                    <button
+                                        onClick={() => handleCopyToClipboard(attendee.phone, 'Telefone')}
+                                        className="p-1.5 text-zinc-400 rounded-full hover:bg-zinc-100 hover:text-zinc-600 transition-colors"
+                                        aria-label="Copiar telefone"
+                                    >
+                                        <CopyIcon />
+                                    </button>
+                                </div>
+                                {attendee.phone && (
+                                    <a
+                                        href={getWhatsAppUrl(attendee.phone)}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        onClick={(e) => e.stopPropagation()}
+                                        className="px-3 py-1 text-xs font-semibold text-white bg-green-500 rounded-full hover:bg-green-600 transition-colors shadow-sm"
+                                        aria-label={`Abrir conversa com ${attendee.name} no WhatsApp`}
+                                    >
+                                        <span>Abrir no WhatsApp</span>
+                                    </a>
+                                )}
+                            </div>
+                        </DetailRow>
                         <DetailRow label="Pacote" value={attendee.packageType} />
                     </div>
 

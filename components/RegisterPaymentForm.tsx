@@ -1,6 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import type { Attendee, PartialPaymentDetails, Payment } from '../types';
 import { PaymentStatus, PaymentType, PackageType } from '../types';
+import { useToast } from '../contexts/ToastContext';
 
 interface RegisterPaymentFormProps {
     attendee: Attendee;
@@ -107,18 +108,17 @@ const PartialPaymentEditor: React.FC<PartialPaymentEditorProps> = ({ title, amou
 
 
 const RegisterPaymentForm: React.FC<RegisterPaymentFormProps> = ({ attendee, onRegisterPayment, onCancel, onDeletePayment }) => {
+    const { addToast } = useToast();
     const isPaid = attendee.payment.status === PaymentStatus.PAGO;
     const isExempt = attendee.payment.status === PaymentStatus.ISENTO;
     const isMultiPayment = attendee.packageType === PackageType.SITIO_BUS;
 
     const [paymentState, setPaymentState] = useState<Payment>(attendee.payment);
     const [isSubmitting, setIsSubmitting] = useState(false);
-    const [submissionError, setSubmissionError] = useState<string | null>(null);
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         setIsSubmitting(true);
-        setSubmissionError(null);
         try {
             const updatedAttendee: Attendee = { ...attendee, payment: paymentState };
 
@@ -136,15 +136,13 @@ const RegisterPaymentForm: React.FC<RegisterPaymentFormProps> = ({ attendee, onR
 
             await onRegisterPayment(updatedAttendee);
         } catch (error) {
-            console.error("Failed to register payment:", error);
-            setSubmissionError("Falha ao salvar pagamento. Tente novamente.");
+            // Error toast is handled by the calling component (App.tsx)
             setIsSubmitting(false);
         }
     };
 
     const handleToggleExemption = async () => {
         setIsSubmitting(true);
-        setSubmissionError(null);
         try {
             const isCurrentlyExempt = attendee.payment.status === PaymentStatus.ISENTO;
             const newStatus = isCurrentlyExempt ? PaymentStatus.PENDENTE : PaymentStatus.ISENTO;
@@ -167,8 +165,8 @@ const RegisterPaymentForm: React.FC<RegisterPaymentFormProps> = ({ attendee, onR
             };
             await onRegisterPayment(updatedAttendee);
         } catch (error) {
-            console.error("Failed to toggle exemption:", error);
-            setSubmissionError("Falha ao alterar status. Tente novamente.");
+            // Error toast is handled by the calling component (App.tsx)
+        } finally {
             setIsSubmitting(false);
         }
     };
@@ -199,7 +197,6 @@ const RegisterPaymentForm: React.FC<RegisterPaymentFormProps> = ({ attendee, onR
     const handleSinglePaymentSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         setIsSubmitting(true);
-        setSubmissionError(null);
         try {
             const updatedAttendee: Attendee = {
                 ...attendee,
@@ -213,9 +210,9 @@ const RegisterPaymentForm: React.FC<RegisterPaymentFormProps> = ({ attendee, onR
             };
             await onRegisterPayment(updatedAttendee);
         } catch (error) {
-            console.error("Failed to register payment:", error);
-            setSubmissionError("Falha ao salvar pagamento. Tente novamente.");
-            setIsSubmitting(false);
+            // Error toast is handled by the calling component (App.tsx)
+        } finally {
+             setIsSubmitting(false);
         }
     }
 
@@ -254,7 +251,6 @@ const RegisterPaymentForm: React.FC<RegisterPaymentFormProps> = ({ attendee, onR
                             {isSubmitting ? <><SpinnerIcon /> Salvando...</> : 'Salvar Pagamentos'}
                         </button>
                     </div>
-                     {submissionError && <p className="text-center text-sm text-red-600 animate-fadeIn">{submissionError}</p>}
                 </form>
             ) : (
                 // --- SINGLE PAYMENT FORM ---
@@ -304,7 +300,6 @@ const RegisterPaymentForm: React.FC<RegisterPaymentFormProps> = ({ attendee, onR
                             {isSubmitting ? <><SpinnerIcon /> Salvando...</> : (isPaid ? 'Salvar Alterações' : 'Confirmar Pagamento')}
                         </button>
                     </div>
-                    {submissionError && <p className="text-center text-sm text-red-600">{submissionError}</p>}
                     {isPaid && <div className="pt-2"><button type="button" onClick={() => onDeletePayment(attendee)} className="w-full text-red-600 font-bold py-3 px-4 rounded-full hover:bg-red-50 transition-colors">Excluir Pagamento</button></div>}
                 </form>
             )}

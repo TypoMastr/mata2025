@@ -7,17 +7,15 @@ import { PaymentStatus, PackageType } from '../types';
 export const useAttendees = () => {
     const [attendees, setAttendees] = useState<Attendee[]>([]);
     const [isLoading, setIsLoading] = useState(true);
-    const [error, setError] = useState<string | null>(null);
 
     const fetchAttendees = useCallback(async () => {
         setIsLoading(true);
-        setError(null);
         try {
             const data = await api.fetchAttendees();
             setAttendees(data);
         } catch (err) {
             console.error("Failed to fetch attendees:", err);
-            setError("Não foi possível carregar os dados. Verifique sua conexão ou a API.");
+            // In a real app, you might want a global error state here
         } finally {
             setIsLoading(false);
         }
@@ -89,7 +87,7 @@ export const useAttendees = () => {
             setAttendees(prev => [createdAttendee, ...prev]);
         } catch (err) {
             console.error("Failed to add attendee:", err);
-            setError("Falha ao adicionar inscrição.");
+            throw err;
         }
     };
 
@@ -99,7 +97,7 @@ export const useAttendees = () => {
             setAttendees(prev => prev.map(a => a.id === savedAttendee.id ? savedAttendee : a));
         } catch (err) {
             console.error("Failed to update attendee:", err);
-            setError("Falha ao atualizar inscrição.");
+            throw err;
         }
     };
 
@@ -109,14 +107,13 @@ export const useAttendees = () => {
             setAttendees(prev => prev.filter(a => a.id !== id));
         } catch (err) {
             console.error("Failed to delete attendee:", err);
-            setError("Falha ao excluir inscrição.");
+            throw err;
         }
     };
 
     return {
         attendees,
         isLoading,
-        error, // You can use this to display an error message in the UI if needed
         addAttendee,
         updateAttendee,
         deleteAttendee,

@@ -13,9 +13,12 @@ import ConfirmDeletePayment from './components/ConfirmDeletePayment';
 import InfoPage from './components/Info';
 import Login from './components/Login';
 import SideNav from './components/SideNav';
+import { ToastProvider, useToast } from './contexts/ToastContext';
+import ToastContainer from './components/ToastContainer';
 
-const App: React.FC = () => {
+const AppContent: React.FC = () => {
     const { attendees, isLoading, addAttendee, updateAttendee, deleteAttendee } = useAttendees();
+    const { addToast } = useToast();
     const [isAuthenticated, setIsAuthenticated] = useState(false);
     const [view, setView] = useState<View>('list');
     const [previousView, setPreviousView] = useState<View>('list');
@@ -90,11 +93,17 @@ const App: React.FC = () => {
 
     const handleConfirmDelete = useCallback(async () => {
         if (attendeeToDelete) {
-            await deleteAttendee(attendeeToDelete.id);
-            setAttendeeToDelete(null);
-            setView('list');
+            try {
+                await deleteAttendee(attendeeToDelete.id);
+                addToast(`Inscrição de ${attendeeToDelete.name} excluída.`, 'success');
+                setAttendeeToDelete(null);
+                setView('list');
+            } catch (error) {
+                addToast('Falha ao excluir inscrição.', 'error');
+                console.error(error);
+            }
         }
-    }, [attendeeToDelete, deleteAttendee]);
+    }, [attendeeToDelete, deleteAttendee, addToast]);
     
     const handleCancelDelete = useCallback(() => {
         setAttendeeToDelete(null);
@@ -116,33 +125,43 @@ const App: React.FC = () => {
                     receiptUrl: null,
                 }
             };
-            await updateAttendee(attendeeToUpdate);
-            setAttendeePaymentToDelete(null);
-            setView('detail');
+             try {
+                await updateAttendee(attendeeToUpdate);
+                addToast('Pagamento removido com sucesso.', 'success');
+                setAttendeePaymentToDelete(null);
+                setView('detail');
+            } catch (error) {
+                addToast('Falha ao remover pagamento.', 'error');
+                console.error(error);
+            }
         }
-    }, [attendeePaymentToDelete, updateAttendee]);
+    }, [attendeePaymentToDelete, updateAttendee, addToast]);
     
     const handleCancelDeletePayment = useCallback(() => {
         setAttendeePaymentToDelete(null);
     }, []);
 
 
-    // FIX: Changed the type of `formData` to correctly override `paymentAmount` from string to number.
-    // The previous type `AttendeeFormData & { paymentAmount: number }` resulted in `paymentAmount: never`.
     const handleSaveAttendee = useCallback(async (formData: Omit<AttendeeFormData, 'paymentAmount'> & { paymentAmount: number }) => {
         await addAttendee(formData);
-        setView('list');
     }, [addAttendee]);
 
     const handleUpdateAttendee = useCallback(async (updatedAttendee: Attendee) => {
         await updateAttendee(updatedAttendee);
-        setView('detail');
     }, [updateAttendee]);
 
     const handleRegisterPayment = useCallback(async (updatedAttendee: Attendee) => {
-        await updateAttendee(updatedAttendee);
-        setView('detail');
-    }, [updateAttendee]);
+        try {
+            await updateAttendee(updatedAttendee);
+            setView('detail');
+            addToast('Pagamento salvo com sucesso.', 'success');
+        } catch (error) {
+             addToast('Falha ao salvar pagamento.', 'error');
+             console.error(error);
+             // Re-throw to allow form to handle its submitting state
+             throw error;
+        }
+    }, [updateAttendee, addToast]);
 
     const renderContent = () => {
         if (isLoading) {
@@ -153,9 +172,9 @@ const App: React.FC = () => {
             case 'detail':
                 return selectedAttendee && <AttendeeDetail attendee={selectedAttendee} onBack={handleCancel} onEdit={handleEdit} onDelete={handleDeleteRequest} onManagePayment={handleShowPaymentForm} onUpdateAttendee={handleUpdateAttendee} />;
             case 'form':
-                return <AddAttendeeForm onAddAttendee={handleSaveAttendee} onCancel={handleCancel} />;
+                return <AddAttendeeForm onAddAttendee={handleSaveAttendee} onCancel={handleCancel} attendees={attendees} />;
             case 'editForm':
-                 return selectedAttendee && <AddAttendeeForm onUpdateAttendee={handleUpdateAttendee} onCancel={() => setView('detail')} attendeeToEdit={selectedAttendee} />;
+                 return selectedAttendee && <AddAttendeeForm onUpdateAttendee={handleUpdateAttendee} onCancel={() => setView('detail')} attendeeToEdit={selectedAttendee} attendees={attendees} />;
             case 'payment':
             case 'editPayment':
                 return selectedAttendee && <RegisterPaymentForm attendee={selectedAttendee} onRegisterPayment={handleRegisterPayment} onCancel={() => setView('detail')} onDeletePayment={handleDeletePaymentRequest} />;
@@ -202,5 +221,13 @@ const App: React.FC = () => {
         </div>
     );
 };
+
+const App: React.FC = () => (
+    <ToastProvider>
+        <AppContent />
+        <ToastContainer />
+    </ToastProvider>
+);
+
 
 export default App;

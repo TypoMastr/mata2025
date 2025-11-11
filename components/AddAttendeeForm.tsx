@@ -1,53 +1,8 @@
-import React, { useState, useEffect, useMemo } from 'react';
-import type { AttendeeFormData, Attendee, PartialPaymentFormDetails } from '../types';
-import { PackageType, DocumentType, PaymentType } from '../types';
-import { formatPhoneNumber, formatDocument, getDocumentType } from '../utils/formatters';
-
-interface AddAttendeeFormProps {
-    // FIX: Changed the type of `data` to correctly override `paymentAmount` from string to number.
-    // The previous type `AttendeeFormData & { paymentAmount: number }` resulted in `paymentAmount: never`.
-    onAddAttendee?: (data: Omit<AttendeeFormData, 'paymentAmount'> & { paymentAmount: number }) => Promise<void>;
-    onUpdateAttendee?: (data: Attendee) => Promise<void>;
-    onCancel: () => void;
-    attendeeToEdit?: Attendee;
-}
-
-const InputField: React.FC<{ label: string, name: string, value: string, onChange: (e: React.ChangeEvent<HTMLInputElement>) => void, error?: string, placeholder?: string, type?: string, maxLength?: number, delay?: number }> = ({ label, name, value, onChange, error, placeholder, type = 'text', maxLength, delay = 0 }) => (
-    <div className="opacity-0 animate-fadeInUp" style={{ animationDelay: `${delay}ms`, animationFillMode: 'forwards' }}>
-        <label htmlFor={name} className="block text-sm font-medium text-zinc-700">{label}</label>
-        <input
-            type={type}
-            id={name}
-            name={name}
-            value={value}
-            onChange={onChange}
-            placeholder={placeholder}
-            maxLength={maxLength}
-            className={`mt-1 block w-full px-3 py-2 bg-white border ${error ? 'border-red-500 text-red-900 placeholder-red-300' : 'border-zinc-300'} rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500 sm:text-sm`}
-            aria-invalid={!!error}
-            aria-describedby={error ? `${name}-error` : undefined}
-            autoComplete="off"
-        />
-        {error && <p id={`${name}-error`} className="mt-1 text-sm text-red-600 animate-fadeIn">{error}</p>}
-    </div>
-);
-
-const TextAreaField: React.FC<{ label: string, name: string, value: string, onChange: (e: React.ChangeEvent<HTMLTextAreaElement>) => void, placeholder?: string, delay?: number, rows?: number }> = ({ label, name, value, onChange, placeholder, delay = 0, rows = 3 }) => (
-    <div className="opacity-0 animate-fadeInUp" style={{ animationDelay: `${delay}ms`, animationFillMode: 'forwards' }}>
-        <label htmlFor={name} className="block text-sm font-medium text-zinc-700">{label}</label>
-        <textarea
-            id={name}
-            name={name}
-            value={value}
-            onChange={onChange}
-            placeholder={placeholder}
-            rows={rows}
-            className="mt-1 block w-full px-3 py-2 bg-white border border-zinc-300 rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500 sm:text-sm"
-            autoComplete="off"
-        />
-    </div>
-);
-
+import React, { useState, useEffect } from 'react';
+import type { Attendee, AttendeeFormData, PartialPaymentFormDetails } from '../types';
+import { PackageType, PaymentType } from '../types';
+import { formatPhoneNumber, formatDocument, getDocumentType, normalizeString } from '../utils/formatters';
+import { useToast } from '../contexts/ToastContext';
 
 const SpinnerIcon: React.FC = () => (
     <svg className="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
@@ -56,74 +11,52 @@ const SpinnerIcon: React.FC = () => (
     </svg>
 );
 
-const SuccessIcon: React.FC = () => (
-     <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-white" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" /></svg>
+const FormField: React.FC<{ label: string; id: string; error?: string; children: React.ReactNode }> = ({ label, id, error, children }) => (
+    <div>
+        <label htmlFor={id} className="block text-sm font-medium text-zinc-700">{label}</label>
+        <div className="mt-1">{children}</div>
+        {error && <p className="mt-1 text-xs text-red-600 animate-fadeIn">{error}</p>}
+    </div>
 );
 
-const PartialPaymentCreator: React.FC<{
-    title: string;
-    amount: number;
-    paymentData: PartialPaymentFormDetails;
+interface PartialPaymentFieldsProps {
+    idPrefix: string;
+    details: PartialPaymentFormDetails;
     onUpdate: (updates: Partial<PartialPaymentFormDetails>) => void;
-    delay: number;
-}> = ({ title, amount, paymentData, onUpdate, delay }) => {
-    
-    const formattedDisplayDate = useMemo(() => {
-        if (!paymentData.date) return null;
-        const [year, month, day] = paymentData.date.split('-').map(Number);
-        const date = new Date(Date.UTC(year, month - 1, day));
-        return new Intl.DateTimeFormat('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric', timeZone: 'UTC' }).format(date);
-    }, [paymentData.date]);
+}
 
+const PartialPaymentFields: React.FC<PartialPaymentFieldsProps> = ({ idPrefix, details, onUpdate }) => {
     return (
-        <div className="bg-white p-4 rounded-xl border border-zinc-200 shadow-sm space-y-3 opacity-0 animate-fadeInUp" style={{ animationDelay: `${delay}ms`, animationFillMode: 'forwards' }}>
-            <div className="flex justify-between items-start">
-                <div>
-                    <h3 className="text-lg font-bold text-zinc-800">{title}</h3>
-                    <p className="font-semibold text-green-600">R$ {amount.toFixed(2).replace('.', ',')}</p>
-                </div>
-                <button
-                    type="button"
-                    onClick={() => onUpdate({ isPaid: !paymentData.isPaid })}
-                    className={`px-3 py-1 text-sm font-bold rounded-full transition-colors ${paymentData.isPaid ? 'bg-green-100 text-green-800' : 'bg-zinc-100 text-zinc-700'}`}
-                >
-                    {paymentData.isPaid ? 'Pago' : 'Marcar como Pago'}
-                </button>
-            </div>
-            {paymentData.isPaid && (
-                <div className="space-y-3 animate-fadeIn border-t border-zinc-200 pt-3">
-                    <div>
-                        <label className="block text-sm font-medium text-zinc-700">Data do Pagamento</label>
+        <div className="space-y-3">
+            <label className="flex items-center space-x-2 cursor-pointer w-fit">
+                <input type="checkbox" checked={details.isPaid} onChange={(e) => onUpdate({ isPaid: e.target.checked })} className="h-4 w-4 rounded border-zinc-300 text-green-600 focus:ring-green-500"/>
+                <span className="text-sm text-zinc-700 font-medium">Pagamento realizado?</span>
+            </label>
+            {details.isPaid && (
+                <div className="space-y-3 pl-6 border-l-2 border-zinc-200 animate-fadeIn">
+                    <FormField label="Data do Pagamento" id={`${idPrefix}-date`}>
                         <input
                             type="date"
-                            value={paymentData.date}
+                            id={`${idPrefix}-date`}
+                            value={details.date}
                             onChange={(e) => onUpdate({ date: e.target.value })}
-                            className="mt-1 block w-full px-3 py-2 bg-white border border-zinc-300 rounded-md shadow-sm sm:text-sm disabled:bg-zinc-100"
-                            required={!paymentData.dateNotInformed}
-                            disabled={paymentData.dateNotInformed}
+                            className="block w-full px-3 py-2 bg-white border border-zinc-300 rounded-md shadow-sm sm:text-sm focus:outline-none focus:ring-green-500 focus:border-green-500 disabled:bg-zinc-100"
+                            required={!details.dateNotInformed}
+                            disabled={details.dateNotInformed}
                             autoComplete="off"
                         />
                          <label className="flex items-center space-x-2 mt-2 cursor-pointer w-fit">
-                            <input
-                                type="checkbox"
-                                checked={paymentData.dateNotInformed}
-                                onChange={(e) => onUpdate({ dateNotInformed: e.target.checked })}
-                                className="h-4 w-4 rounded border-zinc-300 text-green-600 focus:ring-green-500"
-                            />
+                            <input type="checkbox" checked={details.dateNotInformed} onChange={(e) => onUpdate({ dateNotInformed: e.target.checked })} className="h-4 w-4 rounded border-zinc-300 text-green-600 focus:ring-green-500" />
                             <span className="text-sm text-zinc-700">Data não informada</span>
                         </label>
-                         {formattedDisplayDate && !paymentData.dateNotInformed && (
-                            <p className="mt-2 text-sm text-center text-zinc-600 bg-zinc-100 p-2 rounded-md border border-zinc-200">
-                                <strong className="font-bold text-green-700">{formattedDisplayDate}</strong>
-                            </p>
-                        )}
-                    </div>
-                     <div>
-                        <label className="block text-sm font-medium text-zinc-700">Tipo de Pagamento</label>
+                    </FormField>
+                    <FormField label="Tipo de Pagamento" id={`${idPrefix}-type`}>
                         <select
-                            value={paymentData.type}
+                            id={`${idPrefix}-type`}
+                            value={details.type}
                             onChange={(e) => onUpdate({ type: e.target.value as PaymentType })}
-                            className="mt-1 block w-full px-3 py-2 bg-white border border-zinc-300 rounded-md shadow-sm sm:text-sm"
+                            className="block w-full px-3 py-2 bg-white border border-zinc-300 rounded-md shadow-sm sm:text-sm focus:outline-none focus:ring-green-500 focus:border-green-500"
+                            required
                             autoComplete="off"
                         >
                             <option value={PaymentType.PIX_CONTA}>PIX (Conta)</option>
@@ -132,365 +65,242 @@ const PartialPaymentCreator: React.FC<{
                             <option value={PaymentType.CREDITO}>Crédito</option>
                             <option value={PaymentType.DINHEIRO}>Dinheiro</option>
                         </select>
-                    </div>
-                     <button
-                        type="button"
-                        onClick={() => {
-                            onUpdate({
-                                isPaid: false,
-                                date: new Date().toISOString().split('T')[0],
-                                dateNotInformed: false,
-                                type: PaymentType.PIX_CONTA,
-                            });
-                        }}
-                        className="w-full text-red-600 font-semibold text-sm py-2 rounded-lg hover:bg-red-50"
-                    >
-                        Limpar Pagamento
-                    </button>
+                    </FormField>
                 </div>
             )}
         </div>
     );
 };
 
+interface AddAttendeeFormProps {
+    onAddAttendee?: (formData: Omit<AttendeeFormData, 'paymentAmount'> & { paymentAmount: number }) => Promise<void>;
+    onUpdateAttendee?: (attendee: Attendee) => Promise<void>;
+    onCancel: () => void;
+    attendeeToEdit?: Attendee | null;
+    attendees: Attendee[];
+}
 
-const AddAttendeeForm: React.FC<AddAttendeeFormProps> = ({ onAddAttendee, onUpdateAttendee, onCancel, attendeeToEdit }) => {
-    const isEditMode = !!attendeeToEdit;
-    
-    const [formState, setFormState] = useState<AttendeeFormData>(() => {
-        if (isEditMode) {
-            return {
-                name: attendeeToEdit.name,
-                document: attendeeToEdit.document,
-                phone: attendeeToEdit.phone,
-                packageType: attendeeToEdit.packageType,
-                paymentAmount: attendeeToEdit.payment.amount.toFixed(2),
-                registerPaymentNow: false, // Not applicable in edit mode from this form
-                notes: attendeeToEdit.notes || '',
-                paymentDate: new Date().toISOString().split('T')[0],
-                paymentDateNotInformed: false,
-                paymentType: PaymentType.PIX_CONTA,
-                sitePayment: { isPaid: false, date: new Date().toISOString().split('T')[0], dateNotInformed: false, type: PaymentType.PIX_CONTA },
-                busPayment: { isPaid: false, date: new Date().toISOString().split('T')[0], dateNotInformed: false, type: PaymentType.PIX_CONTA },
-            };
-        }
+const getInitialPartialPayment = (): PartialPaymentFormDetails => ({
+    isPaid: false,
+    date: new Date().toISOString().split('T')[0],
+    dateNotInformed: false,
+    type: PaymentType.PIX_CONTA,
+});
+
+const getInitialFormData = (attendee?: Attendee | null): AttendeeFormData => {
+    if (attendee) {
         return {
-            name: '',
-            document: '',
-            phone: '',
-            packageType: PackageType.SITIO_BUS,
-            paymentAmount: '120.00',
+            name: attendee.name,
+            document: attendee.document,
+            phone: attendee.phone,
+            packageType: attendee.packageType,
+            notes: attendee.notes || '',
+            paymentAmount: attendee.payment.amount.toString(),
             registerPaymentNow: false,
-            notes: '',
             paymentDate: new Date().toISOString().split('T')[0],
-            paymentDateNotInformed: false,
+            paymentDateNotInformed: true,
             paymentType: PaymentType.PIX_CONTA,
-            sitePayment: { isPaid: false, date: new Date().toISOString().split('T')[0], dateNotInformed: false, type: PaymentType.PIX_CONTA },
-            busPayment: { isPaid: false, date: new Date().toISOString().split('T')[0], dateNotInformed: false, type: PaymentType.PIX_CONTA },
+            sitePayment: getInitialPartialPayment(),
+            busPayment: getInitialPartialPayment(),
         };
-    });
+    }
+    return {
+        name: '',
+        document: '',
+        phone: '',
+        packageType: PackageType.SITIO_ONLY,
+        paymentAmount: '70.00',
+        registerPaymentNow: false,
+        notes: '',
+        paymentDate: new Date().toISOString().split('T')[0],
+        paymentDateNotInformed: false,
+        paymentType: PaymentType.PIX_CONTA,
+        sitePayment: getInitialPartialPayment(),
+        busPayment: getInitialPartialPayment(),
+    };
+};
 
-    const [errors, setErrors] = useState<{ [key: string]: string }>({});
-    const [docType, setDocType] = useState<DocumentType>(() => 
-        isEditMode ? getDocumentType(attendeeToEdit.document).type : DocumentType.OUTRO
-    );
-    const [submissionStatus, setSubmissionStatus] = useState<'idle' | 'submitting' | 'success' | 'error'>('idle');
-    const [submissionError, setSubmissionError] = useState<string | null>(null);
+const AddAttendeeForm: React.FC<AddAttendeeFormProps> = ({ onAddAttendee, onUpdateAttendee, onCancel, attendeeToEdit, attendees }) => {
+    const { addToast } = useToast();
+    const isEditMode = !!attendeeToEdit;
 
-    const isDocumentRequired = useMemo(() => formState.packageType === PackageType.SITIO_BUS, [formState.packageType]);
-    const isMultiPaymentPackage = useMemo(() => formState.packageType === PackageType.SITIO_BUS, [formState.packageType]);
-
-    const formattedDisplayDate = useMemo(() => {
-        if (!formState.paymentDate) return null;
-        const [year, month, day] = formState.paymentDate.split('-').map(Number);
-        const date = new Date(Date.UTC(year, month - 1, day));
-        return new Intl.DateTimeFormat('pt-BR', {
-            day: '2-digit',
-            month: '2-digit',
-            year: 'numeric',
-            timeZone: 'UTC'
-        }).format(date);
-    }, [formState.paymentDate]);
+    const [formData, setFormData] = useState<AttendeeFormData>(getInitialFormData(attendeeToEdit));
+    const [errors, setErrors] = useState<Record<string, string>>({});
+    const [isSubmitting, setIsSubmitting] = useState(false);
 
     useEffect(() => {
-        const updates: Partial<AttendeeFormData> = {};
-        const newAmount = formState.packageType === PackageType.SITIO_ONLY ? '70.00' : '120.00';
-        
-        if (formState.paymentAmount !== newAmount) {
-            updates.paymentAmount = newAmount;
+        setFormData(getInitialFormData(attendeeToEdit));
+    }, [attendeeToEdit]);
+
+    useEffect(() => {
+        if (!isEditMode) {
+            const amount = formData.packageType === PackageType.SITIO_BUS ? '120.00' : '70.00';
+            setFormData(fd => ({ ...fd, paymentAmount: amount }));
         }
-        if (!isDocumentRequired && formState.document !== '') {
-            updates.document = '';
-            setDocType(DocumentType.OUTRO);
+    }, [formData.packageType, isEditMode]);
+
+    const validateForm = (): boolean => {
+        const newErrors: Record<string, string> = {};
+        if (!formData.name.trim()) newErrors.name = 'Nome é obrigatório.';
+        if (!formData.document.trim()) {
+            newErrors.document = 'Documento é obrigatório.';
+        } else if (formData.packageType === PackageType.SITIO_BUS && !getDocumentType(formData.document).valid) {
+            newErrors.document = 'Documento inválido para pacote com ônibus.';
         }
+        if (!formData.phone.trim() || formData.phone.replace(/\D/g, '').length < 10) newErrors.phone = 'Telefone inválido.';
 
-        if (Object.keys(updates).length > 0) {
-            setFormState(prev => ({ ...prev, ...updates }));
-        }
-    }, [formState.packageType, formState.paymentAmount, formState.document, isDocumentRequired]);
+        const normalizedName = normalizeString(formData.name);
+        const normalizedDocument = formData.document.replace(/[^\d]/g, '');
 
-
-    const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
-        const target = e.target;
-        const name = target.name;
-
-        if (target instanceof HTMLInputElement && target.type === 'checkbox') {
-            setFormState(prev => ({
-                ...prev,
-                [name]: target.checked,
-            }));
-        } else {
-            const value = target.value;
-            let formattedValue = value;
-            if (name === 'phone') {
-                formattedValue = formatPhoneNumber(value);
-            } else if (name === 'document') {
-                formattedValue = formatDocument(value);
-                const { type: docTypeResult } = getDocumentType(formattedValue);
-                setDocType(docTypeResult);
+        if (normalizedName || normalizedDocument) {
+            const duplicate = attendees.find(a => {
+                if (isEditMode && a.id === attendeeToEdit.id) return false;
+                const existingName = normalizeString(a.name);
+                const existingDoc = a.document.replace(/[^\d]/g, '');
+                if (normalizedDocument && existingDoc && normalizedDocument.length > 3) {
+                    return existingDoc === normalizedDocument;
+                }
+                return existingName === normalizedName;
+            });
+            if (duplicate) {
+                if (normalizeString(duplicate.name) === normalizedName) newErrors.name = `"${formData.name}" já está na lista.`;
+                else newErrors.document = 'Este documento já foi cadastrado.';
             }
-            setFormState(prev => ({ ...prev, [name]: formattedValue }));
         }
-    };
-    
-    const validate = (): boolean => {
-        const newErrors: { [key: string]: string } = {};
-        if (!formState.name.trim()) newErrors.name = 'Nome é obrigatório.';
-        
-        if (isDocumentRequired) {
-            const docInfo = getDocumentType(formState.document);
-            if (!docInfo.valid) newErrors.document = 'Documento inválido.';
-        }
-        
-        if (formState.phone.replace(/[^\d]/g, '').length < 10) newErrors.phone = 'Telefone inválido.';
-        
-        const paymentAmount = parseFloat(formState.paymentAmount);
-        if (isNaN(paymentAmount) || paymentAmount <= 0) newErrors.paymentAmount = 'Valor de pagamento deve ser positivo.';
 
         setErrors(newErrors);
         return Object.keys(newErrors).length === 0;
     };
 
+    const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
+        const { name, value, type } = e.target;
+        const isCheckbox = type === 'checkbox';
+        const checked = (e.target as HTMLInputElement).checked;
+
+        let finalValue = isCheckbox ? checked : value;
+
+        if (name === 'phone') finalValue = formatPhoneNumber(value);
+        if (name === 'document') finalValue = formatDocument(value);
+
+        setFormData(prev => ({ ...prev, [name]: finalValue }));
+    };
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-        setSubmissionError(null);
-        if (validate()) {
-            setSubmissionStatus('submitting');
-            try {
-                const { type: docType } = getDocumentType(formState.document);
-                if (isEditMode && onUpdateAttendee && attendeeToEdit) {
-                     const updatedAttendee: Attendee = {
-                        ...attendeeToEdit,
-                        name: formState.name,
-                        document: formState.document,
-                        documentType: docType,
-                        phone: formState.phone,
-                        packageType: formState.packageType,
-                        notes: formState.notes,
-                        payment: {
-                            ...attendeeToEdit.payment,
-                            amount: parseFloat(formState.paymentAmount),
-                        },
-                    };
-                    await onUpdateAttendee(updatedAttendee);
-                } else if (!isEditMode && onAddAttendee) {
-                    await onAddAttendee({
-                        ...formState,
-                        paymentAmount: parseFloat(formState.paymentAmount),
-                    });
-                }
-                setSubmissionStatus('success');
-            } catch (error) {
-                console.error("Submission failed:", error);
-                setSubmissionStatus('error');
-                setSubmissionError('Falha ao salvar os dados. Por favor, tente novamente.');
+        if (!validateForm()) {
+            addToast('Por favor, corrija os erros no formulário.', 'error');
+            return;
+        }
+
+        setIsSubmitting(true);
+        try {
+            if (isEditMode && onUpdateAttendee && attendeeToEdit) {
+                const { type } = getDocumentType(formData.document);
+                const updatedAttendee: Attendee = {
+                    ...attendeeToEdit,
+                    name: formData.name.trim(),
+                    document: formData.document,
+                    documentType: type,
+                    phone: formData.phone,
+                    packageType: formData.packageType,
+                    notes: formData.notes.trim(),
+                    payment: {
+                        ...attendeeToEdit.payment,
+                        amount: formData.packageType === PackageType.SITIO_BUS ? 120 : 70,
+                    },
+                };
+                await onUpdateAttendee(updatedAttendee);
+                addToast('Inscrição atualizada com sucesso!', 'success');
+                onCancel();
+            } else if (!isEditMode && onAddAttendee) {
+                await onAddAttendee({
+                    ...formData,
+                    name: formData.name.trim(),
+                    notes: formData.notes.trim(),
+                    paymentAmount: parseFloat(formData.paymentAmount),
+                });
+                addToast('Inscrição adicionada com sucesso!', 'success');
+                onCancel();
             }
+        } catch (error) {
+            console.error(error);
+            addToast('Falha ao salvar inscrição.', 'error');
+        } finally {
+            setIsSubmitting(false);
         }
     };
-    
-    const isSubmitting = submissionStatus === 'submitting';
+
+    const isBusPackage = formData.packageType === PackageType.SITIO_BUS;
 
     return (
         <div className="animate-fadeIn">
-            <header className="sticky top-0 md:static bg-white md:bg-transparent z-10 p-4 md:pt-6 border-b border-zinc-200 flex items-center gap-4">
+             <header className="sticky top-0 md:static bg-white md:bg-transparent z-10 p-4 md:pt-6 border-b border-zinc-200 flex items-center gap-4">
                 <button onClick={onCancel} className="text-zinc-500 hover:text-zinc-800 p-1 rounded-full hover:bg-zinc-100">
-                     <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>
                 </button>
-                <h1 className="text-xl md:text-2xl font-bold text-zinc-800">{isEditMode ? 'Editar' : 'Adicionar'} Inscrição</h1>
+                <h1 className="text-xl md:text-2xl font-bold text-zinc-800">{isEditMode ? 'Editar Inscrição' : 'Nova Inscrição'}</h1>
             </header>
-            <form onSubmit={handleSubmit} className="p-4">
-                <div className="space-y-4 md:space-y-0 md:grid md:grid-cols-2 md:gap-x-6 md:gap-y-4">
-                    <InputField label="Nome Completo" name="name" value={formState.name} onChange={handleInputChange} error={errors.name} placeholder="Nome do participante" delay={100} />
-                    
-                    {isDocumentRequired && (
-                        <div className="opacity-0 animate-fadeInUp" style={{ animationDelay: '150ms', animationFillMode: 'forwards' }}>
-                            <label htmlFor="document" className="block text-sm font-medium text-zinc-700">Documento (CPF/RG)</label>
-                            <div className="mt-1 relative">
-                                <input
-                                    type="text"
-                                    id="document"
-                                    name="document"
-                                    value={formState.document}
-                                    onChange={handleInputChange}
-                                    placeholder="000.000.000-00"
-                                    maxLength={18}
-                                    className={`block w-full pr-16 px-3 py-2 bg-white border ${errors.document ? 'border-red-500 text-red-900 placeholder-red-300' : 'border-zinc-300'} rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500 sm:text-sm`}
-                                    aria-invalid={!!errors.document}
-                                    aria-describedby={errors.document ? `document-error` : undefined}
-                                    autoComplete="off"
-                                />
-                                {docType !== DocumentType.OUTRO && formState.document.length > 0 && (
-                                    <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
-                                        <span className="text-zinc-500 sm:text-sm font-semibold bg-zinc-100 px-2 py-0.5 rounded-md animate-fadeIn">
-                                            {docType}
-                                        </span>
+            <form onSubmit={handleSubmit} className="p-4 space-y-6">
+                <div className="bg-white p-4 rounded-xl border border-zinc-200 shadow-sm space-y-4">
+                    <h2 className="text-lg font-bold text-zinc-800">Dados Pessoais</h2>
+                    <FormField label="Nome Completo" id="name" error={errors.name}>
+                        <input type="text" id="name" name="name" value={formData.name} onChange={handleInputChange} className="block w-full px-3 py-2 bg-white border border-zinc-300 rounded-md shadow-sm sm:text-sm focus:outline-none focus:ring-green-500 focus:border-green-500" required autoComplete="off" />
+                    </FormField>
+                    <FormField label="Documento (CPF ou RG)" id="document" error={errors.document}>
+                        <input type="tel" id="document" name="document" value={formData.document} onChange={handleInputChange} className="block w-full px-3 py-2 bg-white border border-zinc-300 rounded-md shadow-sm sm:text-sm focus:outline-none focus:ring-green-500 focus:border-green-500" required autoComplete="off" />
+                        {isBusPackage && <p className="mt-1 text-xs text-zinc-500">Documento é obrigatório para o seguro do ônibus.</p>}
+                    </FormField>
+                     <FormField label="Telefone (com DDD)" id="phone" error={errors.phone}>
+                        <input type="tel" id="phone" name="phone" value={formData.phone} onChange={handleInputChange} placeholder="(21) 99999-9999" className="block w-full px-3 py-2 bg-white border border-zinc-300 rounded-md shadow-sm sm:text-sm focus:outline-none focus:ring-green-500 focus:border-green-500" required autoComplete="off" />
+                    </FormField>
+                </div>
+                
+                <div className="bg-white p-4 rounded-xl border border-zinc-200 shadow-sm space-y-4">
+                    <h2 className="text-lg font-bold text-zinc-800">Pacote e Observações</h2>
+                     <FormField label="Pacote" id="packageType" error={errors.packageType}>
+                        <select id="packageType" name="packageType" value={formData.packageType} onChange={handleInputChange} className="block w-full px-3 py-2 bg-white border border-zinc-300 rounded-md shadow-sm sm:text-sm focus:outline-none focus:ring-green-500 focus:border-green-500">
+                            <option value={PackageType.SITIO_ONLY}>Apenas Sítio - R$ 70,00</option>
+                            <option value={PackageType.SITIO_BUS}>Sítio + Ônibus - R$ 120,00</option>
+                        </select>
+                    </FormField>
+                    <FormField label="Observações" id="notes" error={errors.notes}>
+                        <textarea id="notes" name="notes" value={formData.notes} onChange={handleInputChange} rows={3} className="block w-full px-3 py-2 bg-white border border-zinc-300 rounded-md shadow-sm sm:text-sm focus:outline-none focus:ring-green-500 focus:border-green-500" placeholder="Alergias, restrições alimentares, etc."></textarea>
+                    </FormField>
+                </div>
+
+                {!isEditMode && (
+                    <div className="bg-white p-4 rounded-xl border border-zinc-200 shadow-sm space-y-4">
+                        <label className="flex items-center space-x-2 cursor-pointer w-fit">
+                            <input type="checkbox" name="registerPaymentNow" checked={formData.registerPaymentNow} onChange={handleInputChange} className="h-4 w-4 rounded border-zinc-300 text-green-600 focus:ring-green-500"/>
+                            <span className="text-lg text-zinc-800 font-bold">Registrar Pagamento Agora?</span>
+                        </label>
+
+                        {formData.registerPaymentNow && (
+                            <div className="pt-4 border-t border-zinc-200 animate-fadeIn">
+                                {isBusPackage ? (
+                                    <div className="space-y-4">
+                                        <div>
+                                            <h3 className="font-bold text-zinc-700 mb-2">Pagamento Sítio (R$ 70,00)</h3>
+                                            <PartialPaymentFields idPrefix="site" details={formData.sitePayment} onUpdate={(updates) => setFormData(fd => ({ ...fd, sitePayment: { ...fd.sitePayment, ...updates } }))} />
+                                        </div>
+                                        <div>
+                                            <h3 className="font-bold text-zinc-700 mb-2">Pagamento Ônibus (R$ 50,00)</h3>
+                                            <PartialPaymentFields idPrefix="bus" details={formData.busPayment} onUpdate={(updates) => setFormData(fd => ({ ...fd, busPayment: { ...fd.busPayment, ...updates } }))} />
+                                        </div>
                                     </div>
+                                ) : (
+                                    <PartialPaymentFields idPrefix="single" details={{ isPaid: true, date: formData.paymentDate, dateNotInformed: formData.paymentDateNotInformed, type: formData.paymentType }} onUpdate={({date, dateNotInformed, type}) => setFormData(fd => ({...fd, paymentDate: date !== undefined ? date : fd.paymentDate, paymentDateNotInformed: dateNotInformed !== undefined ? dateNotInformed : fd.paymentDateNotInformed, paymentType: type !== undefined ? type : fd.paymentType }))} />
                                 )}
                             </div>
-                            {errors.document && <p id={`document-error`} className="mt-1 text-sm text-red-600 animate-fadeIn">{errors.document}</p>}
-                        </div>
-                    )}
-
-
-                    <InputField label="Telefone" name="phone" value={formState.phone} onChange={handleInputChange} error={errors.phone} placeholder="(00) 00000-0000" maxLength={15} delay={200} />
-                    <div className="opacity-0 animate-fadeInUp" style={{ animationDelay: '250ms', animationFillMode: 'forwards' }}>
-                        <label htmlFor="packageType" className="block text-sm font-medium text-zinc-700">Pacote</label>
-                        <select name="packageType" id="packageType" value={formState.packageType} onChange={handleInputChange} className="mt-1 block w-full px-3 py-2 bg-white border border-zinc-300 rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500 sm:text-sm" autoComplete="off">
-                            <option value={PackageType.SITIO_BUS}>Sítio + Ônibus</option>
-                            <option value={PackageType.SITIO_ONLY}>Apenas Sítio</option>
-                        </select>
+                        )}
                     </div>
-                    <div className="opacity-0 animate-fadeInUp md:col-span-2" style={{ animationDelay: '300ms', animationFillMode: 'forwards' }}>
-                        <label htmlFor="paymentAmount" className="block text-sm font-medium text-zinc-700">Valor a Pagar (R$)</label>
-                        <input
-                            type="text"
-                            id="paymentAmount"
-                            name="paymentAmount"
-                            value={formState.paymentAmount}
-                            readOnly
-                            className="mt-1 block w-full px-3 py-2 bg-zinc-100 border border-zinc-300 rounded-md shadow-sm focus:outline-none sm:text-sm text-zinc-500 cursor-not-allowed"
-                            autoComplete="off"
-                        />
-                    </div>
-                    
-                    <div className="md:col-span-2">
-                        <TextAreaField
-                            label="Observações"
-                            name="notes"
-                            value={formState.notes}
-                            onChange={handleInputChange}
-                            placeholder="Alergias, restrições alimentares, etc."
-                            delay={325}
-                            rows={4}
-                        />
-                    </div>
-                    
-                    {!isEditMode && (
-                         <div className="md:col-span-2 space-y-4 border-t border-zinc-200 pt-4">
-                             <div className="opacity-0 animate-fadeInUp" style={{ animationDelay: '350ms', animationFillMode: 'forwards' }}>
-                                <label className="flex items-center space-x-2 p-2 rounded-md hover:bg-zinc-50 cursor-pointer w-fit">
-                                    <input
-                                        type="checkbox"
-                                        name="registerPaymentNow"
-                                        checked={formState.registerPaymentNow}
-                                        onChange={handleInputChange}
-                                        className="h-4 w-4 rounded border-zinc-300 text-green-600 focus:ring-green-500"
-                                    />
-                                    <span className="text-sm font-medium text-zinc-700">Registrar pagamento agora</span>
-                                </label>
-                            </div>
-                            
-                            {formState.registerPaymentNow && (
-                                <>
-                                    {isMultiPaymentPackage ? (
-                                        <div className="md:col-span-2 md:grid md:grid-cols-2 gap-4 animate-fadeIn">
-                                            <PartialPaymentCreator
-                                                title="Pagamento Sítio"
-                                                amount={70}
-                                                paymentData={formState.sitePayment}
-                                                onUpdate={(updates) => setFormState(prev => ({...prev, sitePayment: {...prev.sitePayment, ...updates}}))}
-                                                delay={50}
-                                            />
-                                            <PartialPaymentCreator
-                                                title="Pagamento Ônibus"
-                                                amount={50}
-                                                paymentData={formState.busPayment}
-                                                onUpdate={(updates) => setFormState(prev => ({...prev, busPayment: {...prev.busPayment, ...updates}}))}
-                                                delay={100}
-                                            />
-                                        </div>
-                                    ) : (
-                                        <div className="md:grid md:grid-cols-2 md:gap-x-6 md:gap-y-4 space-y-4 md:space-y-0 animate-fadeIn">
-                                            <div className="opacity-0 animate-fadeInUp" style={{ animationDelay: '50ms', animationFillMode: 'forwards' }}>
-                                                <label htmlFor="paymentDate" className="block text-sm font-medium text-zinc-700">Data do Pagamento</label>
-                                                <input
-                                                    type="date"
-                                                    id="paymentDate"
-                                                    name="paymentDate"
-                                                    value={formState.paymentDate}
-                                                    onChange={handleInputChange}
-                                                    className="mt-1 block w-full px-3 py-2 bg-white border border-zinc-300 rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500 sm:text-sm disabled:bg-zinc-100"
-                                                    required={!formState.paymentDateNotInformed}
-                                                    disabled={formState.paymentDateNotInformed}
-                                                    autoComplete="off"
-                                                />
-                                                 <label className="flex items-center space-x-2 mt-2 cursor-pointer w-fit">
-                                                    <input
-                                                        type="checkbox"
-                                                        name="paymentDateNotInformed"
-                                                        checked={formState.paymentDateNotInformed}
-                                                        onChange={handleInputChange}
-                                                        className="h-4 w-4 rounded border-zinc-300 text-green-600 focus:ring-green-500"
-                                                    />
-                                                    <span className="text-sm text-zinc-700">Data não informada</span>
-                                                </label>
-                                                {formattedDisplayDate && !formState.paymentDateNotInformed && (
-                                                    <p className="mt-2 text-sm text-center text-zinc-600 bg-zinc-100 p-2 rounded-md border border-zinc-200">
-                                                        Confirmação: <strong className="font-bold text-green-700">{formattedDisplayDate} (dd/mm/aaaa)</strong>
-                                                    </p>
-                                                )}
-                                            </div>
-                                            <div className="opacity-0 animate-fadeInUp" style={{ animationDelay: '100ms', animationFillMode: 'forwards' }}>
-                                                <label htmlFor="paymentType" className="block text-sm font-medium text-zinc-700">Tipo de Pagamento</label>
-                                                <select
-                                                    id="paymentType"
-                                                    name="paymentType"
-                                                    value={formState.paymentType}
-                                                    onChange={handleInputChange}
-                                                    className="mt-1 block w-full px-3 py-2 bg-white border border-zinc-300 rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500 sm:text-sm"
-                                                    required
-                                                    autoComplete="off"
-                                                >
-                                                    <option value={PaymentType.PIX_CONTA}>PIX (Conta)</option>
-                                                    <option value={PaymentType.PIX_MAQUINA}>PIX (Máquina)</option>
-                                                    <option value={PaymentType.DEBITO}>Débito</option>
-                                                    <option value={PaymentType.CREDITO}>Crédito</option>
-                                                    <option value={PaymentType.DINHEIRO}>Dinheiro</option>
-                                                </select>
-                                            </div>
-                                        </div>
-                                    )}
-                                </>
-                            )}
-                         </div>
-                    )}
-
-
-                    <div className="flex flex-col md:flex-row gap-4 pt-4 md:col-span-2 opacity-0 animate-fadeInUp" style={{ animationDelay: '400ms', animationFillMode: 'forwards' }}>
-                        <button type="button" onClick={onCancel} className="w-full bg-zinc-200 text-zinc-800 font-bold py-3 px-4 rounded-full hover:bg-zinc-300 transition-colors">Cancelar</button>
-                        <button type="submit" disabled={isSubmitting} className="w-full bg-green-500 text-white font-bold py-3 px-4 rounded-full hover:bg-green-600 transition-colors shadow-sm flex items-center justify-center gap-2 disabled:bg-green-400 disabled:cursor-not-allowed">
-                            {isSubmitting ? (
-                                <>
-                                    <SpinnerIcon />
-                                    <span>Salvando...</span>
-                                </>
-                            ) : (
-                                isEditMode ? 'Salvar Alterações' : 'Salvar'
-                            )}
-                        </button>
-                    </div>
-                     {submissionError && <p className="text-center text-sm text-red-600 animate-fadeIn md:col-span-2">{submissionError}</p>}
+                )}
+                
+                <div className="flex flex-col md:flex-row gap-4 pt-2">
+                    <button type="button" onClick={onCancel} className="w-full bg-zinc-200 text-zinc-800 font-bold py-3 px-4 rounded-full hover:bg-zinc-300 transition-colors">Cancelar</button>
+                    <button type="submit" disabled={isSubmitting} className="w-full bg-green-500 text-white font-bold py-3 px-4 rounded-full flex items-center justify-center gap-2 hover:bg-green-600 shadow-sm disabled:bg-green-400">
+                        {isSubmitting ? <><SpinnerIcon /> Salvando...</> : (isEditMode ? 'Salvar Alterações' : 'Salvar Inscrição')}
+                    </button>
                 </div>
             </form>
         </div>

@@ -1,9 +1,8 @@
-
 import React, { useState, useEffect, useMemo } from 'react';
 import type { Attendee } from '../types';
 import AttendeeListItem from './AttendeeListItem';
 import { PaymentStatus, PackageType } from '../types';
-import { normalizeString } from '../utils/formatters';
+import { normalizeString, getWhatsAppUrl } from '../utils/formatters';
 
 interface AttendeeListProps {
     attendees: Attendee[];

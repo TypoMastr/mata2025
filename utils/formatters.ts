@@ -72,3 +72,14 @@ export const normalizeString = (str: string): string => {
         .normalize('NFD') // Normalization Form Decomposed
         .replace(/[\u0300-\u036f]/g, ''); // Remove combining diacritical marks
 };
+
+export const getWhatsAppUrl = (phone: string): string => {
+    if (!phone) return '';
+    // Assuming all numbers are from Brazil (country code 55)
+    const countryCode = '55';
+    const digitsOnly = phone.replace(/[^\d]/g, '');
+    
+    if (digitsOnly.length < 10) return ''; // Basic validation
+    
+    return `https://wa.me/${countryCode}${digitsOnly}`;
+};

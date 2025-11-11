@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import type { Attendee, PartialPaymentDetails } from '../types';
-import { PaymentStatus, PackageType } from '../types';
+import { PaymentStatus, PackageType, DocumentType } from '../types';
 import ReceiptViewer from './ReceiptViewer';
 import { useToast } from '../contexts/ToastContext';
 import { getWhatsAppUrl } from '../utils/formatters';
@@ -153,6 +153,8 @@ const AttendeeDetail: React.FC<AttendeeDetailProps> = ({ attendee, onBack, onEdi
         }
     };
 
+    const showInvalidDocAsNotInformed = attendee.packageType === PackageType.SITIO_ONLY && attendee.documentType === DocumentType.OUTRO;
+
 
     return (
         <div className="animate-fadeIn">
@@ -178,20 +180,28 @@ const AttendeeDetail: React.FC<AttendeeDetailProps> = ({ attendee, onBack, onEdi
                                 </button>
                             </div>
                         </DetailRow>
-                        {attendee.packageType === PackageType.SITIO_BUS && (
-                            <DetailRow label="Documento">
-                                <div className="flex items-center justify-between">
+                        <DetailRow label="Documento">
+                            <div className="flex items-center justify-between">
+                                {showInvalidDocAsNotInformed ? (
+                                    <p className="font-semibold text-zinc-500 italic">Não informado</p>
+                                ) : (
                                     <p className="font-semibold text-zinc-800">{`${attendee.document} (${attendee.documentType})`}</p>
-                                    <button
-                                        onClick={() => handleCopyToClipboard(attendee.document, 'Documento')}
-                                        className="p-1.5 text-zinc-400 rounded-full hover:bg-zinc-100 hover:text-zinc-600 transition-colors"
-                                        aria-label="Copiar documento"
-                                    >
-                                        <CopyIcon />
-                                    </button>
-                                </div>
-                            </DetailRow>
-                        )}
+                                )}
+                                <button
+                                    onClick={() => {
+                                        if (showInvalidDocAsNotInformed) {
+                                            addToast('Documento não informado.', 'info');
+                                        } else {
+                                            handleCopyToClipboard(attendee.document, 'Documento');
+                                        }
+                                    }}
+                                    className="p-1.5 text-zinc-400 rounded-full hover:bg-zinc-100 hover:text-zinc-600 transition-colors"
+                                    aria-label="Copiar documento"
+                                >
+                                    <CopyIcon />
+                                </button>
+                            </div>
+                        </DetailRow>
                         <DetailRow label="Telefone">
                             <div className="flex flex-col items-start gap-2">
                                 <div className="flex items-center justify-between w-full">

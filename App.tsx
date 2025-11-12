@@ -210,8 +210,8 @@ const AppContent: React.FC = () => {
     return (
         <div className="bg-zinc-50 font-sans md:max-w-7xl md:mx-auto md:my-8 md:rounded-2xl md:shadow-2xl md:flex flex-grow w-full">
              <SideNav currentView={view} setView={setView} />
-            <div className="flex-grow min-h-screen-mobile relative pb-20 md:pb-0 md:min-h-0">
-                <main key={view}>
+            <div className="flex-grow min-h-screen-mobile relative flex flex-col overflow-hidden md:min-h-0">
+                <main key={view} className="flex-grow overflow-y-auto pb-20 md:pb-0">
                     {renderContent()}
                 </main>
                 {attendeeToDelete && <ConfirmDelete attendee={attendeeToDelete} onConfirm={handleConfirmDelete} onCancel={handleCancelDelete} />}

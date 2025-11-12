@@ -709,16 +709,17 @@ const ReportsDashboard: React.FC<{ attendees: Attendee[]; onGenerateReportClick:
             }
         });
         
-        const sortedPaymentStats = Object.entries(calculatedPaymentStats)
+        const sortedPaymentStats = (Object.entries(calculatedPaymentStats) as [string, { count: number, total: number }][])
             .sort(([, a], [, b]) => {
-                const statsA = a as { count: number; total: number };
-                const statsB = b as { count: number; total: number };
-                if (statsB.count !== statsA.count) {
-                    return statsB.count - statsA.count;
+                if (b.count !== a.count) {
+                    return b.count - a.count;
                 }
-                return statsB.total - statsA.total;
+                return b.total - a.total;
             })
-            .reduce((r, [k, v]) => ({ ...r, [k as PaymentType]: v }), {} as Record<PaymentType, { count: number; total: number }>);
+            .reduce((r, [k, v]) => {
+                r[k as PaymentType] = v
+                return r;
+            }, {} as Record<PaymentType, { count: number; total: number }>);
             
         const calculatedTotalRevenue = attendees
             .filter(a => a.payment.status !== PaymentStatus.ISENTO)

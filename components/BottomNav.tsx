@@ -33,8 +33,7 @@ const BottomNav: React.FC<BottomNavProps> = ({ currentView, setView }) => {
 
     return (
         <footer
-            className="fixed bottom-0 left-0 right-0 h-20 bg-white/95 border-t border-zinc-200 shadow-t-xl max-w-lg mx-auto md:hidden"
-            style={{ transform: 'translateZ(0)' }}
+            className="fixed bottom-0 left-0 right-0 h-20 bg-white/90 backdrop-blur-sm border-t border-zinc-200 md:hidden"
         >
             <div className="flex justify-around items-stretch h-full">
                 <NavItem icon={IconUsers} label="Inscrições" isActive={isCadastroActive} onClick={() => setView('list')} />

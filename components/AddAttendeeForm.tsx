@@ -142,11 +142,17 @@ const AddAttendeeForm: React.FC<AddAttendeeFormProps> = ({ onAddAttendee, onUpda
     const validateForm = (): boolean => {
         const newErrors: Record<string, string> = {};
         if (!formData.name.trim()) newErrors.name = 'Nome é obrigatório.';
-        if (!formData.document.trim()) {
-            newErrors.document = 'Documento é obrigatório.';
-        } else if (formData.packageType === PackageType.SITIO_BUS && !getDocumentType(formData.document).valid) {
-            newErrors.document = 'Documento inválido para pacote com ônibus.';
+        
+        const isBusPackage = formData.packageType === PackageType.SITIO_BUS;
+
+        if (isBusPackage) {
+            if (!formData.document.trim()) {
+                newErrors.document = 'Documento é obrigatório para pacote com ônibus.';
+            } else if (!getDocumentType(formData.document).valid) {
+                newErrors.document = 'Documento inválido.';
+            }
         }
+
         if (!formData.phone.trim() || formData.phone.replace(/\D/g, '').length < 10) newErrors.phone = 'Telefone inválido.';
 
         const normalizedName = normalizeString(formData.name);
@@ -177,10 +183,15 @@ const AddAttendeeForm: React.FC<AddAttendeeFormProps> = ({ onAddAttendee, onUpda
         const isCheckbox = type === 'checkbox';
         const checked = (e.target as HTMLInputElement).checked;
 
-        let finalValue = isCheckbox ? checked : value;
+        let finalValue: string | boolean = isCheckbox ? checked : value;
 
-        if (name === 'phone') finalValue = formatPhoneNumber(value);
-        if (name === 'document') finalValue = formatDocument(value);
+        if (name === 'name') {
+            finalValue = value.toUpperCase();
+        } else if (name === 'phone') {
+            finalValue = formatPhoneNumber(value);
+        } else if (name === 'document') {
+            finalValue = formatDocument(value);
+        }
 
         setFormData(prev => ({ ...prev, [name]: finalValue }));
     };
@@ -246,10 +257,16 @@ const AddAttendeeForm: React.FC<AddAttendeeFormProps> = ({ onAddAttendee, onUpda
                     <FormField label="Nome Completo" id="name" error={errors.name}>
                         <input type="text" id="name" name="name" value={formData.name} onChange={handleInputChange} className="block w-full px-3 py-2 bg-white border border-zinc-300 rounded-md shadow-sm sm:text-sm focus:outline-none focus:ring-green-500 focus:border-green-500" required autoComplete="off" />
                     </FormField>
-                    <FormField label="Documento (CPF ou RG)" id="document" error={errors.document}>
-                        <input type="tel" id="document" name="document" value={formData.document} onChange={handleInputChange} className="block w-full px-3 py-2 bg-white border border-zinc-300 rounded-md shadow-sm sm:text-sm focus:outline-none focus:ring-green-500 focus:border-green-500" required autoComplete="off" />
-                        {isBusPackage && <p className="mt-1 text-xs text-zinc-500">Documento é obrigatório para o seguro do ônibus.</p>}
-                    </FormField>
+                    
+                    {formData.packageType === PackageType.SITIO_BUS ? (
+                        <div className="animate-fadeIn">
+                            <FormField label="Documento (CPF ou RG)" id="document" error={errors.document}>
+                                <input type="tel" id="document" name="document" value={formData.document} onChange={handleInputChange} className="block w-full px-3 py-2 bg-white border border-zinc-300 rounded-md shadow-sm sm:text-sm focus:outline-none focus:ring-green-500 focus:border-green-500" required autoComplete="off" />
+                                <p className="mt-1 text-xs text-zinc-500">Documento é obrigatório para o seguro do ônibus.</p>
+                            </FormField>
+                        </div>
+                    ) : null}
+
                      <FormField label="Telefone (com DDD)" id="phone" error={errors.phone}>
                         <input type="tel" id="phone" name="phone" value={formData.phone} onChange={handleInputChange} placeholder="(21) 99999-9999" className="block w-full px-3 py-2 bg-white border border-zinc-300 rounded-md shadow-sm sm:text-sm focus:outline-none focus:ring-green-500 focus:border-green-500" required autoComplete="off" />
                     </FormField>

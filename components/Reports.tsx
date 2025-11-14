@@ -5,6 +5,75 @@ import { formatDocument, getDocumentType } from '../utils/formatters';
 import { levenshteinDistance } from '../utils/stringSimilarity';
 import { useToast } from '../contexts/ToastContext';
 
+// --- Componente: Modal de Confirmação de Mudança de Ônibus ---
+const SpinnerIconModal: React.FC = () => (
+    <svg className="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+    </svg>
+);
+interface ConfirmationRequest {
+    attendee: Attendee;
+    newBusNumber: number | null;
+    assignmentType: 'manual' | 'auto';
+}
+interface BusChangeConfirmationModalProps {
+    request: ConfirmationRequest;
+    onConfirm: () => void;
+    onCancel: () => void;
+    isSaving: boolean;
+}
+
+const BusChangeConfirmationModal: React.FC<BusChangeConfirmationModalProps> = ({ request, onConfirm, onCancel, isSaving }) => {
+    const { attendee, newBusNumber, assignmentType } = request;
+    const currentBusNumber = attendee.busNumber;
+
+    const getModalContent = () => {
+        if (assignmentType === 'auto' && newBusNumber !== null) {
+            return {
+                title: "Confirmar Designação Manual",
+                description: `Você está movendo "${attendee.name}" para o Ônibus ${newBusNumber}. Isso o tornará um passageiro designado manualmente e o fixará neste ônibus. Deseja continuar?`,
+            };
+        }
+        if (currentBusNumber !== null && newBusNumber !== null && currentBusNumber !== newBusNumber) {
+            return {
+                title: "Confirmar Mudança de Ônibus",
+                description: `Você tem certeza que deseja mover "${attendee.name}" do Ônibus ${currentBusNumber} para o Ônibus ${newBusNumber}?`,
+            };
+        }
+        if (currentBusNumber !== null && newBusNumber === null) {
+            return {
+                title: "Remover Designação Manual",
+                description: `Você está removendo a designação manual de "${attendee.name}". Ele voltará a ser alocado automaticamente em um ônibus com vagas. Deseja continuar?`,
+            };
+        }
+        return { title: "Confirmar Alteração", description: "Por favor, confirme a sua ação." };
+    };
+
+    const { title, description } = getModalContent();
+
+    return (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 animate-fadeIn">
+            <div className="bg-white rounded-xl shadow-lg p-6 max-w-sm w-full animate-popIn">
+                <h3 className="text-lg leading-6 font-bold text-zinc-900">{title}</h3>
+                <div className="mt-2">
+                    <p className="text-sm text-zinc-600">{description}</p>
+                </div>
+                <div className="mt-5 sm:mt-4 flex flex-col-reverse sm:flex-row sm:justify-end gap-3">
+                    <button type="button" onClick={onCancel} disabled={isSaving} className="w-full justify-center rounded-full border border-zinc-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-zinc-700 hover:bg-zinc-50 sm:w-auto sm:text-sm">
+                        Cancelar
+                    </button>
+                    <button type="button" onClick={onConfirm} disabled={isSaving} className="w-full justify-center rounded-full border border-transparent shadow-sm px-4 py-2 bg-green-600 text-base font-medium text-white hover:bg-green-700 sm:w-auto sm:text-sm disabled:bg-green-400 flex items-center gap-2 min-w-[110px]">
+                        {isSaving ? <SpinnerIconModal /> : null}
+                        {isSaving ? 'Salvando...' : 'Confirmar'}
+                    </button>
+                </div>
+            </div>
+        </div>
+    );
+};
+
+
 // --- Componente: Modal de Opções de Compartilhamento ---
 const ShareOptionsModal: React.FC<{
     onClose: () => void;
@@ -719,38 +788,20 @@ interface BusDetails {
 interface EditablePassengerRowProps {
     attendee: Attendee;
     onSelectAttendee: (id: string) => void;
-    onUpdateAttendee: (attendee: Attendee) => Promise<void>;
+    onRequestBusChange: (attendee: Attendee, newBusNumber: number | null) => void;
     totalBuses: number;
     busAssignments: Record<number, number>;
 }
 
-const EditablePassengerRow: React.FC<EditablePassengerRowProps> = ({ attendee, onSelectAttendee, onUpdateAttendee, totalBuses, busAssignments }) => {
-    const [isSaving, setIsSaving] = useState(false);
-    const { addToast } = useToast();
+const EditablePassengerRow: React.FC<EditablePassengerRowProps> = ({ attendee, onSelectAttendee, onRequestBusChange, totalBuses, busAssignments }) => {
 
-    const handleBusChange = async (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const handleBusChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
         const newBusValue = e.target.value;
         const newBusNumber = newBusValue === 'null' ? null : Number(newBusValue);
 
-        // Client-side validation
-        if (newBusNumber !== null) {
-            const currentBusCount = busAssignments[newBusNumber] || 0;
-            if (currentBusCount >= 50 && attendee.busNumber !== newBusNumber) {
-                addToast(`O Ônibus ${newBusNumber} já está lotado.`, 'error');
-                e.target.value = attendee.busNumber?.toString() || 'null';
-                return;
-            }
-        }
-        
-        setIsSaving(true);
-        try {
-            await onUpdateAttendee({ ...attendee, busNumber: newBusNumber });
-            addToast(`"${attendee.name}" movido com sucesso.`, 'success');
-        } catch (error) {
-            addToast(`Falha ao mover "${attendee.name}".`, 'error');
-            e.target.value = attendee.busNumber?.toString() || 'null';
-        } finally {
-            setIsSaving(false);
+        // Prevent triggering if the value hasn't changed
+        if (newBusNumber !== attendee.busNumber) {
+            onRequestBusChange(attendee, newBusNumber);
         }
     };
 
@@ -761,30 +812,26 @@ const EditablePassengerRow: React.FC<EditablePassengerRowProps> = ({ attendee, o
                 <p className="text-xs text-zinc-500 mt-1">{attendee.document} &bull; {attendee.phone}</p>
             </div>
             <div className="flex-shrink-0 flex items-center justify-center pt-2 md:pt-0 w-full md:w-auto">
-                {isSaving ? (
-                    <div className="w-full md:w-36 text-center py-1.5"><SpinnerIcon white={false} /></div>
-                ) : (
-                    <select
-                        value={attendee.busNumber?.toString() || 'null'}
-                        onChange={handleBusChange}
-                        onClick={(e) => e.stopPropagation()}
-                        className="block w-full md:w-40 text-sm bg-white border border-zinc-300 rounded-md shadow-sm focus:outline-none focus:ring-1 focus:ring-green-500 focus:border-green-500 px-2 py-1.5"
-                    >
-                        <option value="null">Nenhum</option>
-                        {Array.from({ length: totalBuses }, (_, i) => i + 1).map(busNum => {
-                            const count = busAssignments[busNum] || 0;
-                            const isFull = count >= 50;
-                            const isCurrentBus = attendee.busNumber === busNum;
-                            const isDisabled = isFull && !isCurrentBus;
+                <select
+                    value={attendee.busNumber?.toString() || 'null'}
+                    onChange={handleBusChange}
+                    onClick={(e) => e.stopPropagation()}
+                    className="block w-full md:w-40 text-sm bg-white border border-zinc-300 rounded-md shadow-sm focus:outline-none focus:ring-1 focus:ring-green-500 focus:border-green-500 px-2 py-1.5"
+                >
+                    <option value="null">Nenhum</option>
+                    {Array.from({ length: totalBuses }, (_, i) => i + 1).map(busNum => {
+                        const count = busAssignments[busNum] || 0;
+                        const isFull = count >= 50;
+                        const isCurrentBus = attendee.busNumber === busNum;
+                        const isDisabled = isFull && !isCurrentBus;
 
-                            return (
-                                <option key={busNum} value={busNum} disabled={isDisabled}>
-                                    Ônibus {busNum}{isDisabled ? ' (Lotado)' : ''}
-                                </option>
-                            );
-                        })}
-                    </select>
-                )}
+                        return (
+                            <option key={busNum} value={busNum} disabled={isDisabled}>
+                                Ônibus {busNum}{isDisabled ? ' (Lotado)' : ''}
+                            </option>
+                        );
+                    })}
+                </select>
             </div>
         </div>
     );
@@ -795,22 +842,22 @@ const BusPassengerList: React.FC<{
     busDetails: BusDetails;
     onBack: () => void;
     onSelectAttendee: (id: string) => void;
-    onUpdateAttendee: (attendee: Attendee) => Promise<void>;
+    onRequestBusChange: (attendee: Attendee, newBusNumber: number | null, assignmentType: 'manual' | 'auto') => void;
     totalBuses: number;
     busAssignments: Record<number, number>;
-}> = ({ busDetails, onBack, onSelectAttendee, onUpdateAttendee, totalBuses, busAssignments }) => {
+}> = ({ busDetails, onBack, onSelectAttendee, onRequestBusChange, totalBuses, busAssignments }) => {
     
     const manuallyAssigned = useMemo(() => busDetails.passengers.filter(p => p.assignmentType === 'manual'), [busDetails]);
     const autoAssigned = useMemo(() => busDetails.passengers.filter(p => p.assignmentType === 'auto'), [busDetails]);
 
-    const renderPassengerList = (passengers: BusPassenger[]) => (
+    const renderPassengerList = (passengers: BusPassenger[], assignmentType: 'manual' | 'auto') => (
         <div className="space-y-2">
             {passengers.map(p => 
                 <EditablePassengerRow 
                     key={p.id} 
                     attendee={p} 
                     onSelectAttendee={onSelectAttendee}
-                    onUpdateAttendee={onUpdateAttendee}
+                    onRequestBusChange={(attendee, newBusNumber) => onRequestBusChange(attendee, newBusNumber, assignmentType)}
                     totalBuses={totalBuses}
                     busAssignments={busAssignments}
                 />
@@ -830,7 +877,7 @@ const BusPassengerList: React.FC<{
                 <div className="bg-white p-4 rounded-xl border border-zinc-200 shadow-sm opacity-0 animate-fadeInUp" style={{ animationFillMode: 'forwards', animationDelay: '100ms' }}>
                     <h2 className="font-bold text-lg text-zinc-800 mb-3">Designados Manualmente ({manuallyAssigned.length})</h2>
                     {manuallyAssigned.length > 0 ? (
-                        renderPassengerList(manuallyAssigned)
+                        renderPassengerList(manuallyAssigned, 'manual')
                     ) : (
                         <p className="text-sm text-zinc-500 italic">Nenhum passageiro foi designado manualmente para este ônibus.</p>
                     )}
@@ -838,7 +885,7 @@ const BusPassengerList: React.FC<{
                 <div className="bg-white p-4 rounded-xl border border-zinc-200 shadow-sm opacity-0 animate-fadeInUp" style={{ animationFillMode: 'forwards', animationDelay: '200ms' }}>
                     <h2 className="font-bold text-lg text-zinc-800 mb-3">Designados Automaticamente ({autoAssigned.length})</h2>
                     {autoAssigned.length > 0 ? (
-                        renderPassengerList(autoAssigned)
+                        renderPassengerList(autoAssigned, 'auto')
                     ) : (
                          <p className="text-sm text-zinc-500 italic">Nenhum passageiro foi designado automaticamente.</p>
                     )}
@@ -1150,10 +1197,13 @@ interface ReportsProps {
 }
 
 const Reports: React.FC<ReportsProps> = ({ attendees, onLogout, onUpdateAttendee, onSelectAttendee }) => {
+    const { addToast } = useToast();
     const [mode, setMode] = useState<'dashboard' | 'form' | 'preview' | 'zeroDoc' | 'duplicateCheck' | 'busDetail' | 'financialDetail' | 'sitioOnlyList'>('dashboard');
     const [reportConfig, setReportConfig] = useState<ReportConfig | null>(null);
     const [reportData, setReportData] = useState<Attendee[] | Attendee[][]>([]);
     const [selectedBusNumber, setSelectedBusNumber] = useState<number | null>(null);
+    const [confirmationRequest, setConfirmationRequest] = useState<ConfirmationRequest | null>(null);
+    const [isSavingChange, setIsSavingChange] = useState(false);
 
     const zeroDocAttendees = useMemo(() => {
         return attendees.filter(a =>
@@ -1371,6 +1421,35 @@ const Reports: React.FC<ReportsProps> = ({ attendees, onLogout, onUpdateAttendee
         }));
     }, [busPassengerLists]);
 
+    const handleRequestBusChange = (attendee: Attendee, newBusNumber: number | null, assignmentType: 'manual' | 'auto') => {
+        if (newBusNumber !== null) {
+            const currentBusCount = busAssignments[newBusNumber] || 0;
+            if (currentBusCount >= 50 && attendee.busNumber !== newBusNumber) {
+                addToast(`O Ônibus ${newBusNumber} já está lotado.`, 'error');
+                return;
+            }
+        }
+        setConfirmationRequest({ attendee, newBusNumber, assignmentType });
+    };
+
+    const handleConfirmBusChange = async () => {
+        if (!confirmationRequest) return;
+        setIsSavingChange(true);
+        const { attendee, newBusNumber } = confirmationRequest;
+        try {
+            await onUpdateAttendee({ ...attendee, busNumber: newBusNumber });
+            addToast(`"${attendee.name}" movido com sucesso.`, 'success');
+        } catch (error) {
+            addToast(`Falha ao mover "${attendee.name}".`, 'error');
+        } finally {
+            setIsSavingChange(false);
+            setConfirmationRequest(null);
+        }
+    };
+
+    const handleCancelBusChange = () => {
+        setConfirmationRequest(null);
+    };
 
     const handleGenerate = (config: ReportConfig) => {
         if (config.type === 'busList') {
@@ -1398,60 +1477,69 @@ const Reports: React.FC<ReportsProps> = ({ attendees, onLogout, onUpdateAttendee
         setMode('busDetail');
     };
     
-    if (mode === 'financialDetail') {
-        return <FinancialDetailView financialData={financialDetails} onBack={() => setMode('dashboard')} />;
-    }
-
-    if (mode === 'sitioOnlyList') {
-        return <SitioOnlyListView attendees={sitioOnlyAttendees} onBack={() => setMode('dashboard')} onSelectAttendee={onSelectAttendee} />;
-    }
-    
-    if (mode === 'form') {
-        return <InteractiveReportForm onGenerate={handleGenerate} onCancel={() => setMode('dashboard')} />;
-    }
-
-    if (mode === 'preview' && reportConfig) {
-        return <InteractiveReportPreview data={reportData} config={reportConfig} onBack={() => setMode('form')} />;
-    }
-
-    if (mode === 'zeroDoc') {
-        return <ZeroDocList attendees={zeroDocAttendees} onBack={() => setMode('dashboard')} onUpdateAttendee={onUpdateAttendee} />;
-    }
-
-    if (mode === 'duplicateCheck') {
-        return <DuplicateCheckerView groups={potentialDuplicates} onBack={() => setMode('dashboard')} onSelectAttendee={onSelectAttendee} />;
-    }
-    
-    if (mode === 'busDetail' && selectedBusNumber) {
-        const busDetails = busPassengerLists.find(b => b.busNumber === selectedBusNumber);
-        if (!busDetails) {
-            // Fallback in case bus number is invalid
-            setMode('dashboard');
-            return null;
+    const renderCurrentView = () => {
+        switch (mode) {
+            case 'financialDetail':
+                return <FinancialDetailView financialData={financialDetails} onBack={() => setMode('dashboard')} />;
+            case 'sitioOnlyList':
+                return <SitioOnlyListView attendees={sitioOnlyAttendees} onBack={() => setMode('dashboard')} onSelectAttendee={onSelectAttendee} />;
+            case 'form':
+                return <InteractiveReportForm onGenerate={handleGenerate} onCancel={() => setMode('dashboard')} />;
+            case 'preview':
+                if (!reportConfig) {
+                    setMode('form');
+                    return null;
+                }
+                return <InteractiveReportPreview data={reportData} config={reportConfig} onBack={() => setMode('form')} />;
+            case 'zeroDoc':
+                return <ZeroDocList attendees={zeroDocAttendees} onBack={() => setMode('dashboard')} onUpdateAttendee={onUpdateAttendee} />;
+            case 'duplicateCheck':
+                return <DuplicateCheckerView groups={potentialDuplicates} onBack={() => setMode('dashboard')} onSelectAttendee={onSelectAttendee} />;
+            case 'busDetail':
+                const busDetails = busPassengerLists.find(b => b.busNumber === selectedBusNumber);
+                if (!busDetails) {
+                    setMode('dashboard');
+                    return null;
+                }
+                return <BusPassengerList
+                    busDetails={busDetails}
+                    onBack={() => setMode('dashboard')}
+                    onSelectAttendee={onSelectAttendee}
+                    onRequestBusChange={handleRequestBusChange}
+                    totalBuses={totalBuses}
+                    busAssignments={busAssignments}
+                />;
+            case 'dashboard':
+            default:
+                return <ReportsDashboard
+                    attendees={attendees}
+                    onGenerateReportClick={() => setMode('form')}
+                    onLogout={onLogout}
+                    onFixDocsClick={() => setMode('zeroDoc')}
+                    onCheckDuplicatesClick={() => setMode('duplicateCheck')}
+                    zeroDocCount={zeroDocAttendees.length}
+                    duplicateGroupCount={potentialDuplicates.length}
+                    busStats={busStatsForDashboard}
+                    onViewBus={handleViewBus}
+                    onViewFinancials={() => setMode('financialDetail')}
+                    onViewSitioOnlyList={() => setMode('sitioOnlyList')}
+                />;
         }
-        return <BusPassengerList 
-            busDetails={busDetails} 
-            onBack={() => setMode('dashboard')} 
-            onSelectAttendee={onSelectAttendee}
-            onUpdateAttendee={onUpdateAttendee}
-            totalBuses={totalBuses}
-            busAssignments={busAssignments}
-        />;
-    }
-
-    return <ReportsDashboard 
-        attendees={attendees} 
-        onGenerateReportClick={() => setMode('form')} 
-        onLogout={onLogout} 
-        onFixDocsClick={() => setMode('zeroDoc')}
-        onCheckDuplicatesClick={() => setMode('duplicateCheck')}
-        zeroDocCount={zeroDocAttendees.length}
-        duplicateGroupCount={potentialDuplicates.length}
-        busStats={busStatsForDashboard}
-        onViewBus={handleViewBus}
-        onViewFinancials={() => setMode('financialDetail')}
-        onViewSitioOnlyList={() => setMode('sitioOnlyList')}
-    />;
+    };
+    
+    return (
+        <>
+            {renderCurrentView()}
+            {confirmationRequest && (
+                <BusChangeConfirmationModal
+                    request={confirmationRequest}
+                    onConfirm={handleConfirmBusChange}
+                    onCancel={handleCancelBusChange}
+                    isSaving={isSavingChange}
+                />
+            )}
+        </>
+    );
 };
 
 export default Reports;

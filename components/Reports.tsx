@@ -768,7 +768,7 @@ const EditablePassengerRow: React.FC<EditablePassengerRowProps> = ({ attendee, o
                         value={attendee.busNumber?.toString() || 'null'}
                         onChange={handleBusChange}
                         onClick={(e) => e.stopPropagation()}
-                        className="block w-full md:w-36 px-2 py-1.5 text-sm bg-white border border-zinc-300 rounded-md shadow-sm focus:outline-none focus:ring-1 focus:ring-green-500 focus:border-green-500"
+                        className="block w-full md:w-40 text-sm bg-white border border-zinc-300 rounded-md shadow-sm focus:outline-none focus:ring-1 focus:ring-green-500 focus:border-green-500 px-2 py-1.5"
                     >
                         <option value="null">Nenhum</option>
                         {Array.from({ length: totalBuses }, (_, i) => i + 1).map(busNum => {
@@ -779,7 +779,7 @@ const EditablePassengerRow: React.FC<EditablePassengerRowProps> = ({ attendee, o
 
                             return (
                                 <option key={busNum} value={busNum} disabled={isDisabled}>
-                                    Ônibus {busNum} {isDisabled ? '(Lotado)' : `(${count}/50)`}
+                                    Ônibus {busNum}{isDisabled ? ' (Lotado)' : ''}
                                 </option>
                             );
                         })}

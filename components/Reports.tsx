@@ -911,6 +911,22 @@ const Reports: React.FC<ReportsProps> = ({ attendees, onLogout, onUpdateAttendee
     const handleGenerate = (config: ReportConfig) => {
         if (config.type === 'busList') {
             const busAttendees = attendees.filter(a => a.packageType === PackageType.SITIO_BUS);
+            const BUS_CAPACITY = 50;
+
+            const totalBuses = Math.ceil(busAttendees.length / BUS_CAPACITY) || (busAttendees.length > 0 ? 1 : 0);
+            const buses: Attendee[][] = Array.from({ length: totalBuses }, () => []);
+
+            const manuallyAssigned = busAttendees.filter(a => a.busNumber != null);
+            const toAutoAssign = busAttendees.filter(a => a.busNumber == null);
+
+            manuallyAssigned.forEach(person => {
+                const busIndex = person.busNumber! - 1;
+                if (busIndex >= 0 && busIndex < totalBuses && buses[busIndex].length < BUS_CAPACITY) {
+                    buses[busIndex].push(person);
+                } else {
+                    toAutoAssign.push(person); // Fallback to auto-assignment if manual assignment is invalid
+                }
+            });
 
             const getLastName = (name: string) => {
                 const parts = name.trim().split(' ');
@@ -920,20 +936,57 @@ const Reports: React.FC<ReportsProps> = ({ attendees, onLogout, onUpdateAttendee
                 }
                 return parts.pop()?.toLowerCase() || '';
             };
+            
+            // This regex also handles variations like "mãe de..."
+            const extractRelationKey = (name: string): string | null => {
+                const match = name.match(/\((?:mãe|pai|padrinho|madrinha|filho|filha|irmão|irmã)\s+de\s+([^)]+)\)/i);
+                return match ? match[1].trim().toLowerCase() : null;
+            };
 
-            const groupsByLastName = busAttendees.reduce((acc, person) => {
+            let groups: Attendee[][] = [];
+            let processedIds = new Set<string>();
+            let individuals: Attendee[] = [];
+
+            // First pass: group by explicit relationships
+            const nameToAttendeeMap = new Map<string, Attendee>();
+            toAutoAssign.forEach(p => nameToAttendeeMap.set(p.name.toLowerCase(), p));
+
+            toAutoAssign.forEach(person => {
+                if (processedIds.has(person.id)) return;
+                
+                const relationKey = extractRelationKey(person.name);
+                const relatedPerson = relationKey ? toAutoAssign.find(p => p.name.toLowerCase().includes(relationKey)) : null;
+
+                if (relatedPerson && !processedIds.has(relatedPerson.id)) {
+                    const group = [person, relatedPerson];
+                    processedIds.add(person.id);
+                    processedIds.add(relatedPerson.id);
+                    // Find others related to the same person
+                    toAutoAssign.forEach(other => {
+                        if (!processedIds.has(other.id) && extractRelationKey(other.name) === relationKey) {
+                            group.push(other);
+                            processedIds.add(other.id);
+                        }
+                    });
+                    groups.push(group);
+                }
+            });
+
+            // Second pass: group remaining by last name
+            const remainingToGroup = toAutoAssign.filter(p => !processedIds.has(p.id));
+            const groupsByLastName = remainingToGroup.reduce((acc, person) => {
                 const lastName = getLastName(person.name);
                 if (lastName) {
                     acc[lastName] = acc[lastName] || [];
                     acc[lastName].push(person);
+                } else {
+                    individuals.push(person); // No last name, becomes an individual
                 }
                 return acc;
             }, {} as Record<string, Attendee[]>);
-            
-            const lastNames = Object.keys(groupsByLastName);
-            const mergedGroups: Record<string, Attendee[]> = {};
-            const processedLastNames = new Set<string>();
 
+            const lastNames = Object.keys(groupsByLastName);
+            const processedLastNames = new Set<string>();
             for (const lastName1 of lastNames) {
                 if (processedLastNames.has(lastName1)) continue;
                 let currentGroup = [...groupsByLastName[lastName1]];
@@ -946,16 +999,14 @@ const Reports: React.FC<ReportsProps> = ({ attendees, onLogout, onUpdateAttendee
                         processedLastNames.add(lastName2);
                     }
                 }
-                mergedGroups[lastName1] = currentGroup;
+                groups.push(currentGroup);
             }
-
-            const families = Object.values(mergedGroups).filter(group => group.length > 1);
-            const individuals = Object.values(mergedGroups).filter(group => group.length === 1).flat();
+            
+            const families = groups.filter(group => group.length > 1);
+            individuals.push(...groups.filter(group => group.length === 1).flat());
             families.sort((a, b) => b.length - a.length);
-
-            const buses: Attendee[][] = [];
-            const BUS_CAPACITY = 50;
-
+            
+            // Allocate families and individuals into available bus spots
             families.forEach(family => {
                 let placed = false;
                 for (const bus of buses) {
@@ -966,32 +1017,16 @@ const Reports: React.FC<ReportsProps> = ({ attendees, onLogout, onUpdateAttendee
                     }
                 }
                 if (!placed) {
-                     let remainingFamily = [...family];
-                    while (remainingFamily.length > 0) {
-                        const newBus: Attendee[] = [];
-                        let spaceOnNewBus = BUS_CAPACITY;
-                        if (remainingFamily.length <= spaceOnNewBus) {
-                            newBus.push(...remainingFamily);
-                            remainingFamily = [];
-                        } else {
-                            newBus.push(...remainingFamily.splice(0, spaceOnNewBus));
-                        }
-                        if (newBus.length > 0) buses.push(newBus);
-                    }
+                    individuals.push(...family); // If no bus can fit the whole family, split them
                 }
             });
 
             individuals.forEach(person => {
-                let placed = false;
                 for (const bus of buses) {
                     if (bus.length < BUS_CAPACITY) {
                         bus.push(person);
-                        placed = true;
                         break;
                     }
-                }
-                if (!placed) {
-                    buses.push([person]);
                 }
             });
             

@@ -32,6 +32,12 @@ const AppContent: React.FC = () => {
     const [packageFilter, setPackageFilter] = useState<'all' | PackageType>('all');
     const [scrollPosition, setScrollPosition] = useState(0);
 
+    const busAttendeesCount = useMemo(() => attendees.filter(a => a.packageType === PackageType.SITIO_BUS).length, [attendees]);
+    const totalBuses = useMemo(() => {
+        const BUS_CAPACITY = 50;
+        return Math.ceil(busAttendeesCount / BUS_CAPACITY) || (busAttendeesCount > 0 ? 1 : 0);
+    }, [busAttendeesCount]);
+
     useEffect(() => {
         const loggedIn = sessionStorage.getItem('isAuthenticated') === 'true';
         if (loggedIn) {
@@ -170,7 +176,7 @@ const AppContent: React.FC = () => {
 
         switch (view) {
             case 'detail':
-                return selectedAttendee && <AttendeeDetail attendee={selectedAttendee} onBack={handleCancel} onEdit={handleEdit} onDelete={handleDeleteRequest} onManagePayment={handleShowPaymentForm} onUpdateAttendee={handleUpdateAttendee} />;
+                return selectedAttendee && <AttendeeDetail attendee={selectedAttendee} onBack={handleCancel} onEdit={handleEdit} onDelete={handleDeleteRequest} onManagePayment={handleShowPaymentForm} onUpdateAttendee={handleUpdateAttendee} totalBuses={totalBuses} />;
             case 'form':
                 return <AddAttendeeForm onAddAttendee={handleSaveAttendee} onCancel={handleCancel} attendees={attendees} />;
             case 'editForm':

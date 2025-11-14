@@ -12,6 +12,7 @@ interface AttendeeDetailProps {
     onDelete: (attendee: Attendee) => void;
     onManagePayment: () => void;
     onUpdateAttendee: (attendee: Attendee) => Promise<void>;
+    totalBuses: number;
 }
 
 const SpinnerIcon: React.FC = () => (
@@ -78,12 +79,15 @@ const PartialPaymentDetail: React.FC<{
     )
 };
 
-const AttendeeDetail: React.FC<AttendeeDetailProps> = ({ attendee, onBack, onEdit, onDelete, onManagePayment, onUpdateAttendee }) => {
+const AttendeeDetail: React.FC<AttendeeDetailProps> = ({ attendee, onBack, onEdit, onDelete, onManagePayment, onUpdateAttendee, totalBuses }) => {
     const { addToast } = useToast();
     const [receiptToView, setReceiptToView] = useState<string | null>(null);
     const [isEditingNotes, setIsEditingNotes] = useState(false);
     const [editedNotes, setEditedNotes] = useState(attendee.notes || '');
     const [isSaving, setIsSaving] = useState(false);
+    const [isEditingBus, setIsEditingBus] = useState(false);
+    const [selectedBus, setSelectedBus] = useState<string>(attendee.busNumber?.toString() || 'null');
+    const [isSavingBus, setIsSavingBus] = useState(false);
 
     const handleCopyToClipboard = async (text: string, label: string) => {
         if (!navigator.clipboard) {
@@ -150,6 +154,24 @@ const AttendeeDetail: React.FC<AttendeeDetailProps> = ({ attendee, onBack, onEdi
             addToast('Falha ao salvar observações.', 'error');
         } finally {
             setIsSaving(false);
+        }
+    };
+
+    const handleSaveBus = async () => {
+        if (isSavingBus) return;
+        setIsSavingBus(true);
+        try {
+            await onUpdateAttendee({
+                ...attendee,
+                busNumber: selectedBus === 'null' ? null : Number(selectedBus),
+            });
+            setIsEditingBus(false);
+            addToast('Ônibus atualizado com sucesso.', 'success');
+        } catch (error) {
+            console.error("Failed to save bus assignment:", error);
+            addToast('Falha ao salvar ônibus.', 'error');
+        } finally {
+            setIsSavingBus(false);
         }
     };
 
@@ -262,6 +284,45 @@ const AttendeeDetail: React.FC<AttendeeDetailProps> = ({ attendee, onBack, onEdi
                         </div>
                     </div>
                     
+                    {isMultiPayment && (
+                        <div className="bg-white p-4 rounded-xl border border-zinc-200 shadow-sm space-y-3 opacity-0 animate-fadeInUp md:col-span-2" style={getAnimationStyle(225)}>
+                            <div className="flex justify-between items-center">
+                                <h2 className="text-lg font-bold text-zinc-800">Transporte</h2>
+                                {!isEditingBus && (
+                                    <button onClick={() => setIsEditingBus(true)} className="text-sm font-semibold text-green-600 hover:text-green-800 transition-colors px-3 py-1 rounded-lg hover:bg-green-50">
+                                        Alterar
+                                    </button>
+                                )}
+                            </div>
+                            {isEditingBus ? (
+                                <div className="animate-fadeIn space-y-3">
+                                    <DetailRow label="Atribuir ao Ônibus">
+                                        <select
+                                            value={selectedBus}
+                                            onChange={(e) => setSelectedBus(e.target.value)}
+                                            className="block w-full px-3 py-2 bg-white border border-zinc-300 rounded-md shadow-sm sm:text-sm focus:outline-none focus:ring-green-500 focus:border-green-500"
+                                        >
+                                            <option value="null">Não atribuído</option>
+                                            {Array.from({ length: totalBuses }, (_, i) => i + 1).map(busNum => (
+                                                <option key={busNum} value={busNum}>Ônibus {busNum}</option>
+                                            ))}
+                                        </select>
+                                    </DetailRow>
+                                    <div className="flex gap-2 mt-2 justify-end">
+                                        <button onClick={() => setIsEditingBus(false)} className="px-4 py-2 text-sm font-bold text-zinc-700 bg-zinc-100 hover:bg-zinc-200 rounded-full transition-colors">
+                                            Cancelar
+                                        </button>
+                                        <button onClick={handleSaveBus} disabled={isSavingBus} className="px-4 py-2 text-sm font-bold text-white bg-green-500 hover:bg-green-600 rounded-full flex items-center justify-center gap-2 disabled:bg-green-400 w-28 transition-colors">
+                                            {isSavingBus ? <SpinnerIcon /> : 'Salvar'}
+                                        </button>
+                                    </div>
+                                </div>
+                            ) : (
+                                <DetailRow label="Ônibus Designado" value={attendee.busNumber ? `Ônibus ${attendee.busNumber}` : 'Não atribuído'} />
+                            )}
+                        </div>
+                    )}
+
                     {isMultiPayment && (
                         <div className="bg-white p-4 rounded-xl border border-zinc-200 shadow-sm space-y-3 opacity-0 animate-fadeInUp md:col-span-2" style={getAnimationStyle(250)}>
                             <PartialPaymentDetail title="Pagamento Sítio" amount={70} details={attendee.payment.sitePaymentDetails} onViewReceipt={setReceiptToView} />

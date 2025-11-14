@@ -53,6 +53,7 @@ export interface Attendee {
     registrationDate: string;
     payment: Payment;
     notes?: string;
+    busNumber?: number | null;
 }
 
 export interface PartialPaymentFormDetails {

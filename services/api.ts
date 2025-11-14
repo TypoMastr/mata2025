@@ -66,6 +66,7 @@ const fromSupabase = (record: any): Attendee => {
         registrationDate: record.registration_date,
         payment: payment,
         notes: record.notes || undefined,
+        busNumber: record.bus_number || null,
     };
 };
 
@@ -85,6 +86,7 @@ const toSupabase = (attendee: Partial<Attendee>): any => {
     if (attendee.packageType !== undefined) record.package_type = attendee.packageType;
     if (attendee.registrationDate !== undefined) record.registration_date = attendee.registrationDate;
     if (attendee.notes !== undefined) record.notes = attendee.notes;
+    if (attendee.busNumber !== undefined) record.bus_number = attendee.busNumber;
 
 
     if (attendee.payment) {

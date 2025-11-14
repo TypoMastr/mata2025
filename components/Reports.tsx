@@ -655,11 +655,159 @@ const DuplicateCheckerView: React.FC<DuplicateCheckerViewProps> = ({ groups, onB
     );
 };
 
+// --- Componente: Lista de Passageiros do Ônibus ---
+interface BusPassenger extends Attendee {
+  assignmentType: 'manual' | 'auto';
+}
+interface BusDetails {
+  busNumber: number;
+  passengers: BusPassenger[];
+  capacity: number;
+}
+
+interface EditablePassengerRowProps {
+    attendee: Attendee;
+    onSelectAttendee: (id: string) => void;
+    onUpdateAttendee: (attendee: Attendee) => Promise<void>;
+    totalBuses: number;
+    busAssignments: Record<number, number>;
+}
+
+const EditablePassengerRow: React.FC<EditablePassengerRowProps> = ({ attendee, onSelectAttendee, onUpdateAttendee, totalBuses, busAssignments }) => {
+    const [isSaving, setIsSaving] = useState(false);
+    const { addToast } = useToast();
+
+    const handleBusChange = async (e: React.ChangeEvent<HTMLSelectElement>) => {
+        const newBusValue = e.target.value;
+        const newBusNumber = newBusValue === 'null' ? null : Number(newBusValue);
+
+        // Client-side validation
+        if (newBusNumber !== null) {
+            const currentBusCount = busAssignments[newBusNumber] || 0;
+            if (currentBusCount >= 50 && attendee.busNumber !== newBusNumber) {
+                addToast(`O Ônibus ${newBusNumber} já está lotado.`, 'error');
+                e.target.value = attendee.busNumber?.toString() || 'null';
+                return;
+            }
+        }
+        
+        setIsSaving(true);
+        try {
+            await onUpdateAttendee({ ...attendee, busNumber: newBusNumber });
+            addToast(`"${attendee.name}" movido com sucesso.`, 'success');
+        } catch (error) {
+            addToast(`Falha ao mover "${attendee.name}".`, 'error');
+            e.target.value = attendee.busNumber?.toString() || 'null';
+        } finally {
+            setIsSaving(false);
+        }
+    };
+
+    return (
+        <div className="w-full text-left p-3 bg-zinc-50 rounded-lg flex justify-between items-center border border-zinc-200 gap-2">
+            <div onClick={() => onSelectAttendee(attendee.id)} className="flex-grow cursor-pointer min-w-0">
+                <p className="font-semibold text-zinc-900 truncate">{attendee.name}</p>
+                <p className="text-xs text-zinc-500 mt-1">{attendee.document} &bull; {attendee.phone}</p>
+            </div>
+            <div className="flex-shrink-0 flex items-center gap-2">
+                {isSaving ? (
+                    <div className="w-28 text-center"><SpinnerIcon white={false} /></div>
+                ) : (
+                    <select
+                        value={attendee.busNumber?.toString() || 'null'}
+                        onChange={handleBusChange}
+                        onClick={(e) => e.stopPropagation()}
+                        className="block w-28 px-2 py-1 text-sm bg-white border border-zinc-300 rounded-md shadow-sm focus:outline-none focus:ring-1 focus:ring-green-500 focus:border-green-500"
+                    >
+                        <option value="null">Nenhum</option>
+                        {Array.from({ length: totalBuses }, (_, i) => i + 1).map(busNum => {
+                            const count = busAssignments[busNum] || 0;
+                            const isFull = count >= 50;
+                            const isCurrentBus = attendee.busNumber === busNum;
+                            const isDisabled = isFull && !isCurrentBus;
+
+                            return (
+                                <option key={busNum} value={busNum} disabled={isDisabled}>
+                                    Ônibus {busNum} {isDisabled ? '(Lotado)' : `(${count}/50)`}
+                                </option>
+                            );
+                        })}
+                    </select>
+                )}
+            </div>
+        </div>
+    );
+};
+
+
+const BusPassengerList: React.FC<{
+    busDetails: BusDetails;
+    onBack: () => void;
+    onSelectAttendee: (id: string) => void;
+    onUpdateAttendee: (attendee: Attendee) => Promise<void>;
+    totalBuses: number;
+    busAssignments: Record<number, number>;
+}> = ({ busDetails, onBack, onSelectAttendee, onUpdateAttendee, totalBuses, busAssignments }) => {
+    
+    const manuallyAssigned = useMemo(() => busDetails.passengers.filter(p => p.assignmentType === 'manual'), [busDetails]);
+    const autoAssigned = useMemo(() => busDetails.passengers.filter(p => p.assignmentType === 'auto'), [busDetails]);
+
+    const renderPassengerList = (passengers: BusPassenger[]) => (
+        <div className="space-y-2">
+            {passengers.map(p => 
+                <EditablePassengerRow 
+                    key={p.id} 
+                    attendee={p} 
+                    onSelectAttendee={onSelectAttendee}
+                    onUpdateAttendee={onUpdateAttendee}
+                    totalBuses={totalBuses}
+                    busAssignments={busAssignments}
+                />
+            )}
+        </div>
+    );
+
+    return (
+        <div className="animate-fadeIn">
+            <header className="sticky top-0 md:static bg-white z-10 p-4 md:pt-6 border-b border-zinc-200 flex items-center gap-4">
+                <button onClick={onBack} className="text-zinc-500 hover:text-zinc-800 p-1 rounded-full hover:bg-zinc-100">
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>
+                </button>
+                <h1 className="text-xl md:text-2xl font-bold text-zinc-800">Ônibus {busDetails.busNumber} ({busDetails.passengers.length}/{busDetails.capacity})</h1>
+            </header>
+            <main className="p-4 space-y-6">
+                <div className="bg-white p-4 rounded-xl border border-zinc-200 shadow-sm opacity-0 animate-fadeInUp" style={{ animationFillMode: 'forwards', animationDelay: '100ms' }}>
+                    <h2 className="font-bold text-lg text-zinc-800 mb-3">Designados Manualmente ({manuallyAssigned.length})</h2>
+                    {manuallyAssigned.length > 0 ? (
+                        renderPassengerList(manuallyAssigned)
+                    ) : (
+                        <p className="text-sm text-zinc-500 italic">Nenhum passageiro foi designado manualmente para este ônibus.</p>
+                    )}
+                </div>
+                <div className="bg-white p-4 rounded-xl border border-zinc-200 shadow-sm opacity-0 animate-fadeInUp" style={{ animationFillMode: 'forwards', animationDelay: '200ms' }}>
+                    <h2 className="font-bold text-lg text-zinc-800 mb-3">Designados Automaticamente ({autoAssigned.length})</h2>
+                    {autoAssigned.length > 0 ? (
+                        renderPassengerList(autoAssigned)
+                    ) : (
+                         <p className="text-sm text-zinc-500 italic">Nenhum passageiro foi designado automaticamente.</p>
+                    )}
+                </div>
+            </main>
+        </div>
+    );
+};
+
 // --- Componente: Painel Principal de Relatórios ---
+interface BusStat {
+    busNumber: number;
+    filledSeats: number;
+    remainingSeats: number;
+    capacity: number;
+}
 const StatCard: React.FC<{ title: string; children: React.ReactNode; icon: React.ReactElement; className?: string, delay: number, onClick?: () => void }> = ({ title, children, icon, className = '', delay, onClick }) => (
-    <div onClick={onClick} className={`bg-white p-4 rounded-xl border border-zinc-200 shadow-sm opacity-0 animate-fadeInUp ${className} ${onClick ? 'cursor-pointer hover:border-zinc-300 hover:bg-zinc-50 transition-colors' : ''}`} style={{ animationDelay: `${delay}ms`, animationFillMode: 'forwards' }}>
+    <div onClick={onClick} className={`bg-white p-4 rounded-xl border border-zinc-200 shadow-sm opacity-0 animate-fadeInUp flex flex-col ${className} ${onClick ? 'cursor-pointer hover:border-zinc-300 hover:bg-zinc-50 transition-colors' : ''}`} style={{ animationDelay: `${delay}ms`, animationFillMode: 'forwards' }}>
         <div className="flex items-center gap-3 mb-3"><div className="text-green-500">{icon}</div><h2 className="text-md font-bold text-zinc-800">{title}</h2></div>
-        <div className="space-y-3">{children}</div>
+        <div className="space-y-3 flex-grow">{children}</div>
     </div>
 );
 const ProgressBar: React.FC<{ value: number; max: number; colorClass?: string }> = ({ value, max, colorClass = 'bg-green-500' }) => {
@@ -667,12 +815,8 @@ const ProgressBar: React.FC<{ value: number; max: number; colorClass?: string }>
     return (<div className="w-full bg-zinc-200 rounded-full h-2"><div className={`${colorClass} h-2 rounded-full transition-all duration-500`} style={{ width: `${percentage}%` }}></div></div>);
 };
 
-const ReportsDashboard: React.FC<{ attendees: Attendee[]; onGenerateReportClick: () => void; onLogout: () => void; onFixDocsClick: () => void; onCheckDuplicatesClick: () => void; zeroDocCount: number; duplicateGroupCount: number; }> = ({ attendees, onGenerateReportClick, onLogout, onFixDocsClick, onCheckDuplicatesClick, zeroDocCount, duplicateGroupCount }) => {
-    const { totalAttendees, paidCount, pendingCount, isentoCount, totalRevenue, pendingRevenue, totalPossibleRevenue, buses, sitioOnlyCount, paymentStats } = useMemo(() => {
-        const busAttendees = attendees.filter(a => a.packageType === PackageType.SITIO_BUS);
-        const BUS_CAPACITY = 50;
-        const busCount = Math.ceil(busAttendees.length / BUS_CAPACITY) || (busAttendees.length > 0 ? 1 : 0);
-
+const ReportsDashboard: React.FC<{ attendees: Attendee[]; onGenerateReportClick: () => void; onLogout: () => void; onFixDocsClick: () => void; onCheckDuplicatesClick: () => void; zeroDocCount: number; duplicateGroupCount: number; busStats: BusStat[]; onViewBus: (busNumber: number) => void; }> = ({ attendees, onGenerateReportClick, onLogout, onFixDocsClick, onCheckDuplicatesClick, zeroDocCount, duplicateGroupCount, busStats, onViewBus }) => {
+    const { totalAttendees, paidCount, pendingCount, isentoCount, totalRevenue, pendingRevenue, totalPossibleRevenue, sitioOnlyCount, paymentStats } = useMemo(() => {
         const paidAttendees = attendees.filter(a => a.payment.status === PaymentStatus.PAGO);
         const pendingAttendees = attendees.filter(a => a.payment.status === PaymentStatus.PENDENTE);
         const isentoAttendees = attendees.filter(a => a.payment.status === PaymentStatus.ISENTO);
@@ -748,10 +892,6 @@ const ReportsDashboard: React.FC<{ attendees: Attendee[]; onGenerateReportClick:
             totalRevenue: calculatedTotalRevenue,
             totalPossibleRevenue: calculatedTotalPossibleRevenue,
             pendingRevenue: calculatedTotalPossibleRevenue - calculatedTotalRevenue,
-            buses: Array.from({ length: busCount }, (_, i) => {
-                const filledSeats = Math.min(BUS_CAPACITY, Math.max(0, busAttendees.length - (i * BUS_CAPACITY)));
-                return { busNumber: i + 1, filledSeats, remainingSeats: BUS_CAPACITY - filledSeats, capacity: BUS_CAPACITY };
-            }),
             sitioOnlyCount: attendees.filter(a => a.packageType === PackageType.SITIO_ONLY).length,
             paymentStats: sortedPaymentStats
         };
@@ -811,8 +951,22 @@ const ReportsDashboard: React.FC<{ attendees: Attendee[]; onGenerateReportClick:
                     </StatCard>
                 )}
 
-                {buses.map((bus, index) => (<StatCard key={bus.busNumber} title={`Ônibus ${bus.busNumber}`} icon={IconBus} delay={300 + index * 50}><div className="flex justify-between items-baseline"><span className="font-bold text-3xl text-zinc-800">{bus.filledSeats}</span><span className="text-sm font-semibold text-zinc-500">/ {bus.capacity} vagas</span></div><ProgressBar value={bus.filledSeats} max={bus.capacity} colorClass="bg-blue-500" /><div className="flex justify-between text-sm"><span className="font-semibold text-blue-600">{bus.filledSeats} {bus.filledSeats === 1 ? 'Preenchida' : 'Preenchidas'}</span><span className="font-semibold text-zinc-500">{bus.remainingSeats} {bus.remainingSeats === 1 ? 'Restante' : 'Restantes'}</span></div></StatCard>))}
-                <StatCard title="Apenas Sítio" icon={IconHome} delay={325 + (buses.length * 50)}>
+                {busStats.map((bus, index) => (
+                    <StatCard key={bus.busNumber} onClick={() => onViewBus(bus.busNumber)} title={`Ônibus ${bus.busNumber}`} icon={IconBus} delay={300 + index * 50}>
+                        <div className="flex justify-between items-baseline"><span className="font-bold text-3xl text-zinc-800">{bus.filledSeats}</span><span className="text-sm font-semibold text-zinc-500">/ {bus.capacity} vagas</span></div>
+                        <ProgressBar value={bus.filledSeats} max={bus.capacity} colorClass="bg-blue-500" />
+                        <div className="flex justify-between text-sm"><span className="font-semibold text-blue-600">{bus.filledSeats} {bus.filledSeats === 1 ? 'Preenchida' : 'Preenchidas'}</span><span className="font-semibold text-zinc-500">{bus.remainingSeats} {bus.remainingSeats === 1 ? 'Restante' : 'Restantes'}</span></div>
+                        <div className="mt-auto pt-3 border-t border-zinc-100">
+                             <span className="text-sm font-semibold text-green-600 flex items-center justify-center gap-1">
+                                Ver Lista
+                                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                    <path strokeLinecap="round" strokeLinejoin="round" d="M13 7l5 5m0 0l-5 5m5-5H6" />
+                                </svg>
+                            </span>
+                        </div>
+                    </StatCard>
+                ))}
+                <StatCard title="Apenas Sítio" icon={IconHome} delay={325 + (busStats.length * 50)}>
                     <div className="flex justify-between items-baseline">
                         <span className="font-bold text-3xl text-zinc-800">{sitioOnlyCount}</span>
                         <span className="text-sm font-semibold text-zinc-500">{sitioOnlyCount === 1 ? 'Inscrito' : 'Inscritos'}</span>
@@ -821,7 +975,7 @@ const ReportsDashboard: React.FC<{ attendees: Attendee[]; onGenerateReportClick:
                         Não há limite de vagas para este pacote.
                     </div>
                 </StatCard>
-                <StatCard title="Formas de Pagamento" icon={IconCreditCard} delay={350 + (buses.length * 50)}>
+                <StatCard title="Formas de Pagamento" icon={IconCreditCard} delay={350 + (busStats.length * 50)}>
                     {paidCount > 0 || Object.values(paymentStats).some(s => s.count > 0) ? (
                         <div className="space-y-3">
                             {(Object.entries(paymentStats) as [string, { count: number; total: number }][]).map(([type, stats]) => (
@@ -844,7 +998,7 @@ const ReportsDashboard: React.FC<{ attendees: Attendee[]; onGenerateReportClick:
                         </div>
                     )}
                 </StatCard>
-                <StatCard title="Gerador de Relatórios" icon={IconClipboardList} delay={400 + (buses.length * 50)} className="md:col-span-full lg:col-span-1">
+                <StatCard title="Gerador de Relatórios" icon={IconClipboardList} delay={400 + (busStats.length * 50)} className="md:col-span-full lg:col-span-1">
                     <p className="text-sm text-zinc-600">Crie listas personalizadas ou gere a lista de passageiros para os ônibus. Exporte em PDF, imprima ou compartilhe.</p>
                     <button onClick={onGenerateReportClick} className="mt-2 w-full bg-blue-500 text-white font-bold py-2 px-4 rounded-full hover:bg-blue-600 transition-colors shadow-sm flex items-center justify-center gap-2">
                         Gerar Relatório
@@ -864,9 +1018,10 @@ interface ReportsProps {
 }
 
 const Reports: React.FC<ReportsProps> = ({ attendees, onLogout, onUpdateAttendee, onSelectAttendee }) => {
-    const [mode, setMode] = useState<'dashboard' | 'form' | 'preview' | 'zeroDoc' | 'duplicateCheck'>('dashboard');
+    const [mode, setMode] = useState<'dashboard' | 'form' | 'preview' | 'zeroDoc' | 'duplicateCheck' | 'busDetail'>('dashboard');
     const [reportConfig, setReportConfig] = useState<ReportConfig | null>(null);
     const [reportData, setReportData] = useState<Attendee[] | Attendee[][]>([]);
+    const [selectedBusNumber, setSelectedBusNumber] = useState<number | null>(null);
 
     const zeroDocAttendees = useMemo(() => {
         return attendees.filter(a =>
@@ -908,134 +1063,145 @@ const Reports: React.FC<ReportsProps> = ({ attendees, onLogout, onUpdateAttendee
         return groups;
     }, [attendees]);
 
+    const busAttendees = useMemo(() => attendees.filter(a => a.packageType === PackageType.SITIO_BUS), [attendees]);
+    const totalBuses = useMemo(() => {
+        const BUS_CAPACITY = 50;
+        return Math.ceil(busAttendees.length / BUS_CAPACITY) || (busAttendees.length > 0 ? 1 : 0);
+    }, [busAttendees]);
+
+    const busAssignments = useMemo(() => {
+        return busAttendees.reduce((acc, attendee) => {
+            if (attendee.busNumber) {
+                acc[attendee.busNumber] = (acc[attendee.busNumber] || 0) + 1;
+            }
+            return acc;
+        }, {} as Record<number, number>);
+    }, [busAttendees]);
+    
+    const busPassengerLists = useMemo((): BusDetails[] => {
+        const busAttendees = attendees.filter(a => a.packageType === PackageType.SITIO_BUS);
+        const BUS_CAPACITY = 50;
+        const totalBusesCalculated = Math.ceil(busAttendees.length / BUS_CAPACITY) || (busAttendees.length > 0 ? 1 : 0);
+        
+        const buses: BusPassenger[][] = Array.from({ length: totalBusesCalculated }, () => []);
+
+        const manuallyAssigned = busAttendees.filter(a => a.busNumber != null);
+        const toAutoAssign = busAttendees.filter(a => a.busNumber == null);
+        
+        manuallyAssigned.forEach(person => {
+            const busIndex = person.busNumber! - 1;
+            if (busIndex >= 0 && busIndex < totalBusesCalculated && buses[busIndex].length < BUS_CAPACITY) {
+                buses[busIndex].push({ ...person, assignmentType: 'manual' });
+            } else {
+                toAutoAssign.push(person); // Fallback if manual assignment is invalid
+            }
+        });
+        
+        // --- Auto-assignment logic (same as before) ---
+        const getLastName = (name: string) => {
+            const parts = name.trim().split(' ');
+            const suffixes = ['jr', 'junior', 'filho', 'filha', 'neto', 'neta'];
+            if (parts.length > 1 && suffixes.includes(parts[parts.length - 1].toLowerCase())) {
+                return parts[parts.length - 2].toLowerCase();
+            }
+            return parts.pop()?.toLowerCase() || '';
+        };
+        const extractRelationKey = (name: string): string | null => {
+            const match = name.match(/\((?:mãe|pai|padrinho|madrinha|filho|filha|irmão|irmã)\s+de\s+([^)]+)\)/i);
+            return match ? match[1].trim().toLowerCase() : null;
+        };
+        let groups: Attendee[][] = [];
+        let processedIds = new Set<string>();
+        let individuals: Attendee[] = [];
+        toAutoAssign.forEach(person => {
+            if (processedIds.has(person.id)) return;
+            const relationKey = extractRelationKey(person.name);
+            const relatedPerson = relationKey ? toAutoAssign.find(p => p.name.toLowerCase().includes(relationKey)) : null;
+            if (relatedPerson && !processedIds.has(relatedPerson.id)) {
+                const group = [person, relatedPerson];
+                processedIds.add(person.id);
+                processedIds.add(relatedPerson.id);
+                toAutoAssign.forEach(other => {
+                    if (!processedIds.has(other.id) && extractRelationKey(other.name) === relationKey) {
+                        group.push(other);
+                        processedIds.add(other.id);
+                    }
+                });
+                groups.push(group);
+            }
+        });
+        const remainingToGroup = toAutoAssign.filter(p => !processedIds.has(p.id));
+        const groupsByLastName = remainingToGroup.reduce((acc, person) => {
+            const lastName = getLastName(person.name);
+            if (lastName) {
+                acc[lastName] = acc[lastName] || [];
+                acc[lastName].push(person);
+            } else {
+                individuals.push(person);
+            }
+            return acc;
+        }, {} as Record<string, Attendee[]>);
+        const lastNames = Object.keys(groupsByLastName);
+        const processedLastNames = new Set<string>();
+        for (const lastName1 of lastNames) {
+            if (processedLastNames.has(lastName1)) continue;
+            let currentGroup = [...groupsByLastName[lastName1]];
+            processedLastNames.add(lastName1);
+            for (const lastName2 of lastNames) {
+                if (processedLastNames.has(lastName2)) continue;
+                if (levenshteinDistance(lastName1, lastName2) <= 2) {
+                    currentGroup.push(...groupsByLastName[lastName2]);
+                    processedLastNames.add(lastName2);
+                }
+            }
+            groups.push(currentGroup);
+        }
+        const families = groups.filter(group => group.length > 1);
+        individuals.push(...groups.filter(group => group.length === 1).flat());
+        families.sort((a, b) => b.length - a.length);
+        families.forEach(family => {
+            let placed = false;
+            for (const bus of buses) {
+                if (bus.length + family.length <= BUS_CAPACITY) {
+                    bus.push(...family.map(p => ({ ...p, assignmentType: 'auto' as const })));
+                    placed = true;
+                    break;
+                }
+            }
+            if (!placed) individuals.push(...family);
+        });
+        individuals.forEach(person => {
+            for (const bus of buses) {
+                if (bus.length < BUS_CAPACITY) {
+                    bus.push({ ...person, assignmentType: 'auto' });
+                    break;
+                }
+            }
+        });
+        buses.forEach(bus => bus.sort((a, b) => a.name.localeCompare(b.name)));
+        
+        return buses.map((passengers, index) => ({
+            busNumber: index + 1,
+            passengers,
+            capacity: BUS_CAPACITY,
+        }));
+    }, [attendees]);
+
+    const busStatsForDashboard = useMemo((): BusStat[] => {
+        return busPassengerLists.map(bus => ({
+            busNumber: bus.busNumber,
+            filledSeats: bus.passengers.length,
+            capacity: bus.capacity,
+            remainingSeats: bus.capacity - bus.passengers.length,
+        }));
+    }, [busPassengerLists]);
+
+
     const handleGenerate = (config: ReportConfig) => {
         if (config.type === 'busList') {
-            const busAttendees = attendees.filter(a => a.packageType === PackageType.SITIO_BUS);
-            const BUS_CAPACITY = 50;
-
-            const totalBuses = Math.ceil(busAttendees.length / BUS_CAPACITY) || (busAttendees.length > 0 ? 1 : 0);
-            const buses: Attendee[][] = Array.from({ length: totalBuses }, () => []);
-
-            const manuallyAssigned = busAttendees.filter(a => a.busNumber != null);
-            const toAutoAssign = busAttendees.filter(a => a.busNumber == null);
-
-            manuallyAssigned.forEach(person => {
-                const busIndex = person.busNumber! - 1;
-                if (busIndex >= 0 && busIndex < totalBuses && buses[busIndex].length < BUS_CAPACITY) {
-                    buses[busIndex].push(person);
-                } else {
-                    toAutoAssign.push(person); // Fallback to auto-assignment if manual assignment is invalid
-                }
-            });
-
-            const getLastName = (name: string) => {
-                const parts = name.trim().split(' ');
-                const suffixes = ['jr', 'junior', 'filho', 'filha', 'neto', 'neta'];
-                if (parts.length > 1 && suffixes.includes(parts[parts.length - 1].toLowerCase())) {
-                    return parts[parts.length - 2].toLowerCase();
-                }
-                return parts.pop()?.toLowerCase() || '';
-            };
-            
-            // This regex also handles variations like "mãe de..."
-            const extractRelationKey = (name: string): string | null => {
-                const match = name.match(/\((?:mãe|pai|padrinho|madrinha|filho|filha|irmão|irmã)\s+de\s+([^)]+)\)/i);
-                return match ? match[1].trim().toLowerCase() : null;
-            };
-
-            let groups: Attendee[][] = [];
-            let processedIds = new Set<string>();
-            let individuals: Attendee[] = [];
-
-            // First pass: group by explicit relationships
-            const nameToAttendeeMap = new Map<string, Attendee>();
-            toAutoAssign.forEach(p => nameToAttendeeMap.set(p.name.toLowerCase(), p));
-
-            toAutoAssign.forEach(person => {
-                if (processedIds.has(person.id)) return;
-                
-                const relationKey = extractRelationKey(person.name);
-                const relatedPerson = relationKey ? toAutoAssign.find(p => p.name.toLowerCase().includes(relationKey)) : null;
-
-                if (relatedPerson && !processedIds.has(relatedPerson.id)) {
-                    const group = [person, relatedPerson];
-                    processedIds.add(person.id);
-                    processedIds.add(relatedPerson.id);
-                    // Find others related to the same person
-                    toAutoAssign.forEach(other => {
-                        if (!processedIds.has(other.id) && extractRelationKey(other.name) === relationKey) {
-                            group.push(other);
-                            processedIds.add(other.id);
-                        }
-                    });
-                    groups.push(group);
-                }
-            });
-
-            // Second pass: group remaining by last name
-            const remainingToGroup = toAutoAssign.filter(p => !processedIds.has(p.id));
-            const groupsByLastName = remainingToGroup.reduce((acc, person) => {
-                const lastName = getLastName(person.name);
-                if (lastName) {
-                    acc[lastName] = acc[lastName] || [];
-                    acc[lastName].push(person);
-                } else {
-                    individuals.push(person); // No last name, becomes an individual
-                }
-                return acc;
-            }, {} as Record<string, Attendee[]>);
-
-            const lastNames = Object.keys(groupsByLastName);
-            const processedLastNames = new Set<string>();
-            for (const lastName1 of lastNames) {
-                if (processedLastNames.has(lastName1)) continue;
-                let currentGroup = [...groupsByLastName[lastName1]];
-                processedLastNames.add(lastName1);
-
-                for (const lastName2 of lastNames) {
-                    if (processedLastNames.has(lastName2)) continue;
-                    if (levenshteinDistance(lastName1, lastName2) <= 2) {
-                        currentGroup.push(...groupsByLastName[lastName2]);
-                        processedLastNames.add(lastName2);
-                    }
-                }
-                groups.push(currentGroup);
-            }
-            
-            const families = groups.filter(group => group.length > 1);
-            individuals.push(...groups.filter(group => group.length === 1).flat());
-            families.sort((a, b) => b.length - a.length);
-            
-            // Allocate families and individuals into available bus spots
-            families.forEach(family => {
-                let placed = false;
-                for (const bus of buses) {
-                    if (bus.length + family.length <= BUS_CAPACITY) {
-                        bus.push(...family);
-                        placed = true;
-                        break;
-                    }
-                }
-                if (!placed) {
-                    individuals.push(...family); // If no bus can fit the whole family, split them
-                }
-            });
-
-            individuals.forEach(person => {
-                for (const bus of buses) {
-                    if (bus.length < BUS_CAPACITY) {
-                        bus.push(person);
-                        break;
-                    }
-                }
-            });
-            
-            buses.forEach(bus => {
-                bus.sort((a, b) => a.name.localeCompare(b.name));
-            });
-
+            const busesDataForReport = busPassengerLists.map(bus => bus.passengers);
             setReportConfig(config);
-            setReportData(buses);
+            setReportData(busesDataForReport);
             setMode('preview');
         } else {
             const filteredData = attendees.filter(attendee => {
@@ -1050,6 +1216,11 @@ const Reports: React.FC<ReportsProps> = ({ attendees, onLogout, onUpdateAttendee
             setReportData(sortedData);
             setMode('preview');
         }
+    };
+
+    const handleViewBus = (busNumber: number) => {
+        setSelectedBusNumber(busNumber);
+        setMode('busDetail');
     };
 
     if (mode === 'form') {
@@ -1067,6 +1238,23 @@ const Reports: React.FC<ReportsProps> = ({ attendees, onLogout, onUpdateAttendee
     if (mode === 'duplicateCheck') {
         return <DuplicateCheckerView groups={potentialDuplicates} onBack={() => setMode('dashboard')} onSelectAttendee={onSelectAttendee} />;
     }
+    
+    if (mode === 'busDetail' && selectedBusNumber) {
+        const busDetails = busPassengerLists.find(b => b.busNumber === selectedBusNumber);
+        if (!busDetails) {
+            // Fallback in case bus number is invalid
+            setMode('dashboard');
+            return null;
+        }
+        return <BusPassengerList 
+            busDetails={busDetails} 
+            onBack={() => setMode('dashboard')} 
+            onSelectAttendee={onSelectAttendee}
+            onUpdateAttendee={onUpdateAttendee}
+            totalBuses={totalBuses}
+            busAssignments={busAssignments}
+        />;
+    }
 
     return <ReportsDashboard 
         attendees={attendees} 
@@ -1076,6 +1264,8 @@ const Reports: React.FC<ReportsProps> = ({ attendees, onLogout, onUpdateAttendee
         onCheckDuplicatesClick={() => setMode('duplicateCheck')}
         zeroDocCount={zeroDocAttendees.length}
         duplicateGroupCount={potentialDuplicates.length}
+        busStats={busStatsForDashboard}
+        onViewBus={handleViewBus}
     />;
 };
 

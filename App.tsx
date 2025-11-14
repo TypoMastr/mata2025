@@ -38,6 +38,15 @@ const AppContent: React.FC = () => {
         return Math.ceil(busAttendeesCount / BUS_CAPACITY) || (busAttendeesCount > 0 ? 1 : 0);
     }, [busAttendeesCount]);
 
+    const busAssignments = useMemo(() => {
+        return attendees.reduce((acc, attendee) => {
+            if (attendee.busNumber) {
+                acc[attendee.busNumber] = (acc[attendee.busNumber] || 0) + 1;
+            }
+            return acc;
+        }, {} as Record<number, number>);
+    }, [attendees]);
+
     useEffect(() => {
         const loggedIn = sessionStorage.getItem('isAuthenticated') === 'true';
         if (loggedIn) {
@@ -176,7 +185,7 @@ const AppContent: React.FC = () => {
 
         switch (view) {
             case 'detail':
-                return selectedAttendee && <AttendeeDetail attendee={selectedAttendee} onBack={handleCancel} onEdit={handleEdit} onDelete={handleDeleteRequest} onManagePayment={handleShowPaymentForm} onUpdateAttendee={handleUpdateAttendee} totalBuses={totalBuses} />;
+                return selectedAttendee && <AttendeeDetail attendee={selectedAttendee} onBack={handleCancel} onEdit={handleEdit} onDelete={handleDeleteRequest} onManagePayment={handleShowPaymentForm} onUpdateAttendee={handleUpdateAttendee} totalBuses={totalBuses} busAssignments={busAssignments} />;
             case 'form':
                 return <AddAttendeeForm onAddAttendee={handleSaveAttendee} onCancel={handleCancel} attendees={attendees} />;
             case 'editForm':

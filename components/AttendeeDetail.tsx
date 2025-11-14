@@ -13,6 +13,7 @@ interface AttendeeDetailProps {
     onManagePayment: () => void;
     onUpdateAttendee: (attendee: Attendee) => Promise<void>;
     totalBuses: number;
+    busAssignments: Record<number, number>;
 }
 
 const SpinnerIcon: React.FC = () => (
@@ -79,7 +80,7 @@ const PartialPaymentDetail: React.FC<{
     )
 };
 
-const AttendeeDetail: React.FC<AttendeeDetailProps> = ({ attendee, onBack, onEdit, onDelete, onManagePayment, onUpdateAttendee, totalBuses }) => {
+const AttendeeDetail: React.FC<AttendeeDetailProps> = ({ attendee, onBack, onEdit, onDelete, onManagePayment, onUpdateAttendee, totalBuses, busAssignments }) => {
     const { addToast } = useToast();
     const [receiptToView, setReceiptToView] = useState<string | null>(null);
     const [isEditingNotes, setIsEditingNotes] = useState(false);
@@ -159,11 +160,23 @@ const AttendeeDetail: React.FC<AttendeeDetailProps> = ({ attendee, onBack, onEdi
 
     const handleSaveBus = async () => {
         if (isSavingBus) return;
+        const newBusNumber = selectedBus === 'null' ? null : Number(selectedBus);
+
+        // Client-side validation to prevent assigning to a full bus
+        if (newBusNumber !== null) {
+            const currentBusCount = busAssignments[newBusNumber] || 0;
+            // The bus is full, and we are trying to move a *new* person into it.
+            if (currentBusCount >= 50 && attendee.busNumber !== newBusNumber) {
+                addToast(`O Ônibus ${newBusNumber} já está lotado.`, 'error');
+                return;
+            }
+        }
+        
         setIsSavingBus(true);
         try {
             await onUpdateAttendee({
                 ...attendee,
-                busNumber: selectedBus === 'null' ? null : Number(selectedBus),
+                busNumber: newBusNumber,
             });
             setIsEditingBus(false);
             addToast('Ônibus atualizado com sucesso.', 'success');
@@ -303,9 +316,19 @@ const AttendeeDetail: React.FC<AttendeeDetailProps> = ({ attendee, onBack, onEdi
                                             className="block w-full px-3 py-2 bg-white border border-zinc-300 rounded-md shadow-sm sm:text-sm focus:outline-none focus:ring-green-500 focus:border-green-500"
                                         >
                                             <option value="null">Não atribuído</option>
-                                            {Array.from({ length: totalBuses }, (_, i) => i + 1).map(busNum => (
-                                                <option key={busNum} value={busNum}>Ônibus {busNum}</option>
-                                            ))}
+                                            {Array.from({ length: totalBuses }, (_, i) => i + 1).map(busNum => {
+                                                const count = busAssignments[busNum] || 0;
+                                                const isFull = count >= 50;
+                                                // An attendee can remain in their current bus even if it's full.
+                                                const isCurrentBus = attendee.busNumber === busNum;
+                                                const isDisabled = isFull && !isCurrentBus;
+
+                                                return (
+                                                    <option key={busNum} value={busNum} disabled={isDisabled}>
+                                                        Ônibus {busNum} ({count}/50){isDisabled ? ' - Lotado' : ''}
+                                                    </option>
+                                                );
+                                            })}
                                         </select>
                                     </DetailRow>
                                     <div className="flex gap-2 mt-2 justify-end">

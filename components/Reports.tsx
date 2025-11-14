@@ -655,6 +655,57 @@ const DuplicateCheckerView: React.FC<DuplicateCheckerViewProps> = ({ groups, onB
     );
 };
 
+// --- Componente: Detalhes Financeiros ---
+interface FinancialData {
+    paidSitio: number;
+    totalSitio: number;
+    pendingSitio: number;
+    paidBus: number;
+    totalBus: number;
+    pendingBus: number;
+}
+const FinancialDetailCard: React.FC<{ title: string; paid: number; total: number; }> = ({ title, paid, total }) => (
+    <div className="bg-white p-4 rounded-xl border border-zinc-200 shadow-sm space-y-3">
+        <h3 className="font-bold text-lg text-zinc-800">{title}</h3>
+        <div>
+            <div className="flex justify-between items-baseline">
+                <span className="font-bold text-3xl text-zinc-800">R$ {paid.toFixed(2).replace('.', ',')}</span>
+                <span className="text-sm font-semibold text-zinc-500">de R$ {total.toFixed(2).replace('.', ',')}</span>
+            </div>
+            <ProgressBar value={paid} max={total} />
+        </div>
+    </div>
+);
+const FinancialDetailView: React.FC<{ financialData: FinancialData; onBack: () => void; }> = ({ financialData, onBack }) => {
+    return (
+        <div className="animate-fadeIn">
+            <header className="sticky top-0 md:static bg-white z-10 p-4 md:pt-6 border-b border-zinc-200 flex items-center gap-4">
+                <button onClick={onBack} className="text-zinc-500 hover:text-zinc-800 p-1 rounded-full hover:bg-zinc-100">
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>
+                </button>
+                <h1 className="text-xl md:text-2xl font-bold text-zinc-800">Detalhes Financeiros</h1>
+            </header>
+            <main className="p-4 grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="opacity-0 animate-fadeInUp" style={{ animationFillMode: 'forwards', animationDelay: '100ms' }}>
+                    <FinancialDetailCard title="Arrecadado (Sítio)" paid={financialData.paidSitio} total={financialData.totalSitio} />
+                </div>
+                 <div className="opacity-0 animate-fadeInUp" style={{ animationFillMode: 'forwards', animationDelay: '200ms' }}>
+                    <FinancialDetailCard title="Arrecadado (Ônibus)" paid={financialData.paidBus} total={financialData.totalBus} />
+                </div>
+                <div className="bg-red-50 p-4 rounded-xl border border-red-200 shadow-sm space-y-3 opacity-0 animate-fadeInUp" style={{ animationFillMode: 'forwards', animationDelay: '300ms' }}>
+                     <h3 className="font-bold text-lg text-red-800">Pendente (Sítio)</h3>
+                     <span className="font-bold text-3xl text-red-800">R$ {financialData.pendingSitio.toFixed(2).replace('.', ',')}</span>
+                </div>
+                <div className="bg-red-50 p-4 rounded-xl border border-red-200 shadow-sm space-y-3 opacity-0 animate-fadeInUp" style={{ animationFillMode: 'forwards', animationDelay: '400ms' }}>
+                     <h3 className="font-bold text-lg text-red-800">Pendente (Ônibus)</h3>
+                     <span className="font-bold text-3xl text-red-800">R$ {financialData.pendingBus.toFixed(2).replace('.', ',')}</span>
+                </div>
+            </main>
+        </div>
+    );
+};
+
+
 // --- Componente: Lista de Passageiros do Ônibus ---
 interface BusPassenger extends Attendee {
   assignmentType: 'manual' | 'auto';
@@ -704,20 +755,20 @@ const EditablePassengerRow: React.FC<EditablePassengerRowProps> = ({ attendee, o
     };
 
     return (
-        <div className="w-full text-left p-3 bg-zinc-50 rounded-lg flex justify-between items-center border border-zinc-200 gap-2">
+        <div className="w-full text-left p-3 bg-zinc-50 rounded-lg flex flex-col md:flex-row justify-between md:items-center border border-zinc-200 gap-3">
             <div onClick={() => onSelectAttendee(attendee.id)} className="flex-grow cursor-pointer min-w-0">
-                <p className="font-semibold text-zinc-900 truncate">{attendee.name}</p>
+                <p className="font-semibold text-zinc-900">{attendee.name}</p>
                 <p className="text-xs text-zinc-500 mt-1">{attendee.document} &bull; {attendee.phone}</p>
             </div>
-            <div className="flex-shrink-0 flex items-center gap-2">
+            <div className="flex-shrink-0 flex items-center justify-center pt-2 md:pt-0 w-full md:w-auto">
                 {isSaving ? (
-                    <div className="w-28 text-center"><SpinnerIcon white={false} /></div>
+                    <div className="w-full md:w-36 text-center py-1.5"><SpinnerIcon white={false} /></div>
                 ) : (
                     <select
                         value={attendee.busNumber?.toString() || 'null'}
                         onChange={handleBusChange}
                         onClick={(e) => e.stopPropagation()}
-                        className="block w-28 px-2 py-1 text-sm bg-white border border-zinc-300 rounded-md shadow-sm focus:outline-none focus:ring-1 focus:ring-green-500 focus:border-green-500"
+                        className="block w-full md:w-36 px-2 py-1.5 text-sm bg-white border border-zinc-300 rounded-md shadow-sm focus:outline-none focus:ring-1 focus:ring-green-500 focus:border-green-500"
                     >
                         <option value="null">Nenhum</option>
                         {Array.from({ length: totalBuses }, (_, i) => i + 1).map(busNum => {
@@ -797,6 +848,62 @@ const BusPassengerList: React.FC<{
     );
 };
 
+// --- Componente: Lista de Inscritos Apenas Sítio ---
+const SitioOnlyListView: React.FC<{
+    attendees: Attendee[];
+    onBack: () => void;
+    onSelectAttendee: (id: string) => void;
+}> = ({ attendees, onBack, onSelectAttendee }) => {
+    
+    const getStatusClasses = (status: PaymentStatus) => {
+        switch (status) {
+            case PaymentStatus.PAGO: return 'bg-green-100 text-green-800';
+            case PaymentStatus.PENDENTE: return 'bg-red-100 text-red-800';
+            case PaymentStatus.ISENTO: return 'bg-blue-100 text-blue-800';
+            default: return 'bg-zinc-100 text-zinc-800';
+        }
+    };
+
+    return (
+        <div className="animate-fadeIn">
+            <header className="sticky top-0 md:static bg-white z-10 p-4 md:pt-6 border-b border-zinc-200 flex items-center gap-4">
+                <button onClick={onBack} className="text-zinc-500 hover:text-zinc-800 p-1 rounded-full hover:bg-zinc-100">
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>
+                </button>
+                <h1 className="text-xl md:text-2xl font-bold text-zinc-800">Pacote Apenas Sítio ({attendees.length})</h1>
+            </header>
+            <main className="p-4 space-y-2">
+                {attendees.length > 0 ? (
+                    attendees.map((attendee, index) => (
+                        <button 
+                            key={attendee.id} 
+                            onClick={() => onSelectAttendee(attendee.id)}
+                            className="w-full text-left p-3 bg-white rounded-lg flex justify-between items-center border border-zinc-200 hover:bg-zinc-50 transition-colors shadow-sm opacity-0 animate-fadeInUp"
+                            style={{ animationDelay: `${index * 30}ms`, animationFillMode: 'forwards' }}
+                        >
+                            <div className="min-w-0">
+                                <p className="font-semibold text-zinc-900">{attendee.name}</p>
+                                <p className="text-xs text-zinc-500 mt-1">{attendee.phone}</p>
+                            </div>
+                            <div className="flex items-center gap-3 flex-shrink-0">
+                                <span className={`px-2 py-0.5 text-xs font-bold rounded-full ${getStatusClasses(attendee.payment.status)}`}>
+                                    {attendee.payment.status.toUpperCase()}
+                                </span>
+                                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-zinc-400" viewBox="0 0 20 20" fill="currentColor">
+                                    <path fillRule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clipRule="evenodd" />
+                                </svg>
+                            </div>
+                        </button>
+                    ))
+                ) : (
+                    <p className="text-center text-zinc-500 py-8">Nenhum inscrito com este pacote.</p>
+                )}
+            </main>
+        </div>
+    );
+};
+
+
 // --- Componente: Painel Principal de Relatórios ---
 interface BusStat {
     busNumber: number;
@@ -815,7 +922,7 @@ const ProgressBar: React.FC<{ value: number; max: number; colorClass?: string }>
     return (<div className="w-full bg-zinc-200 rounded-full h-2"><div className={`${colorClass} h-2 rounded-full transition-all duration-500`} style={{ width: `${percentage}%` }}></div></div>);
 };
 
-const ReportsDashboard: React.FC<{ attendees: Attendee[]; onGenerateReportClick: () => void; onLogout: () => void; onFixDocsClick: () => void; onCheckDuplicatesClick: () => void; zeroDocCount: number; duplicateGroupCount: number; busStats: BusStat[]; onViewBus: (busNumber: number) => void; }> = ({ attendees, onGenerateReportClick, onLogout, onFixDocsClick, onCheckDuplicatesClick, zeroDocCount, duplicateGroupCount, busStats, onViewBus }) => {
+const ReportsDashboard: React.FC<{ attendees: Attendee[]; onGenerateReportClick: () => void; onLogout: () => void; onFixDocsClick: () => void; onCheckDuplicatesClick: () => void; zeroDocCount: number; duplicateGroupCount: number; busStats: BusStat[]; onViewBus: (busNumber: number) => void; onViewFinancials: () => void; onViewSitioOnlyList: () => void; }> = ({ attendees, onGenerateReportClick, onLogout, onFixDocsClick, onCheckDuplicatesClick, zeroDocCount, duplicateGroupCount, busStats, onViewBus, onViewFinancials, onViewSitioOnlyList }) => {
     const { totalAttendees, paidCount, pendingCount, isentoCount, totalRevenue, pendingRevenue, totalPossibleRevenue, sitioOnlyCount, paymentStats } = useMemo(() => {
         const paidAttendees = attendees.filter(a => a.payment.status === PaymentStatus.PAGO);
         const pendingAttendees = attendees.filter(a => a.payment.status === PaymentStatus.PENDENTE);
@@ -853,7 +960,7 @@ const ReportsDashboard: React.FC<{ attendees: Attendee[]; onGenerateReportClick:
             }
         });
         
-        const sortedPaymentStats = (Object.entries(calculatedPaymentStats) as [string, { count: number, total: number }][])
+        const sortedPaymentStats = (Object.entries(calculatedPaymentStats) as [string, { count: number; total: number }][])
             .sort(([, a], [, b]) => {
                 if (b.count !== a.count) {
                     return b.count - a.count;
@@ -929,7 +1036,24 @@ const ReportsDashboard: React.FC<{ attendees: Attendee[]; onGenerateReportClick:
                         {isentoCount > 0 && <span className="font-semibold text-blue-600">{isentoCount} {isentoCount === 1 ? 'Isento' : 'Isentos'}</span>}
                     </div>
                 </StatCard>
-                <StatCard title="Financeiro" icon={IconDollar} delay={150}><div className="flex justify-between items-baseline"><span className="font-bold text-3xl text-zinc-800">R$ {totalRevenue.toFixed(2).replace('.',',')}</span><span className="text-sm font-semibold text-zinc-500">Arrecadado</span></div><ProgressBar value={totalRevenue} max={totalPossibleRevenue} /><div className="flex justify-between text-sm"><span className="font-semibold text-zinc-500">Pendente: R$ {pendingRevenue.toFixed(2).replace('.',',')}</span></div></StatCard>
+                <StatCard title="Financeiro" icon={IconDollar} delay={150} onClick={onViewFinancials}>
+                    <div className="flex justify-between items-baseline">
+                        <span className="font-bold text-3xl text-zinc-800">R$ {totalRevenue.toFixed(2).replace('.',',')}</span>
+                        <span className="text-sm font-semibold text-zinc-500">Arrecadado</span>
+                    </div>
+                    <ProgressBar value={totalRevenue} max={totalPossibleRevenue} />
+                    <div className="flex justify-between text-sm">
+                        <span className="font-semibold text-zinc-500">Pendente: R$ {pendingRevenue.toFixed(2).replace('.',',')}</span>
+                    </div>
+                    <div className="mt-auto pt-3 border-t border-zinc-100">
+                        <span className="text-sm font-semibold text-green-600 flex items-center justify-center gap-1">
+                            Ver Detalhes
+                            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M13 7l5 5m0 0l-5 5m5-5H6" />
+                            </svg>
+                        </span>
+                    </div>
+                </StatCard>
                 
                 {zeroDocCount > 0 && (
                     <StatCard onClick={onFixDocsClick} title="Documentos Pendentes" icon={IconWarning} delay={200} className="bg-yellow-50 border-yellow-300 h-full">
@@ -966,13 +1090,21 @@ const ReportsDashboard: React.FC<{ attendees: Attendee[]; onGenerateReportClick:
                         </div>
                     </StatCard>
                 ))}
-                <StatCard title="Apenas Sítio" icon={IconHome} delay={325 + (busStats.length * 50)}>
+                <StatCard title="Apenas Sítio" icon={IconHome} delay={325 + (busStats.length * 50)} onClick={onViewSitioOnlyList}>
                     <div className="flex justify-between items-baseline">
                         <span className="font-bold text-3xl text-zinc-800">{sitioOnlyCount}</span>
                         <span className="text-sm font-semibold text-zinc-500">{sitioOnlyCount === 1 ? 'Inscrito' : 'Inscritos'}</span>
                     </div>
-                    <div className="text-xs text-zinc-400 text-center pt-4">
+                    <div className="text-xs text-zinc-400 text-center pt-4 flex-grow flex items-center justify-center">
                         Não há limite de vagas para este pacote.
+                    </div>
+                    <div className="mt-auto pt-3 border-t border-zinc-100">
+                        <span className="text-sm font-semibold text-green-600 flex items-center justify-center gap-1">
+                            Ver Lista
+                            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M13 7l5 5m0 0l-5 5m5-5H6" />
+                            </svg>
+                        </span>
                     </div>
                 </StatCard>
                 <StatCard title="Formas de Pagamento" icon={IconCreditCard} delay={350 + (busStats.length * 50)}>
@@ -1018,7 +1150,7 @@ interface ReportsProps {
 }
 
 const Reports: React.FC<ReportsProps> = ({ attendees, onLogout, onUpdateAttendee, onSelectAttendee }) => {
-    const [mode, setMode] = useState<'dashboard' | 'form' | 'preview' | 'zeroDoc' | 'duplicateCheck' | 'busDetail'>('dashboard');
+    const [mode, setMode] = useState<'dashboard' | 'form' | 'preview' | 'zeroDoc' | 'duplicateCheck' | 'busDetail' | 'financialDetail' | 'sitioOnlyList'>('dashboard');
     const [reportConfig, setReportConfig] = useState<ReportConfig | null>(null);
     const [reportData, setReportData] = useState<Attendee[] | Attendee[][]>([]);
     const [selectedBusNumber, setSelectedBusNumber] = useState<number | null>(null);
@@ -1029,6 +1161,10 @@ const Reports: React.FC<ReportsProps> = ({ attendees, onLogout, onUpdateAttendee
             /^0+$/.test(a.document.replace(/[^\d]/g, ''))
         );
     }, [attendees]);
+    
+    const sitioOnlyAttendees = useMemo(() => 
+        attendees.filter(a => a.packageType === PackageType.SITIO_ONLY).sort((a,b) => a.name.localeCompare(b.name)), 
+    [attendees]);
 
     const potentialDuplicates = useMemo(() => {
         if (attendees.length < 2) return [];
@@ -1061,6 +1197,45 @@ const Reports: React.FC<ReportsProps> = ({ attendees, onLogout, onUpdateAttendee
             }
         }
         return groups;
+    }, [attendees]);
+    
+    const financialDetails = useMemo(() => {
+        let paidSitio = 0;
+        let totalSitio = 0;
+        let paidBus = 0;
+        let totalBus = 0;
+
+        attendees.forEach(a => {
+            if (a.payment.status === PaymentStatus.ISENTO) {
+                return; // Skip exempt attendees from financial calculations
+            }
+
+            if (a.packageType === PackageType.SITIO_ONLY) {
+                totalSitio += 70;
+                if (a.payment.status === PaymentStatus.PAGO) {
+                    paidSitio += 70;
+                }
+            } else if (a.packageType === PackageType.SITIO_BUS) {
+                totalSitio += 70;
+                totalBus += 50;
+
+                if (a.payment.sitePaymentDetails?.isPaid) {
+                    paidSitio += 70;
+                }
+                if (a.payment.busPaymentDetails?.isPaid) {
+                    paidBus += 50;
+                }
+            }
+        });
+
+        return {
+            paidSitio,
+            totalSitio,
+            pendingSitio: totalSitio - paidSitio,
+            paidBus,
+            totalBus,
+            pendingBus: totalBus - paidBus,
+        };
     }, [attendees]);
 
     const busAttendees = useMemo(() => attendees.filter(a => a.packageType === PackageType.SITIO_BUS), [attendees]);
@@ -1222,7 +1397,15 @@ const Reports: React.FC<ReportsProps> = ({ attendees, onLogout, onUpdateAttendee
         setSelectedBusNumber(busNumber);
         setMode('busDetail');
     };
+    
+    if (mode === 'financialDetail') {
+        return <FinancialDetailView financialData={financialDetails} onBack={() => setMode('dashboard')} />;
+    }
 
+    if (mode === 'sitioOnlyList') {
+        return <SitioOnlyListView attendees={sitioOnlyAttendees} onBack={() => setMode('dashboard')} onSelectAttendee={onSelectAttendee} />;
+    }
+    
     if (mode === 'form') {
         return <InteractiveReportForm onGenerate={handleGenerate} onCancel={() => setMode('dashboard')} />;
     }
@@ -1266,6 +1449,8 @@ const Reports: React.FC<ReportsProps> = ({ attendees, onLogout, onUpdateAttendee
         duplicateGroupCount={potentialDuplicates.length}
         busStats={busStatsForDashboard}
         onViewBus={handleViewBus}
+        onViewFinancials={() => setMode('financialDetail')}
+        onViewSitioOnlyList={() => setMode('sitioOnlyList')}
     />;
 };
 

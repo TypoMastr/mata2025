@@ -225,6 +225,7 @@ const InteractiveReportForm: React.FC<{ onGenerate: (config: ReportConfig) => vo
 // --- Componente: Visualização do Relatório ---
 const InteractiveReportPreview: React.FC<{ data: Attendee[] | Attendee[][]; config: ReportConfig; onBack: () => void; }> = ({ data, config, onBack }) => {
     const [isShareModalOpen, setIsShareModalOpen] = useState(false);
+    const [isOrientationModalOpen, setIsOrientationModalOpen] = useState(false);
     
     // FIX: Update field names to use dot notation.
     const fieldNames: Record<ReportField, string> = {
@@ -249,8 +250,10 @@ const InteractiveReportPreview: React.FC<{ data: Attendee[] | Attendee[][]; conf
         return value || 'N/A';
     };
     
-    const handlePrintAndExport = () => {
+    const handlePrintAndExport = (orientation: 'portrait' | 'landscape') => {
+        setIsOrientationModalOpen(false);
         let printableHtml = '';
+        const pageStyle = `@page { size: A4 ${orientation}; margin: 1in; }`;
 
         if (config.type === 'busList') {
             const busData = data as Attendee[][];
@@ -300,7 +303,7 @@ const InteractiveReportPreview: React.FC<{ data: Attendee[] | Attendee[][]; conf
                     .bus-section { page-break-inside: avoid; }
                     .bus-section--first { page-break-inside: auto; }
                     .bus-section + .bus-section { page-break-before: always; }
-                    @page { size: A4; margin: 1in; }
+                    ${pageStyle}
                     @media print { body { margin: 0; } .bus-section + .bus-section { margin-top: 0; } }
                 </style></head><body>
                     <h1>Lista de Passageiros</h1>
@@ -326,7 +329,7 @@ const InteractiveReportPreview: React.FC<{ data: Attendee[] | Attendee[][]; conf
                     tr:nth-child(even) { background-color: #fcfcfc; }
                     thead { display: table-header-group; }
                     tbody tr { page-break-inside: avoid; }
-                    @page { size: A4; margin: 1in; }
+                    ${pageStyle}
                 </style></head><body>
                     <h1>Relatório - Gira da Mata</h1>
                     <p><strong>Data de Geração:</strong> ${new Date().toLocaleString('pt-BR')}</p>
@@ -403,8 +406,8 @@ const InteractiveReportPreview: React.FC<{ data: Attendee[] | Attendee[][]; conf
     };
 
     const handleShareAsPdf = () => {
-        handlePrintAndExport();
         setIsShareModalOpen(false);
+        setIsOrientationModalOpen(true);
     };
 
     return (
@@ -422,7 +425,7 @@ const InteractiveReportPreview: React.FC<{ data: Attendee[] | Attendee[][]; conf
                     <button onClick={() => setIsShareModalOpen(true)} className="p-2 rounded-full text-zinc-700 bg-zinc-200 hover:bg-zinc-300 transition-colors" aria-label="Compartilhar">
                         <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path d="M15 8a3 3 0 10-2.977-2.63l-4.94 2.47a3 3 0 100 4.319l4.94 2.47a3 3 0 10.895-1.789l-4.94-2.47a3.027 3.027 0 000-.74l4.94-2.47C13.456 7.68 14.19 8 15 8z" /></svg>
                     </button>
-                    <button onClick={handlePrintAndExport} className="p-2 rounded-full text-white bg-blue-500 hover:bg-blue-600 transition-colors shadow-sm" aria-label="Imprimir / PDF">
+                    <button onClick={() => setIsOrientationModalOpen(true)} className="p-2 rounded-full text-white bg-blue-500 hover:bg-blue-600 transition-colors shadow-sm" aria-label="Imprimir / PDF">
                         <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M5 4v3H4a2 2 0 00-2 2v3a2 2 0 002 2h1v-2a1 1 0 011-1h8a1 1 0 011 1v2h1a2 2 0 002-2v-3a2 2 0 00-2-2h-1V4a2 2 0 00-2-2H7a2 2 0 00-2 2zm8 0H7v3h6V4zm0 8H7v4h6v-4z" clipRule="evenodd" /></svg>
                     </button>
                 </div>
@@ -510,6 +513,24 @@ const InteractiveReportPreview: React.FC<{ data: Attendee[] | Attendee[][]; conf
                     onShareAsText={handleShareAsText}
                     onShareAsPdf={handleShareAsPdf}
                 />
+            )}
+            {isOrientationModalOpen && (
+                <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 animate-fadeIn" onClick={() => setIsOrientationModalOpen(false)}>
+                    <div className="bg-white rounded-xl shadow-lg p-6 max-w-sm w-full animate-popIn" onClick={(e) => e.stopPropagation()}>
+                        <h3 className="text-lg leading-6 font-bold text-zinc-900 mb-4 text-center">Escolha a Orientação</h3>
+                        <div className="space-y-3">
+                            <button onClick={() => handlePrintAndExport('portrait')} className="w-full bg-zinc-100 text-zinc-800 font-bold py-3 px-4 rounded-full hover:bg-zinc-200 transition-colors shadow-sm flex items-center justify-center gap-2">
+                                Retrato (Vertical)
+                            </button>
+                            <button onClick={() => handlePrintAndExport('landscape')} className="w-full bg-zinc-100 text-zinc-800 font-bold py-3 px-4 rounded-full hover:bg-zinc-200 transition-colors shadow-sm flex items-center justify-center gap-2">
+                                Paisagem (Horizontal)
+                            </button>
+                        </div>
+                        <button onClick={() => setIsOrientationModalOpen(false)} className="w-full text-zinc-700 font-bold py-3 px-4 rounded-full hover:bg-zinc-100 transition-colors mt-4">
+                            Cancelar
+                        </button>
+                    </div>
+                </div>
             )}
         </div>
     );

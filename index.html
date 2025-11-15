@@ -22,10 +22,18 @@
       html {
         color-scheme: light;
       }
-      /* Add a smooth transition to all elements for a more fluid feel */
+      /* Global styles for transitions and touch responsiveness */
       * {
         transition: background-color 0.2s ease-in-out, color 0.2s ease-in-out, border-color 0.2s ease-in-out, opacity 0.2s ease-in-out;
+        /* Improve touch responsiveness on iOS and other touch devices */
+        touch-action: manipulation; /* Disables double-tap to zoom, making single taps faster */
+        -webkit-tap-highlight-color: transparent; /* Removes the gray highlight on tap */
       }
+      /* Ensures interactive elements have a pointer cursor, which can also help with touch event registration on some browsers */
+      button, a, select, input[type="button"], input[type="submit"], [role="button"] {
+        cursor: pointer;
+      }
+
       /* Custom animations */
       @keyframes fadeInUp {
         from { opacity: 0; transform: translateY(20px); }

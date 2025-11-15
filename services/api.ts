@@ -1,13 +1,16 @@
+
 import { createClient } from '@supabase/supabase-js';
 import type { Registration, Payment, PartialPaymentDetails, Person, Event } from '../types';
 import { PackageType, PaymentStatus } from '../types';
 
 // --- Supabase Client Setup ---
+
+// Credenciais atualizadas conforme fornecido pelo usuário.
 const supabaseUrl = 'https://bjuzljwcbtnzylyirkzu.supabase.co';
 const supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJqdXpsandjYnRuenlseWlya3p1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjIzOTEyNDIsImV4cCI6MjA3Nzk2NzI0Mn0.VGB0hLfDHAo1jXSXFTf_xm5PecwEq0h2rQmuD-fo0Zk';
 
 if (!supabaseUrl || !supabaseAnonKey) {
-    throw new Error("Supabase URL and Anon Key must be provided.");
+    throw new Error("As credenciais do Supabase não estão configuradas corretamente no arquivo services/api.ts.");
 }
 const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
@@ -181,6 +184,16 @@ export const deleteRegistration = async (id: string): Promise<void> => {
 };
 
 // PEOPLE
+export const fetchAllPeople = async (): Promise<Person[]> => {
+    const { data, error } = await supabase
+        .from('people')
+        .select('*')
+        .order('name', { ascending: true });
+    
+    if (error) throw new Error(error.message);
+    return data as Person[];
+};
+
 export const searchPeople = async (query: string): Promise<Person[]> => {
     const { data, error } = await supabase
         .from('people')
@@ -214,6 +227,35 @@ export const updatePerson = async (person: Person): Promise<Person> => {
     return data as Person;
 };
 
+export const deletePerson = async (personId: string): Promise<void> => {
+    // Safety Check: Verify this person has no event registrations.
+    const { count, error: checkError } = await supabase
+        .from('event_registrations')
+        .select('*', { count: 'exact', head: true })
+        .eq('person_id', personId);
+    
+    if (checkError) {
+        console.error('Error checking registrations:', checkError);
+        throw new Error(`Failed to verify person's registrations: ${checkError.message}`);
+    }
+
+    if (count !== null && count > 0) {
+        throw new Error(`PERSON_HAS_REGISTRATIONS`);
+    }
+
+    // If check passes, proceed with deletion.
+    const { error: deleteError } = await supabase
+        .from('people')
+        .delete()
+        .eq('id', personId);
+
+    if (deleteError) {
+        console.error('Error deleting person:', deleteError);
+        throw new Error(`Failed to delete person: ${deleteError.message}`);
+    }
+};
+
+
 // EVENTS
 export const fetchEvents = async (): Promise<Event[]> => {
     const { data, error } = await supabase
@@ -245,4 +287,31 @@ export const updateEvent = async (eventData: Event): Promise<Event> => {
         .single();
     if (error) throw new Error(error.message);
     return data as Event;
+};
+
+export const getRegistrationCountForEvent = async (eventId: string): Promise<number> => {
+    const { count, error } = await supabase
+        .from('event_registrations')
+        .select('*', { count: 'exact', head: true })
+        .eq('event_id', eventId);
+    
+    if (error) {
+        console.error('Error counting registrations:', error);
+        throw new Error(error.message);
+    }
+    return count || 0;
+};
+
+export const deleteEvent = async (eventId: string): Promise<void> => {
+    // Assuming ON DELETE CASCADE is enabled on the event_id foreign key
+    // in the event_registrations table.
+    const { error } = await supabase
+        .from('events')
+        .delete()
+        .eq('id', eventId);
+
+    if (error) {
+        console.error('Error deleting event:', error);
+        throw new Error(`Failed to delete event: ${error.message}`);
+    }
 };

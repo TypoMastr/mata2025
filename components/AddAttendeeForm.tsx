@@ -369,7 +369,7 @@ const AddAttendeeForm: React.FC<AddAttendeeFormProps> = ({ onAddAttendee, onUpda
                                         {personSearchResults.map(person => (
                                             <li key={person.id} onClick={() => handleSelectPerson(person)} className="px-3 py-2 text-sm text-zinc-700 hover:bg-zinc-100 cursor-pointer">
                                                 <p className="font-semibold">{person.name}</p>
-                                                <p className="text-xs text-zinc-500">{person.document}</p>
+                                                <p className="text-xs text-zinc-500">{person.document} &bull; {person.phone}</p>
                                             </li>
                                         ))}
                                     </ul>
@@ -384,6 +384,7 @@ const AddAttendeeForm: React.FC<AddAttendeeFormProps> = ({ onAddAttendee, onUpda
                                 <div>
                                     <p className="font-bold text-green-800">{formData.name}</p>
                                     <p className="text-sm text-green-700">{formData.document}</p>
+                                    <p className="text-sm text-green-700 mt-1">{formData.phone}</p>
                                 </div>
                                 <button type="button" onClick={handleClearPersonSelection} className="text-sm font-semibold text-zinc-600 hover:text-zinc-800">
                                     Alterar

@@ -130,4 +130,4 @@ export interface Event {
 }
 
 
-export type View = 'list' | 'detail' | 'form' | 'reports' | 'payment' | 'editForm' | 'info' | 'management';
+export type View = 'list' | 'detail' | 'form' | 'reports' | 'payment' | 'editForm' | 'info' | 'management' | 'peopleManagement';

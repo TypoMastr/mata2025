@@ -2,7 +2,8 @@
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { useRegistrations } from './hooks/useAttendees';
 import { useEvents } from './hooks/useEvents';
-import type { View, Registration, RegistrationFormData, Event } from './types';
+import { usePeople } from './hooks/usePeople';
+import type { View, Registration, RegistrationFormData, Event, Person } from './types';
 import { PaymentStatus, PackageType } from './types';
 import AttendeeList from './components/AttendeeList';
 import AttendeeDetail from './components/AttendeeDetail';
@@ -16,11 +17,13 @@ import InfoPage from './components/Info';
 import Login from './components/Login';
 import SideNav from './components/SideNav';
 import ManagementPage from './components/management/ManagementPage';
+import PeopleManagementPage from './components/management/PeopleManagementPage';
 import { ToastProvider, useToast } from './contexts/ToastContext';
 import ToastContainer from './components/ToastContainer';
 
 const AppContent: React.FC = () => {
-    const { events, isLoading: isLoadingEvents, addEvent, updateEvent } = useEvents();
+    const { events, isLoading: isLoadingEvents, addEvent, updateEvent, deleteEvent } = useEvents();
+    const { people, isLoading: isLoadingPeople, addPerson, updatePerson, deletePerson } = usePeople();
     const [selectedEventId, setSelectedEventId] = useState<string | null>(null);
 
     const { 
@@ -202,7 +205,7 @@ const AppContent: React.FC = () => {
     }, [updateRegistration, addToast]);
 
     const renderContent = () => {
-        if (isLoadingEvents || (selectedEventId && isLoadingRegistrations)) {
+        if (isLoadingEvents || (selectedEventId && isLoadingRegistrations) || isLoadingPeople) {
             return <div className="flex justify-center items-center h-screen"><p>Carregando...</p></div>;
         }
 
@@ -210,24 +213,22 @@ const AppContent: React.FC = () => {
             case 'detail':
                 return selectedRegistration && <AttendeeDetail attendee={selectedRegistration} onBack={handleCancel} onEdit={handleEdit} onDelete={handleDeleteRequest} onManagePayment={handleShowPaymentForm} onUpdateAttendee={handleUpdateRegistration} totalBuses={totalBuses} busAssignments={busAssignments} />;
             case 'form':
-                // FIX: Pass registrations to AddAttendeeForm. The prop type in the component was also fixed to match.
                 return <AddAttendeeForm onAddAttendee={handleSaveRegistration} onCancel={handleCancel} registrations={registrations} event={selectedEvent} />;
             case 'editForm':
-                 // FIX: Pass registrations to AddAttendeeForm. The prop in the component was renamed from 'attendees' to 'registrations'.
                  return selectedRegistration && <AddAttendeeForm onUpdateAttendee={handleUpdateRegistration} onCancel={() => setView('detail')} attendeeToEdit={selectedRegistration} registrations={registrations} event={selectedEvent} />;
             case 'payment':
                 return selectedRegistration && <RegisterPaymentForm attendee={selectedRegistration} onRegisterPayment={handleRegisterPayment} onCancel={() => setView('detail')} onDeletePayment={handleDeletePaymentRequest} />;
              case 'reports':
-                // FIX: Removed unused 'event' prop to match component's props interface.
                 return <Reports attendees={registrations} onLogout={handleLogout} onUpdateAttendee={updateRegistration} onSelectAttendee={handleSelectRegistration} event={selectedEvent} />;
              case 'info':
                 return <InfoPage onLogout={handleLogout} event={selectedEvent} />;
              case 'management':
-                return <ManagementPage events={events} onAddEvent={addEvent} onUpdateEvent={updateEvent} onLogout={handleLogout} selectedEventId={selectedEventId} onEventChange={setSelectedEventId} />;
+                return <ManagementPage events={events} onAddEvent={addEvent} onUpdateEvent={updateEvent} onDeleteEvent={deleteEvent} onLogout={handleLogout} selectedEventId={selectedEventId} onEventChange={setSelectedEventId} setView={setView} />;
+             case 'peopleManagement':
+                return <PeopleManagementPage people={people} onAddPerson={addPerson} onUpdatePerson={updatePerson} onDeletePerson={deletePerson} onBack={() => setView('management')} />;
             case 'list':
             default:
                 return (
-                    // FIX: Pass events, selectedEventId, and onEventChange to AttendeeList. The component props were updated to accept these.
                     <AttendeeList 
                         attendees={registrations} 
                         onSelectAttendee={handleSelectRegistration} 

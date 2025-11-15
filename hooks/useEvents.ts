@@ -1,3 +1,4 @@
+
 import { useState, useEffect, useCallback } from 'react';
 import type { Event } from '../types';
 import * as api from '../services/api';
@@ -44,10 +45,21 @@ export const useEvents = () => {
         }
     };
 
+    const deleteEvent = async (eventId: string) => {
+        try {
+            await api.deleteEvent(eventId);
+            setEvents(prev => prev.filter(e => e.id !== eventId));
+        } catch (err) {
+            console.error("Failed to delete event:", err);
+            throw err;
+        }
+    };
+
     return {
         events,
         isLoading,
         addEvent,
         updateEvent,
+        deleteEvent,
     };
 };

@@ -1,6 +1,5 @@
-
 import React, { useState, useEffect } from 'react';
-import type { Event, View } from '../../types';
+import type { Event, View, ActionHistory } from '../../types';
 import EventForm from './EventForm';
 import ConfirmDeleteEvent from '../ConfirmDeleteEvent';
 import * as authService from '../../services/authService';
@@ -14,6 +13,7 @@ interface ManagementPageProps {
     selectedEventId: string | null;
     onEventChange: (id: string | null) => void;
     setView: (view: View) => void;
+    latestHistory: ActionHistory[];
 }
 
 const InfoCard: React.FC<{ icon: React.ReactElement; title: string; children: React.ReactNode; delay: number; }> = ({ icon, title, children, delay }) => (
@@ -106,7 +106,7 @@ const formatDate = (dateString?: string) => {
     });
 };
 
-const ManagementPage: React.FC<ManagementPageProps> = ({ events, onAddEvent, onUpdateEvent, onDeleteEvent, onLogout, selectedEventId, onEventChange, setView }) => {
+const ManagementPage: React.FC<ManagementPageProps> = ({ events, onAddEvent, onUpdateEvent, onDeleteEvent, onLogout, selectedEventId, onEventChange, setView, latestHistory }) => {
     const [isFormOpen, setIsFormOpen] = useState(false);
     const [eventToEdit, setEventToEdit] = useState<Event | null>(null);
     const [eventToDelete, setEventToDelete] = useState<Event | null>(null);
@@ -206,6 +206,27 @@ const ManagementPage: React.FC<ManagementPageProps> = ({ events, onAddEvent, onU
                         <div className="text-center py-12 text-zinc-500">
                             <p className="font-semibold">Nenhum evento criado.</p>
                             <p className="mt-2 text-sm">Clique em "Novo Evento" para começar.</p>
+                        </div>
+                    )}
+                </div>
+
+                 <div className="bg-white p-4 rounded-xl border border-zinc-200 shadow-sm space-y-3">
+                    <h2 className="text-lg font-bold text-zinc-700">Histórico de Ações</h2>
+                    {latestHistory.length > 0 ? (
+                        <div className="space-y-3">
+                            {latestHistory.map(item => (
+                                <div key={item.id} className="text-sm text-zinc-600 p-2 bg-zinc-50 rounded-md border border-zinc-200">
+                                    <span className="font-semibold text-zinc-800">{new Date(item.created_at).toLocaleTimeString('pt-BR', {hour: '2-digit', minute:'2-digit'})}: </span>
+                                    {item.description}
+                                </div>
+                            ))}
+                            <button onClick={() => setView('history')} className="w-full text-center text-sm font-bold text-green-600 hover:underline pt-2">
+                                Ver Histórico Completo
+                            </button>
+                        </div>
+                    ) : (
+                         <div className="text-center py-8 text-zinc-500">
+                            <p className="text-sm">Nenhuma ação recente registrada.</p>
                         </div>
                     )}
                 </div>

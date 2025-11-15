@@ -11,6 +11,7 @@ export const useRegistrations = (eventId: string | null) => {
     const fetchRegistrations = useCallback(async (id: string) => {
         setIsLoading(true);
         try {
+            // API now handles soft deletes, so no change needed here.
             const data = await api.fetchRegistrations(id);
             setRegistrations(data);
         } catch (err) {

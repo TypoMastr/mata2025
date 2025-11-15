@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useCallback } from 'react';
 import type { Event } from '../types';
 import * as api from '../services/api';
@@ -26,7 +25,7 @@ export const useEvents = () => {
     const addEvent = async (eventData: Omit<Event, 'id'>) => {
         try {
             const newEvent = await api.createEvent(eventData);
-            setEvents(prev => [newEvent, ...prev]);
+            setEvents(prev => [newEvent, ...prev].sort((a, b) => new Date(b.event_date).getTime() - new Date(a.event_date).getTime()));
             return newEvent;
         } catch (err) {
             console.error("Failed to add event:", err);

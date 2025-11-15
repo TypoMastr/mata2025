@@ -49,6 +49,7 @@ export interface Person {
     document: string;
     documentType: DocumentType;
     phone: string;
+    is_deleted?: boolean;
 }
 
 // This type represents a registration for an event, joining data from
@@ -63,6 +64,7 @@ export interface Registration {
     payment: Payment;
     notes?: string;
     busNumber?: number | null;
+    is_deleted?: boolean;
 }
 
 // Alias for backwards compatibility in components.
@@ -125,9 +127,23 @@ export interface Event {
     pix_key: string;
     bus_departure_time: string;
     bus_return_time: string;
-
     payment_deadline: string;
+    is_deleted?: boolean;
+}
+
+export interface ActionHistory {
+    id: string;
+    created_at: string;
+    action_type: string; // e.g., 'CREATE_REGISTRATION'
+    table_name: string;
+    record_id: string;
+    previous_data: any | null;
+    new_data: any | null;
+    description: string;
+    ip_address?: string;
+    location_info?: any;
+    is_undone: boolean;
 }
 
 
-export type View = 'list' | 'detail' | 'form' | 'reports' | 'payment' | 'editForm' | 'info' | 'management' | 'peopleManagement';
+export type View = 'list' | 'detail' | 'form' | 'reports' | 'payment' | 'editForm' | 'info' | 'management' | 'peopleManagement' | 'history';

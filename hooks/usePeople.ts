@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useCallback } from 'react';
 import type { Person } from '../types';
 import * as api from '../services/api';

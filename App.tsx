@@ -1,9 +1,9 @@
-
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { useRegistrations } from './hooks/useAttendees';
 import { useEvents } from './hooks/useEvents';
 import { usePeople } from './hooks/usePeople';
-import type { View, Registration, RegistrationFormData, Event, Person } from './types';
+import { useHistory } from './hooks/useHistory';
+import type { View, Registration, RegistrationFormData } from './types';
 import { PaymentStatus, PackageType } from './types';
 import AttendeeList from './components/AttendeeList';
 import AttendeeDetail from './components/AttendeeDetail';
@@ -18,12 +18,16 @@ import Login from './components/Login';
 import SideNav from './components/SideNav';
 import ManagementPage from './components/management/ManagementPage';
 import PeopleManagementPage from './components/management/PeopleManagementPage';
+import HistoryPage from './components/management/HistoryPage';
 import { ToastProvider, useToast } from './contexts/ToastContext';
 import ToastContainer from './components/ToastContainer';
+import DatabaseMigration from './components/DatabaseMigration';
+import * as api from './services/api';
 
 const AppContent: React.FC = () => {
     const { events, isLoading: isLoadingEvents, addEvent, updateEvent, deleteEvent } = useEvents();
     const { people, isLoading: isLoadingPeople, addPerson, updatePerson, deletePerson } = usePeople();
+    const historyHook = useHistory();
     const [selectedEventId, setSelectedEventId] = useState<string | null>(null);
 
     const { 
@@ -42,7 +46,6 @@ const AppContent: React.FC = () => {
     const [registrationToDelete, setRegistrationToDelete] = useState<Registration | null>(null);
     const [registrationPaymentToDelete, setRegistrationPaymentToDelete] = useState<Registration | null>(null);
 
-    // State for list persistence
     const [searchQuery, setSearchQuery] = useState('');
     const [statusFilter, setStatusFilter] = useState<'all' | PaymentStatus>('all');
     const [packageFilter, setPackageFilter] = useState<'all' | PackageType>('all');
@@ -50,9 +53,14 @@ const AppContent: React.FC = () => {
 
     useEffect(() => {
         if (!selectedEventId && events.length > 0) {
-            setSelectedEventId(events[0].id);
+            const activeEvent = events.find(e => !e.is_deleted);
+            if(activeEvent) setSelectedEventId(activeEvent.id);
         }
     }, [events, selectedEventId]);
+
+    useEffect(() => {
+        historyHook.fetchLatestHistory();
+    }, []);
 
     const busAttendeesCount = useMemo(() => registrations.filter(a => a.packageType === PackageType.SITIO_BUS).length, [registrations]);
     const totalBuses = useMemo(() => {
@@ -71,9 +79,7 @@ const AppContent: React.FC = () => {
 
     useEffect(() => {
         const loggedIn = sessionStorage.getItem('isAuthenticated') === 'true';
-        if (loggedIn) {
-            setIsAuthenticated(true);
-        }
+        if (loggedIn) setIsAuthenticated(true);
     }, []);
 
     const handleLoginSuccess = useCallback(() => {
@@ -87,7 +93,6 @@ const AppContent: React.FC = () => {
         setView('list'); 
     }, []);
 
-
     const selectedRegistration = useMemo(() => {
         return registrations.find(a => a.id === selectedRegistrationId) || null;
     }, [registrations, selectedRegistrationId]);
@@ -97,10 +102,8 @@ const AppContent: React.FC = () => {
     }, [events, selectedEventId]);
 
     const handleSelectRegistration = useCallback((id: string) => {
-        if (view !== 'detail') {
-            setPreviousView(view);
-        }
-        setScrollPosition(window.scrollY); // Store scroll position before navigating
+        if (view !== 'detail') setPreviousView(view);
+        setScrollPosition(window.scrollY);
         setSelectedRegistrationId(id);
         setView('detail');
     }, [view]);
@@ -116,18 +119,20 @@ const AppContent: React.FC = () => {
         setView(previousView);
     }, [previousView]);
     
-    const handleEdit = useCallback(() => {
-        setView('editForm');
-    }, []);
+    const handleEdit = useCallback(() => setView('editForm'), []);
+    const handleShowPaymentForm = useCallback(() => setView('payment'), []);
+    const handleDeleteRequest = useCallback((registration: Registration) => setRegistrationToDelete(registration), []);
+    const handleCancelDelete = useCallback(() => setRegistrationToDelete(null), []);
+    const handleDeletePaymentRequest = useCallback((registration: Registration) => setRegistrationPaymentToDelete(registration), []);
+    const handleCancelDeletePayment = useCallback(() => setRegistrationPaymentToDelete(null), []);
 
-    const handleShowPaymentForm = useCallback(() => {
-        setView('payment');
-    }, []);
-
-    const handleDeleteRequest = useCallback((registration: Registration) => {
-        setRegistrationToDelete(registration);
-    }, []);
-
+    const afterAction = () => {
+        historyHook.fetchLatestHistory();
+        if (view === 'history') {
+             historyHook.fetchAllHistory();
+        }
+    }
+    
     const handleConfirmDelete = useCallback(async () => {
         if (registrationToDelete) {
             try {
@@ -135,49 +140,26 @@ const AppContent: React.FC = () => {
                 addToast(`Inscrição de ${registrationToDelete.person.name} excluída.`, 'success');
                 setRegistrationToDelete(null);
                 setView('list');
+                afterAction();
             } catch (error) {
                 addToast('Falha ao excluir inscrição.', 'error');
-                console.error(error);
             }
         }
-    }, [registrationToDelete, deleteRegistration, addToast]);
+    }, [registrationToDelete, deleteRegistration, addToast, historyHook]);
     
-    const handleCancelDelete = useCallback(() => {
-        setRegistrationToDelete(null);
-    }, []);
-
-    const handleDeletePaymentRequest = useCallback((registration: Registration) => {
-        setRegistrationPaymentToDelete(registration);
-    }, []);
-
     const handleConfirmDeletePayment = useCallback(async () => {
         if (registrationPaymentToDelete) {
-            const registrationToUpdate: Registration = {
-                ...registrationPaymentToDelete,
-                payment: {
-                    ...registrationPaymentToDelete.payment,
-                    status: PaymentStatus.PENDENTE,
-                    date: undefined,
-                    type: undefined,
-                    receiptUrl: null,
-                }
-            };
-             try {
-                await updateRegistration(registrationToUpdate);
+            try {
+                await updateRegistration({ ...registrationPaymentToDelete, payment: { ...registrationPaymentToDelete.payment, status: PaymentStatus.PENDENTE, date: undefined, type: undefined, receiptUrl: null } });
                 addToast('Pagamento removido com sucesso.', 'success');
                 setRegistrationPaymentToDelete(null);
                 setView('detail');
+                afterAction();
             } catch (error) {
                 addToast('Falha ao remover pagamento.', 'error');
-                console.error(error);
             }
         }
-    }, [registrationPaymentToDelete, updateRegistration, addToast]);
-    
-    const handleCancelDeletePayment = useCallback(() => {
-        setRegistrationPaymentToDelete(null);
-    }, []);
-
+    }, [registrationPaymentToDelete, updateRegistration, addToast, historyHook]);
 
     const handleSaveRegistration = useCallback(async (formData: RegistrationFormData) => {
         if (!selectedEventId) {
@@ -185,24 +167,25 @@ const AppContent: React.FC = () => {
             return;
         }
         await addRegistration(formData, selectedEventId);
-    }, [addRegistration, selectedEventId, addToast]);
+        afterAction();
+    }, [addRegistration, selectedEventId, addToast, historyHook]);
 
     const handleUpdateRegistration = useCallback(async (updatedRegistration: Registration) => {
         await updateRegistration(updatedRegistration);
-    }, [updateRegistration]);
+        afterAction();
+    }, [updateRegistration, historyHook]);
 
     const handleRegisterPayment = useCallback(async (updatedRegistration: Registration) => {
         try {
             await updateRegistration(updatedRegistration);
             setView('detail');
             addToast('Pagamento salvo com sucesso.', 'success');
+            afterAction();
         } catch (error) {
              addToast('Falha ao salvar pagamento.', 'error');
-             console.error(error);
-             // Re-throw to allow form to handle its submitting state
              throw error;
         }
-    }, [updateRegistration, addToast]);
+    }, [updateRegistration, addToast, historyHook]);
 
     const renderContent = () => {
         if (isLoadingEvents || (selectedEventId && isLoadingRegistrations) || isLoadingPeople) {
@@ -219,40 +202,35 @@ const AppContent: React.FC = () => {
             case 'payment':
                 return selectedRegistration && <RegisterPaymentForm attendee={selectedRegistration} onRegisterPayment={handleRegisterPayment} onCancel={() => setView('detail')} onDeletePayment={handleDeletePaymentRequest} />;
              case 'reports':
-                return <Reports attendees={registrations} onLogout={handleLogout} onUpdateAttendee={updateRegistration} onSelectAttendee={handleSelectRegistration} event={selectedEvent} />;
+                return <Reports attendees={registrations} onLogout={handleLogout} onUpdateAttendee={handleUpdateRegistration} onSelectAttendee={handleSelectRegistration} event={selectedEvent} />;
              case 'info':
                 return <InfoPage onLogout={handleLogout} event={selectedEvent} />;
              case 'management':
-                return <ManagementPage events={events} onAddEvent={addEvent} onUpdateEvent={updateEvent} onDeleteEvent={deleteEvent} onLogout={handleLogout} selectedEventId={selectedEventId} onEventChange={setSelectedEventId} setView={setView} />;
+                return <ManagementPage events={events} onAddEvent={addEvent} onUpdateEvent={updateEvent} onDeleteEvent={deleteEvent} onLogout={handleLogout} selectedEventId={selectedEventId} onEventChange={setSelectedEventId} setView={setView} latestHistory={historyHook.latestHistory} />;
              case 'peopleManagement':
                 return <PeopleManagementPage people={people} onAddPerson={addPerson} onUpdatePerson={updatePerson} onDeletePerson={deletePerson} onBack={() => setView('management')} />;
+            case 'history':
+                return <HistoryPage history={historyHook.history} isLoading={historyHook.isLoading} onUndo={historyHook.undoAction} onBack={() => setView('management')} />;
             case 'list':
             default:
                 return (
                     <AttendeeList 
-                        attendees={registrations} 
-                        onSelectAttendee={handleSelectRegistration} 
-                        onAddAttendee={handleAddAttendeeClick} 
-                        onLogout={handleLogout}
-                        searchQuery={searchQuery}
-                        onSearchQueryChange={setSearchQuery}
-                        statusFilter={statusFilter}
-                        onStatusFilterChange={setStatusFilter}
-                        packageFilter={packageFilter}
-                        onPackageFilterChange={setPackageFilter}
-                        scrollPosition={scrollPosition}
-                        onScrollPositionReset={() => setScrollPosition(0)}
-                        events={events}
-                        selectedEventId={selectedEventId}
-                        onEventChange={setSelectedEventId}
+                        attendees={registrations} onSelectAttendee={handleSelectRegistration} onAddAttendee={handleAddAttendeeClick} onLogout={handleLogout}
+                        searchQuery={searchQuery} onSearchQueryChange={setSearchQuery} statusFilter={statusFilter} onStatusFilterChange={setStatusFilter}
+                        packageFilter={packageFilter} onPackageFilterChange={setPackageFilter} scrollPosition={scrollPosition} onScrollPositionReset={() => setScrollPosition(0)}
+                        events={events} selectedEventId={selectedEventId} onEventChange={setSelectedEventId}
                     />
                 );
         }
     };
 
-    if (!isAuthenticated) {
-        return <Login onLoginSuccess={handleLoginSuccess} />;
-    }
+    useEffect(() => {
+        if(view === 'history') {
+            historyHook.fetchAllHistory();
+        }
+    }, [view, historyHook.fetchAllHistory]);
+
+    if (!isAuthenticated) return <Login onLoginSuccess={handleLoginSuccess} />;
 
     return (
         <div className="bg-zinc-50 font-sans md:max-w-7xl md:mx-auto md:my-8 md:rounded-2xl md:shadow-2xl md:flex flex-grow w-full">
@@ -269,9 +247,47 @@ const AppContent: React.FC = () => {
     );
 };
 
+const AppInitializer: React.FC = () => {
+    const [schemaErrors, setSchemaErrors] = useState<string[] | null>(null);
+    const [isVerifying, setIsVerifying] = useState(true);
+
+    useEffect(() => {
+        const checkSchema = async () => {
+            try {
+                const result = await api.verifySchema();
+                if (!result.success) {
+                    setSchemaErrors(result.missingIn);
+                }
+            } catch (e) {
+                console.error("Error verifying schema:", e);
+                // Fallback for unexpected errors during verification
+                setSchemaErrors(['desconhecido']);
+            } finally {
+                setIsVerifying(false);
+            }
+        };
+        checkSchema();
+    }, []);
+
+    if (isVerifying) {
+        return (
+            <div className="flex justify-center items-center min-h-screen bg-zinc-50">
+                <p className="text-zinc-600 font-semibold animate-pulse">Verificando banco de dados...</p>
+            </div>
+        );
+    }
+
+    if (schemaErrors && schemaErrors.length > 0) {
+        return <DatabaseMigration missingIn={schemaErrors} />;
+    }
+
+    return <AppContent />;
+};
+
+
 const App: React.FC = () => (
     <ToastProvider>
-        <AppContent />
+        <AppInitializer />
         <ToastContainer />
     </ToastProvider>
 );

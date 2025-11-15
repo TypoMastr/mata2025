@@ -17,7 +17,7 @@ interface AttendeeDetailProps {
 }
 
 const SpinnerIcon: React.FC = () => (
-    <svg className="animate-spin h-5 w-5 text-white" xmlns="http://www.w.org/2000/svg" fill="none" viewBox="0 0 24 24">
+    <svg className="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
         <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
         <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
     </svg>
@@ -188,7 +188,8 @@ const AttendeeDetail: React.FC<AttendeeDetailProps> = ({ attendee, onBack, onEdi
         }
     };
 
-    const showInvalidDocAsNotInformed = attendee.packageType === PackageType.SITIO_ONLY && attendee.documentType === DocumentType.OUTRO;
+    // FIX: Access documentType from the nested person object.
+    const showInvalidDocAsNotInformed = attendee.packageType === PackageType.SITIO_ONLY && attendee.person.documentType === DocumentType.OUTRO;
 
 
     return (
@@ -205,9 +206,11 @@ const AttendeeDetail: React.FC<AttendeeDetailProps> = ({ attendee, onBack, onEdi
                     <div className="bg-white p-4 rounded-xl border border-zinc-200 shadow-sm space-y-4 opacity-0 animate-fadeInUp" style={getAnimationStyle(100)}>
                         <DetailRow label="Nome">
                             <div className="flex items-center justify-between">
-                                <p className="font-semibold text-zinc-800">{attendee.name}</p>
+                                {/* FIX: Access name from the nested person object. */}
+                                <p className="font-semibold text-zinc-800">{attendee.person.name}</p>
                                 <button
-                                    onClick={() => handleCopyToClipboard(attendee.name, 'Nome')}
+                                    // FIX: Access name from the nested person object.
+                                    onClick={() => handleCopyToClipboard(attendee.person.name, 'Nome')}
                                     className="p-1.5 text-zinc-400 rounded-full hover:bg-zinc-100 hover:text-zinc-600 transition-colors"
                                     aria-label="Copiar nome"
                                 >
@@ -220,14 +223,16 @@ const AttendeeDetail: React.FC<AttendeeDetailProps> = ({ attendee, onBack, onEdi
                                 {showInvalidDocAsNotInformed ? (
                                     <p className="font-semibold text-zinc-500 italic">Não informado</p>
                                 ) : (
-                                    <p className="font-semibold text-zinc-800">{`${attendee.document} (${attendee.documentType})`}</p>
+                                    // FIX: Access document and documentType from the nested person object.
+                                    <p className="font-semibold text-zinc-800">{`${attendee.person.document} (${attendee.person.documentType})`}</p>
                                 )}
                                 <button
                                     onClick={() => {
                                         if (showInvalidDocAsNotInformed) {
                                             addToast('Documento não informado.', 'info');
                                         } else {
-                                            handleCopyToClipboard(attendee.document, 'Documento');
+                                            // FIX: Access document from the nested person object.
+                                            handleCopyToClipboard(attendee.person.document, 'Documento');
                                         }
                                     }}
                                     className="p-1.5 text-zinc-400 rounded-full hover:bg-zinc-100 hover:text-zinc-600 transition-colors"
@@ -240,23 +245,28 @@ const AttendeeDetail: React.FC<AttendeeDetailProps> = ({ attendee, onBack, onEdi
                         <DetailRow label="Telefone">
                             <div className="flex flex-col items-start gap-2">
                                 <div className="flex items-center justify-between w-full">
-                                    <p className="font-semibold text-zinc-800">{attendee.phone}</p>
+                                    {/* FIX: Access phone from the nested person object. */}
+                                    <p className="font-semibold text-zinc-800">{attendee.person.phone}</p>
                                     <button
-                                        onClick={() => handleCopyToClipboard(attendee.phone, 'Telefone')}
+                                        // FIX: Access phone from the nested person object.
+                                        onClick={() => handleCopyToClipboard(attendee.person.phone, 'Telefone')}
                                         className="p-1.5 text-zinc-400 rounded-full hover:bg-zinc-100 hover:text-zinc-600 transition-colors"
                                         aria-label="Copiar telefone"
                                     >
                                         <CopyIcon />
                                     </button>
                                 </div>
-                                {attendee.phone && (
+                                {/* FIX: Access phone from the nested person object. */}
+                                {attendee.person.phone && (
                                     <a
-                                        href={getWhatsAppUrl(attendee.phone)}
+                                        // FIX: Access phone from the nested person object.
+                                        href={getWhatsAppUrl(attendee.person.phone)}
                                         target="_blank"
                                         rel="noopener noreferrer"
                                         onClick={(e) => e.stopPropagation()}
                                         className="px-3 py-1 text-xs font-semibold text-white bg-green-500 rounded-full hover:bg-green-600 transition-colors shadow-sm"
-                                        aria-label={`Abrir conversa com ${attendee.name} no WhatsApp`}
+                                        // FIX: Access name from the nested person object.
+                                        aria-label={`Abrir conversa com ${attendee.person.name} no WhatsApp`}
                                     >
                                         <span>Abrir no WhatsApp</span>
                                     </a>

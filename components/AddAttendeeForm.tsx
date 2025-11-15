@@ -1,11 +1,13 @@
-import React, { useState, useEffect } from 'react';
-import type { Attendee, AttendeeFormData, PartialPaymentFormDetails } from '../types';
+
+import React, { useState, useEffect, useCallback } from 'react';
+import type { Attendee, AttendeeFormData, PartialPaymentFormDetails, Event, Person } from '../types';
 import { PackageType, PaymentType } from '../types';
 import { formatPhoneNumber, formatDocument, getDocumentType, normalizeString } from '../utils/formatters';
 import { useToast } from '../contexts/ToastContext';
+import * as api from '../services/api';
 
-const SpinnerIcon: React.FC = () => (
-    <svg className="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+const SpinnerIcon: React.FC<{ white?: boolean }> = ({ white = true }) => (
+    <svg className={`animate-spin h-5 w-5 ${white ? 'text-white' : 'text-zinc-700'}`} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
         <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
         <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
     </svg>
@@ -73,11 +75,12 @@ const PartialPaymentFields: React.FC<PartialPaymentFieldsProps> = ({ idPrefix, d
 };
 
 interface AddAttendeeFormProps {
-    onAddAttendee?: (formData: Omit<AttendeeFormData, 'paymentAmount'> & { paymentAmount: number }) => Promise<void>;
+    onAddAttendee?: (formData: AttendeeFormData) => Promise<void>;
     onUpdateAttendee?: (attendee: Attendee) => Promise<void>;
     onCancel: () => void;
     attendeeToEdit?: Attendee | null;
-    attendees: Attendee[];
+    registrations: Attendee[];
+    event: Event | null;
 }
 
 const getInitialPartialPayment = (): PartialPaymentFormDetails => ({
@@ -90,9 +93,10 @@ const getInitialPartialPayment = (): PartialPaymentFormDetails => ({
 const getInitialFormData = (attendee?: Attendee | null): AttendeeFormData => {
     if (attendee) {
         return {
-            name: attendee.name,
-            document: attendee.document,
-            phone: attendee.phone,
+            personId: attendee.person.id,
+            name: attendee.person.name,
+            document: attendee.person.document,
+            phone: attendee.person.phone,
             packageType: attendee.packageType,
             notes: attendee.notes || '',
             paymentAmount: attendee.payment.amount.toString(),
@@ -105,6 +109,7 @@ const getInitialFormData = (attendee?: Attendee | null): AttendeeFormData => {
         };
     }
     return {
+        personId: null,
         name: '',
         document: '',
         phone: '',
@@ -120,24 +125,93 @@ const getInitialFormData = (attendee?: Attendee | null): AttendeeFormData => {
     };
 };
 
-const AddAttendeeForm: React.FC<AddAttendeeFormProps> = ({ onAddAttendee, onUpdateAttendee, onCancel, attendeeToEdit, attendees }) => {
+const AddAttendeeForm: React.FC<AddAttendeeFormProps> = ({ onAddAttendee, onUpdateAttendee, onCancel, attendeeToEdit, registrations, event }) => {
     const { addToast } = useToast();
     const isEditMode = !!attendeeToEdit;
 
     const [formData, setFormData] = useState<AttendeeFormData>(getInitialFormData(attendeeToEdit));
     const [errors, setErrors] = useState<Record<string, string>>({});
     const [isSubmitting, setIsSubmitting] = useState(false);
+    
+    // State for person search
+    const [personSearchQuery, setPersonSearchQuery] = useState('');
+    const [personSearchResults, setPersonSearchResults] = useState<Person[]>([]);
+    const [isSearching, setIsSearching] = useState(false);
+    const [isPersonSelected, setIsPersonSelected] = useState(false);
+
 
     useEffect(() => {
         setFormData(getInitialFormData(attendeeToEdit));
-    }, [attendeeToEdit]);
+        if(isEditMode) {
+             setIsPersonSelected(true);
+        }
+    }, [attendeeToEdit, isEditMode]);
+
+    // Debounced search for people
+    useEffect(() => {
+        if (personSearchQuery.length < 3 || isPersonSelected) {
+            setPersonSearchResults([]);
+            return;
+        }
+
+        const search = async () => {
+            setIsSearching(true);
+            try {
+                const results = await api.searchPeople(personSearchQuery);
+                // Filter out people already registered for the current event
+                const registeredPersonIds = new Set(registrations.map(r => r.person.id));
+                const availableResults = results.filter(p => !registeredPersonIds.has(p.id));
+                setPersonSearchResults(availableResults);
+            } catch (error) {
+                console.error("Failed to search people:", error);
+                addToast('Erro ao buscar pessoas.', 'error');
+            } finally {
+                setIsSearching(false);
+            }
+        };
+
+        const debounceTimer = setTimeout(() => {
+            search();
+        }, 300);
+
+        return () => clearTimeout(debounceTimer);
+    }, [personSearchQuery, isPersonSelected, registrations, addToast]);
+
 
     useEffect(() => {
         if (!isEditMode) {
-            const amount = formData.packageType === PackageType.SITIO_BUS ? '120.00' : '70.00';
+            const sitePrice = event?.site_price ?? 70;
+            const busPrice = event?.bus_price ?? 50;
+            const amount = formData.packageType === PackageType.SITIO_BUS ? (sitePrice + busPrice).toFixed(2) : sitePrice.toFixed(2);
             setFormData(fd => ({ ...fd, paymentAmount: amount }));
         }
-    }, [formData.packageType, isEditMode]);
+    }, [formData.packageType, isEditMode, event]);
+
+    const handleSelectPerson = (person: Person) => {
+        setFormData(prev => ({
+            ...prev,
+            personId: person.id,
+            name: person.name,
+            document: person.document,
+            phone: person.phone,
+        }));
+        setIsPersonSelected(true);
+        setPersonSearchQuery(person.name);
+        setPersonSearchResults([]);
+        setErrors({});
+    };
+
+    const handleClearPersonSelection = () => {
+        setFormData(prev => ({
+            ...prev,
+            personId: null,
+            name: '',
+            document: '',
+            phone: '',
+        }));
+        setIsPersonSelected(false);
+        setPersonSearchQuery('');
+    };
 
     const validateForm = (): boolean => {
         const newErrors: Record<string, string> = {};
@@ -154,23 +228,25 @@ const AddAttendeeForm: React.FC<AddAttendeeFormProps> = ({ onAddAttendee, onUpda
         }
 
         if (!formData.phone.trim() || formData.phone.replace(/\D/g, '').length < 10) newErrors.phone = 'Telefone inválido.';
+        
+        // Only check for duplicates if it's a new person being registered
+        if (!isPersonSelected) {
+            const normalizedName = normalizeString(formData.name);
+            const normalizedDocument = formData.document.replace(/[^\d]/g, '');
 
-        const normalizedName = normalizeString(formData.name);
-        const normalizedDocument = formData.document.replace(/[^\d]/g, '');
-
-        if (normalizedName || normalizedDocument) {
-            const duplicate = attendees.find(a => {
-                if (isEditMode && a.id === attendeeToEdit.id) return false;
-                const existingName = normalizeString(a.name);
-                const existingDoc = a.document.replace(/[^\d]/g, '');
-                if (normalizedDocument && existingDoc && normalizedDocument.length > 3) {
-                    return existingDoc === normalizedDocument;
+            if (normalizedName || normalizedDocument) {
+                const duplicate = registrations.find(a => {
+                    const existingName = normalizeString(a.person.name);
+                    const existingDoc = a.person.document.replace(/[^\d]/g, '');
+                    if (normalizedDocument && existingDoc && normalizedDocument.length > 3) {
+                        return existingDoc === normalizedDocument;
+                    }
+                    return existingName === normalizedName;
+                });
+                if (duplicate) {
+                    if (normalizeString(duplicate.person.name) === normalizedName) newErrors.name = `"${formData.name}" já está na lista deste evento.`;
+                    else newErrors.document = 'Este documento já foi cadastrado para este evento.';
                 }
-                return existingName === normalizedName;
-            });
-            if (duplicate) {
-                if (normalizeString(duplicate.name) === normalizedName) newErrors.name = `"${formData.name}" já está na lista.`;
-                else newErrors.document = 'Este documento já foi cadastrado.';
             }
         }
 
@@ -195,6 +271,16 @@ const AddAttendeeForm: React.FC<AddAttendeeFormProps> = ({ onAddAttendee, onUpda
 
         setFormData(prev => ({ ...prev, [name]: finalValue }));
     };
+    
+    const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const value = e.target.value;
+        setPersonSearchQuery(value);
+        if (isPersonSelected) {
+            setIsPersonSelected(false);
+            setFormData(prev => ({ ...prev, personId: null }));
+        }
+    };
+
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -209,15 +295,18 @@ const AddAttendeeForm: React.FC<AddAttendeeFormProps> = ({ onAddAttendee, onUpda
                 const { type } = getDocumentType(formData.document);
                 const updatedAttendee: Attendee = {
                     ...attendeeToEdit,
-                    name: formData.name.trim(),
-                    document: formData.document,
-                    documentType: type,
-                    phone: formData.phone,
+                    person: {
+                        ...attendeeToEdit.person,
+                        name: formData.name.trim(),
+                        document: formData.document,
+                        documentType: type,
+                        phone: formData.phone,
+                    },
                     packageType: formData.packageType,
                     notes: formData.notes.trim(),
                     payment: {
                         ...attendeeToEdit.payment,
-                        amount: formData.packageType === PackageType.SITIO_BUS ? 120 : 70,
+                        amount: formData.packageType === PackageType.SITIO_BUS ? ((event?.site_price ?? 70) + (event?.bus_price ?? 50)) : (event?.site_price ?? 70),
                     },
                 };
                 await onUpdateAttendee(updatedAttendee);
@@ -228,20 +317,25 @@ const AddAttendeeForm: React.FC<AddAttendeeFormProps> = ({ onAddAttendee, onUpda
                     ...formData,
                     name: formData.name.trim(),
                     notes: formData.notes.trim(),
-                    paymentAmount: parseFloat(formData.paymentAmount),
                 });
                 addToast('Inscrição adicionada com sucesso!', 'success');
                 onCancel();
             }
         } catch (error) {
             console.error(error);
-            addToast('Falha ao salvar inscrição.', 'error');
+            if (error instanceof Error && error.message.includes('duplicate key value')) {
+                 addToast('Esta pessoa já está inscrita neste evento.', 'error');
+            } else {
+                 addToast('Falha ao salvar inscrição.', 'error');
+            }
         } finally {
             setIsSubmitting(false);
         }
     };
 
     const isBusPackage = formData.packageType === PackageType.SITIO_BUS;
+    const sitePriceText = (event?.site_price ?? 70).toFixed(2).replace('.', ',');
+    const totalBusPriceText = ((event?.site_price ?? 70) + (event?.bus_price ?? 50)).toFixed(2).replace('.', ',');
 
     return (
         <div className="animate-fadeIn">
@@ -254,30 +348,86 @@ const AddAttendeeForm: React.FC<AddAttendeeFormProps> = ({ onAddAttendee, onUpda
             <form onSubmit={handleSubmit} className="p-4 space-y-6">
                 <div className="bg-white p-4 rounded-xl border border-zinc-200 shadow-sm space-y-4">
                     <h2 className="text-lg font-bold text-zinc-800">Dados Pessoais</h2>
-                    <FormField label="Nome Completo" id="name" error={errors.name}>
-                        <input type="text" id="name" name="name" value={formData.name} onChange={handleInputChange} className="block w-full px-3 py-2 bg-white border border-zinc-300 rounded-md shadow-sm sm:text-sm focus:outline-none focus:ring-green-500 focus:border-green-500" required autoComplete="off" />
-                    </FormField>
                     
-                    {formData.packageType === PackageType.SITIO_BUS ? (
-                        <div className="animate-fadeIn">
-                            <FormField label="Documento (CPF ou RG)" id="document" error={errors.document}>
-                                <input type="tel" id="document" name="document" value={formData.document} onChange={handleInputChange} className="block w-full px-3 py-2 bg-white border border-zinc-300 rounded-md shadow-sm sm:text-sm focus:outline-none focus:ring-green-500 focus:border-green-500" required autoComplete="off" />
-                                <p className="mt-1 text-xs text-zinc-500">Documento é obrigatório para o seguro do ônibus.</p>
+                    {!isEditMode && (
+                         <div className="relative">
+                            <FormField label="1. Buscar Participante Existente" id="personSearch">
+                                <input
+                                    type="search"
+                                    id="personSearch"
+                                    value={personSearchQuery}
+                                    onChange={handleSearchChange}
+                                    placeholder="Digite um nome para buscar..."
+                                    className="block w-full px-3 py-2 bg-white border border-zinc-300 rounded-md shadow-sm sm:text-sm focus:outline-none focus:ring-green-500 focus:border-green-500"
+                                    autoComplete="off"
+                                />
+                            </FormField>
+                             {isSearching && <div className="absolute right-3 top-9"><SpinnerIcon white={false} /></div>}
+                            {personSearchResults.length > 0 && (
+                                <div className="absolute z-10 w-full mt-1 bg-white border border-zinc-300 rounded-md shadow-lg max-h-60 overflow-auto">
+                                    <ul className="py-1">
+                                        {personSearchResults.map(person => (
+                                            <li key={person.id} onClick={() => handleSelectPerson(person)} className="px-3 py-2 text-sm text-zinc-700 hover:bg-zinc-100 cursor-pointer">
+                                                <p className="font-semibold">{person.name}</p>
+                                                <p className="text-xs text-zinc-500">{person.document}</p>
+                                            </li>
+                                        ))}
+                                    </ul>
+                                </div>
+                            )}
+                        </div>
+                    )}
+                    
+                    {isPersonSelected && !isEditMode && (
+                        <div className="bg-green-50 border-l-4 border-green-500 p-3 rounded-r-lg animate-fadeIn">
+                            <div className="flex justify-between items-center">
+                                <div>
+                                    <p className="font-bold text-green-800">{formData.name}</p>
+                                    <p className="text-sm text-green-700">{formData.document}</p>
+                                </div>
+                                <button type="button" onClick={handleClearPersonSelection} className="text-sm font-semibold text-zinc-600 hover:text-zinc-800">
+                                    Alterar
+                                </button>
+                            </div>
+                        </div>
+                    )}
+
+                    <div className={isPersonSelected ? 'hidden' : 'space-y-4'}>
+                         <p className="text-sm text-zinc-500 text-center border-b pb-4">
+                            {isEditMode ? 'Edite os dados abaixo:' : 'Ou cadastre uma nova pessoa:'}
+                         </p>
+                        <FormField label="Nome Completo" id="name" error={errors.name}>
+                            <input type="text" id="name" name="name" value={formData.name} onChange={handleInputChange} className="block w-full px-3 py-2 bg-white border border-zinc-300 rounded-md shadow-sm sm:text-sm focus:outline-none focus:ring-green-500 focus:border-green-500" required autoComplete="off" disabled={isPersonSelected} />
+                        </FormField>
+                         <FormField label={`Documento (CPF ou RG)${formData.packageType === PackageType.SITIO_BUS ? '' : ' - Opcional'}`} id="document" error={errors.document}>
+                            <input type="tel" id="document" name="document" value={formData.document} onChange={handleInputChange} className="block w-full px-3 py-2 bg-white border border-zinc-300 rounded-md shadow-sm sm:text-sm focus:outline-none focus:ring-green-500 focus:border-green-500" required={formData.packageType === PackageType.SITIO_BUS} autoComplete="off" disabled={isPersonSelected} />
+                        </FormField>
+                         <FormField label="Telefone (com DDD)" id="phone" error={errors.phone}>
+                            <input type="tel" id="phone" name="phone" value={formData.phone} onChange={handleInputChange} placeholder="(21) 99999-9999" className="block w-full px-3 py-2 bg-white border border-zinc-300 rounded-md shadow-sm sm:text-sm focus:outline-none focus:ring-green-500 focus:border-green-500" required autoComplete="off" disabled={isPersonSelected} />
+                        </FormField>
+                    </div>
+
+                    {isEditMode && (
+                         <div className="space-y-4">
+                            <FormField label="Nome Completo" id="name" error={errors.name}>
+                                <input type="text" id="name" name="name" value={formData.name} onChange={handleInputChange} className="block w-full px-3 py-2 bg-white border border-zinc-300 rounded-md shadow-sm sm:text-sm" required autoComplete="off" />
+                            </FormField>
+                            <FormField label={`Documento (CPF ou RG)${formData.packageType === PackageType.SITIO_BUS ? '' : ' - Opcional'}`} id="document" error={errors.document}>
+                                <input type="tel" id="document" name="document" value={formData.document} onChange={handleInputChange} className="block w-full px-3 py-2 bg-white border border-zinc-300 rounded-md shadow-sm sm:text-sm" required={formData.packageType === PackageType.SITIO_BUS} autoComplete="off" />
+                            </FormField>
+                            <FormField label="Telefone (com DDD)" id="phone" error={errors.phone}>
+                                <input type="tel" id="phone" name="phone" value={formData.phone} onChange={handleInputChange} placeholder="(21) 99999-9999" className="block w-full px-3 py-2 bg-white border border-zinc-300 rounded-md shadow-sm sm:text-sm" required autoComplete="off" />
                             </FormField>
                         </div>
-                    ) : null}
-
-                     <FormField label="Telefone (com DDD)" id="phone" error={errors.phone}>
-                        <input type="tel" id="phone" name="phone" value={formData.phone} onChange={handleInputChange} placeholder="(21) 99999-9999" className="block w-full px-3 py-2 bg-white border border-zinc-300 rounded-md shadow-sm sm:text-sm focus:outline-none focus:ring-green-500 focus:border-green-500" required autoComplete="off" />
-                    </FormField>
+                    )}
                 </div>
                 
                 <div className="bg-white p-4 rounded-xl border border-zinc-200 shadow-sm space-y-4">
                     <h2 className="text-lg font-bold text-zinc-800">Pacote e Observações</h2>
                      <FormField label="Pacote" id="packageType" error={errors.packageType}>
                         <select id="packageType" name="packageType" value={formData.packageType} onChange={handleInputChange} className="block w-full px-3 py-2 bg-white border border-zinc-300 rounded-md shadow-sm sm:text-sm focus:outline-none focus:ring-green-500 focus:border-green-500">
-                            <option value={PackageType.SITIO_ONLY}>Apenas Sítio - R$ 70,00</option>
-                            <option value={PackageType.SITIO_BUS}>Sítio + Ônibus - R$ 120,00</option>
+                            <option value={PackageType.SITIO_ONLY}>Apenas Sítio - R$ {sitePriceText}</option>
+                            <option value={PackageType.SITIO_BUS}>Sítio + Ônibus - R$ {totalBusPriceText}</option>
                         </select>
                     </FormField>
                     <FormField label="Observações" id="notes" error={errors.notes}>
@@ -297,16 +447,16 @@ const AddAttendeeForm: React.FC<AddAttendeeFormProps> = ({ onAddAttendee, onUpda
                                 {isBusPackage ? (
                                     <div className="space-y-4">
                                         <div>
-                                            <h3 className="font-bold text-zinc-700 mb-2">Pagamento Sítio (R$ 70,00)</h3>
+                                            <h3 className="font-bold text-zinc-700 mb-2">Pagamento Sítio (R$ {sitePriceText})</h3>
                                             <PartialPaymentFields idPrefix="site" details={formData.sitePayment} onUpdate={(updates) => setFormData(fd => ({ ...fd, sitePayment: { ...fd.sitePayment, ...updates } }))} />
                                         </div>
                                         <div>
-                                            <h3 className="font-bold text-zinc-700 mb-2">Pagamento Ônibus (R$ 50,00)</h3>
+                                            <h3 className="font-bold text-zinc-700 mb-2">Pagamento Ônibus (R$ {(event?.bus_price ?? 50).toFixed(2).replace('.',',')})</h3>
                                             <PartialPaymentFields idPrefix="bus" details={formData.busPayment} onUpdate={(updates) => setFormData(fd => ({ ...fd, busPayment: { ...fd.busPayment, ...updates } }))} />
                                         </div>
                                     </div>
                                 ) : (
-                                    <PartialPaymentFields idPrefix="single" details={{ isPaid: true, date: formData.paymentDate, dateNotInformed: formData.paymentDateNotInformed, type: formData.paymentType }} onUpdate={({date, dateNotInformed, type}) => setFormData(fd => ({...fd, paymentDate: date !== undefined ? date : fd.paymentDate, paymentDateNotInformed: dateNotInformed !== undefined ? dateNotInformed : fd.paymentDateNotInformed, paymentType: type !== undefined ? type : fd.paymentType }))} />
+                                    <PartialPaymentFields idPrefix="single" details={{ isPaid: true, date: formData.paymentDate, dateNotInformed: formData.paymentDateNotInformed, type: formData.paymentType }} onUpdate={({date, dateNotInformed, type}) => setFormData(fd => ({...fd, paymentDate: date !== undefined ? date : fd.paymentDate, paymentDateNotInformed: dateNotInformed !== undefined ? dateNotInformed : fd.paymentDateNotInformed, type: type !== undefined ? type : fd.paymentType }))} />
                                 )}
                             </div>
                         )}
@@ -315,7 +465,7 @@ const AddAttendeeForm: React.FC<AddAttendeeFormProps> = ({ onAddAttendee, onUpda
                 
                 <div className="flex flex-col md:flex-row gap-4 pt-2">
                     <button type="button" onClick={onCancel} className="w-full bg-zinc-200 text-zinc-800 font-bold py-3 px-4 rounded-full hover:bg-zinc-300 transition-colors">Cancelar</button>
-                    <button type="submit" disabled={isSubmitting} className="w-full bg-green-500 text-white font-bold py-3 px-4 rounded-full flex items-center justify-center gap-2 hover:bg-green-600 shadow-sm disabled:bg-green-400">
+                    <button type="submit" disabled={isSubmitting || (!isPersonSelected && !formData.name)} className="w-full bg-green-500 text-white font-bold py-3 px-4 rounded-full flex items-center justify-center gap-2 hover:bg-green-600 shadow-sm disabled:bg-green-400 disabled:cursor-not-allowed">
                         {isSubmitting ? <><SpinnerIcon /> Salvando...</> : (isEditMode ? 'Salvar Alterações' : 'Salvar Inscrição')}
                     </button>
                 </div>

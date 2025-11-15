@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import type { Attendee } from '../types';
+import type { Attendee, Event } from '../types';
 import AttendeeListItem from './AttendeeListItem';
 import { PaymentStatus, PackageType } from '../types';
 import { normalizeString, getWhatsAppUrl } from '../utils/formatters';
@@ -17,6 +17,10 @@ interface AttendeeListProps {
     onPackageFilterChange: (filter: 'all' | PackageType) => void;
     scrollPosition: number;
     onScrollPositionReset: () => void;
+    // FIX: Add props for event selection
+    events: Event[];
+    selectedEventId: string | null;
+    onEventChange: (id: string | null) => void;
 }
 
 const FilterPill: React.FC<{ label: string; isActive: boolean; onClick: () => void; }> = ({ label, isActive, onClick }) => {
@@ -84,7 +88,10 @@ const AttendeeList: React.FC<AttendeeListProps> = ({
     packageFilter,
     onPackageFilterChange,
     scrollPosition,
-    onScrollPositionReset
+    onScrollPositionReset,
+    events,
+    selectedEventId,
+    onEventChange,
 }) => {
 
     useEffect(() => {
@@ -102,7 +109,8 @@ const AttendeeList: React.FC<AttendeeListProps> = ({
         const normalizedSearchQuery = normalizeString(searchQuery);
         const filtered = attendees
             .filter(attendee =>
-                normalizeString(attendee.name).includes(normalizedSearchQuery)
+                // FIX: Access name from the nested person object.
+                normalizeString(attendee.person.name).includes(normalizedSearchQuery)
             )
             .filter(attendee =>
                 statusFilter === 'all' || attendee.payment.status === statusFilter
@@ -111,7 +119,8 @@ const AttendeeList: React.FC<AttendeeListProps> = ({
                 packageFilter === 'all' || attendee.packageType === packageFilter
             );
         
-        return [...filtered].sort((a, b) => a.name.localeCompare(b.name));
+        // FIX: Access name from the nested person object for sorting.
+        return [...filtered].sort((a, b) => a.person.name.localeCompare(b.person.name));
     }, [attendees, searchQuery, statusFilter, packageFilter]);
 
 
@@ -137,6 +146,22 @@ const AttendeeList: React.FC<AttendeeListProps> = ({
                     </div>
                 </div>
 
+                {events.length > 1 && (
+                    <div className="pt-2">
+                        <label htmlFor="event-selector" className="block text-sm font-medium text-zinc-700">Filtrar por Evento</label>
+                        <select
+                            id="event-selector"
+                            value={selectedEventId || ''}
+                            onChange={(e) => onEventChange(e.target.value)}
+                            className="mt-1 block w-full pl-3 pr-10 py-2 text-base border-zinc-300 focus:outline-none focus:ring-green-500 focus:border-green-500 sm:text-sm rounded-md shadow-sm"
+                        >
+                            {events.map(event => (
+                                <option key={event.id} value={event.id}>{event.name}</option>
+                            ))}
+                        </select>
+                    </div>
+                )}
+                
                 <div className="relative">
                     <input
                         type="search"
@@ -197,10 +222,12 @@ const AttendeeList: React.FC<AttendeeListProps> = ({
                                 <tbody className="bg-white divide-y divide-zinc-200">
                                     {sortedAttendees.map((attendee) => (
                                         <tr key={attendee.id} onClick={() => onSelectAttendee(attendee.id)} className="hover:bg-zinc-50 cursor-pointer transition-colors">
-                                            <td className="px-6 py-4"><div className="text-sm font-medium text-zinc-900">{attendee.name}</div></td>
+                                            {/* FIX: Access name from the nested person object. */}
+                                            <td className="px-6 py-4"><div className="text-sm font-medium text-zinc-900">{attendee.person.name}</div></td>
                                             <td className="px-6 py-4"><div className="flex items-center text-sm text-zinc-500"><PackageIcon packageType={attendee.packageType} />{attendee.packageType}</div></td>
                                             <td className="px-6 py-4"><StatusBadge attendee={attendee} /></td>
-                                            <td className="px-6 py-4 text-sm text-zinc-500">{attendee.phone}</td>
+                                            {/* FIX: Access phone from the nested person object. */}
+                                            <td className="px-6 py-4 text-sm text-zinc-500">{attendee.person.phone}</td>
                                             <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                                                 <span className="text-green-600 hover:text-green-900 flex items-center justify-end">
                                                    Ver

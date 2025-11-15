@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import * as authService from '../services/authService';
+import type { Event } from '../types';
 
 const InfoCard: React.FC<{ icon: React.ReactElement; title: string; children: React.ReactNode; delay: number; }> = ({ icon, title, children, delay }) => (
     <div className="bg-white p-4 rounded-xl border border-zinc-200 shadow-sm opacity-0 animate-fadeInUp" style={{ animationDelay: `${delay}ms`, animationFillMode: 'forwards' }}>
@@ -96,12 +97,32 @@ const Highlight: React.FC<{ children: React.ReactNode }> = ({ children }) => (
     <strong className="font-bold text-green-600">{children}</strong>
 );
 
-const InfoPage: React.FC<{ onLogout: () => void; }> = ({ onLogout }) => {
-    // FIX: Added className to SVG elements to avoid using React.cloneElement.
+const formatDate = (dateString?: string) => {
+    if (!dateString) return 'N/A';
+    return new Date(dateString).toLocaleDateString('pt-BR', {
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric',
+        timeZone: 'UTC',
+    });
+};
+
+const InfoPage: React.FC<{ onLogout: () => void; event: Event | null }> = ({ onLogout, event }) => {
     const IconCalendar = <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 012.25-2.25h13.5A2.25 2.25 0 0121 7.5v11.25m-18 0A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75m-18 0h18M-4.5 12h22.5" /></svg>;
     const IconDollar = <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M12 6v12m-3-2.818l.879.659c1.171.879 3.07.879 4.242 0 1.172-.879 1.172-2.303 0-3.182C13.536 12.219 12.768 12 12 12c-.725 0-1.45-.22-2.003-.659-1.106-.879-1.106-2.303 0-3.182s2.9-.879 4.006 0l.415.33M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>;
     const IconClipboard = <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M9 12h3.75M9 15h3.75M9 18h3.75m3 .75H18a2.25 2.25 0 002.25-2.25V6.108c0-1.135-.845-2.098-1.976-2.192a48.424 48.424 0 00-1.123-.08m-5.801 0c-.065.21-.1.433-.1.664 0 .414.336.75.75.75h4.5a.75.75 0 00.75-.75c0-.231-.035-.454-.1-.664M6.75 7.5h10.5a2.25 2.25 0 012.25 2.25v7.5a2.25 2.25 0 01-2.25-2.25H6.75a2.25 2.25 0 01-2.25-2.25v-7.5a2.25 2.25 0 012.25-2.25z" /></svg>;
     const IconBus = <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M8.25 18.75a1.5 1.5 0 01-3 0m3 0a1.5 1.5 0 00-3 0m3 0h6m-9 0H3.375a1.125 1.125 0 01-1.125-1.125V14.25m17.25 4.5a1.5 1.5 0 01-3 0m3 0a1.5 1.5 0 00-3 0m3 0h1.125c.621 0 1.125-.504 1.125-1.125V14.25m-17.25 4.5v-1.875a3.375 3.375 0 013.375-3.375h9.75a3.375 3.375 0 013.375 3.375v1.875m-17.25 4.5h15M6.375 12h11.25" /></svg>;
+
+    if (!event) {
+        return (
+             <div className="flex justify-center items-center h-full p-8">
+                <div className="text-center">
+                    <h2 className="text-xl font-bold text-zinc-700">Nenhum evento selecionado</h2>
+                    <p className="text-zinc-500 mt-2">Vá para a página de 'Gestão' para criar um novo evento.</p>
+                </div>
+            </div>
+        );
+    }
 
     return (
         <div className="pb-4 animate-fadeIn">
@@ -115,24 +136,24 @@ const InfoPage: React.FC<{ onLogout: () => void; }> = ({ onLogout }) => {
             </header>
             <main className="p-4 space-y-4 md:grid md:grid-cols-2 md:gap-4 md:space-y-0">
                 <BiometricsCard />
-                <InfoCard icon={IconCalendar} title="Gira da Mata 2025" delay={150}>
-                    <InfoItem label="Data"><Highlight>06/12/2025</Highlight></InfoItem>
-                    <InfoItem label="Local"><p>Maricá</p></InfoItem>
-                    <InfoItem label="Horário das atividades"><p>9:30 às 18:00</p></InfoItem>
+                <InfoCard icon={IconCalendar} title={event.name} delay={150}>
+                    <InfoItem label="Data"><Highlight>{formatDate(event.event_date)}</Highlight></InfoItem>
+                    <InfoItem label="Local"><p>{event.location}</p></InfoItem>
+                    <InfoItem label="Horário das atividades"><p>{event.activity_time}</p></InfoItem>
                 </InfoCard>
 
                 <InfoCard icon={IconDollar} title="Valores e Pagamento" delay={200}>
-                    <InfoItem label="Entrada (Sítio + Tenda)"><p><Highlight>R$ 70,00</Highlight> por pessoa. Menores de 14 anos não pagam.</p></InfoItem>
-                    <InfoItem label="Formas de Pagamento"><p>Cartão de Débito/Crédito e PIX.</p><p className="mt-1 p-2 bg-zinc-100 rounded-md text-center font-mono">Chave Pix: <Highlight>teuco@teuco.com.br</Highlight></p></InfoItem>
+                    <InfoItem label="Entrada (Sítio + Tenda)"><p><Highlight>R$ {event.site_price.toFixed(2)}</Highlight> por pessoa. Menores de 14 anos não pagam.</p></InfoItem>
+                    <InfoItem label="Formas de Pagamento"><p>Cartão de Débito/Crédito e PIX.</p><p className="mt-1 p-2 bg-zinc-100 rounded-md text-center font-mono">Chave Pix: <Highlight>{event.pix_key}</Highlight></p></InfoItem>
                     <InfoItem label="Condição Especial (Médiuns)"><p>Pagamento parcelado em 2x (outubro e novembro) incluindo o ônibus.</p></InfoItem>
                     <InfoItem label="Local de Pagamento"><p>Todos os pagamentos devem ser feitos no Bazar, apresentando o comprovante PIX. Não pagar na cantina.</p></InfoItem>
                 </InfoCard>
                 
                 <InfoCard icon={IconBus} title="Ônibus Fretado" delay={250}>
-                    <InfoItem label="Valor"><p><Highlight>R$ 50,00</Highlight> por pessoa. Crianças até 6 anos, no colo, não pagam.</p></InfoItem>
-                    <InfoItem label="Saída"><p>T.E.U.CO. às <Highlight>7:30</Highlight> (chegar com 20 min de antecedência). <strong className="text-red-600">Sem tolerância de atraso.</strong></p></InfoItem>
-                    <InfoItem label="Retorno"><p><Highlight>19:00</Highlight>, com desembarque apenas na T.E.U.CO.</p></InfoItem>
-                    <InfoItem label="Compromisso de Pagamento"><p>Reserva de vaga implica pagamento até <Highlight>22/11/2025</Highlight>.</p></InfoItem>
+                    <InfoItem label="Valor"><p><Highlight>R$ {event.bus_price.toFixed(2)}</Highlight> por pessoa. Crianças até 6 anos, no colo, não pagam.</p></InfoItem>
+                    <InfoItem label="Saída"><p>T.E.U.CO. às <Highlight>{event.bus_departure_time}</Highlight> (chegar com 20 min de antecedência). <strong className="text-red-600">Sem tolerância de atraso.</strong></p></InfoItem>
+                    <InfoItem label="Retorno"><p><Highlight>{event.bus_return_time}</Highlight>, com desembarque apenas na T.E.U.CO.</p></InfoItem>
+                    <InfoItem label="Compromisso de Pagamento"><p>Reserva de vaga implica pagamento até <Highlight>{formatDate(event.payment_deadline)}</Highlight>.</p></InfoItem>
                     <InfoItem label="Obrigatório"><p>Informar nome completo e RG/CPF de todos os passageiros para o seguro e levar documento com foto no dia.</p></InfoItem>
                 </InfoCard>
 

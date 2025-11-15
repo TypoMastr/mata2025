@@ -1,6 +1,8 @@
+
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
-import { useAttendees } from './hooks/useAttendees';
-import type { View, Attendee, AttendeeFormData } from './types';
+import { useRegistrations } from './hooks/useAttendees';
+import { useEvents } from './hooks/useEvents';
+import type { View, Registration, RegistrationFormData, Event } from './types';
 import { PaymentStatus, PackageType } from './types';
 import AttendeeList from './components/AttendeeList';
 import AttendeeDetail from './components/AttendeeDetail';
@@ -13,18 +15,29 @@ import ConfirmDeletePayment from './components/ConfirmDeletePayment';
 import InfoPage from './components/Info';
 import Login from './components/Login';
 import SideNav from './components/SideNav';
+import ManagementPage from './components/management/ManagementPage';
 import { ToastProvider, useToast } from './contexts/ToastContext';
 import ToastContainer from './components/ToastContainer';
 
 const AppContent: React.FC = () => {
-    const { attendees, isLoading, addAttendee, updateAttendee, deleteAttendee } = useAttendees();
+    const { events, isLoading: isLoadingEvents, addEvent, updateEvent } = useEvents();
+    const [selectedEventId, setSelectedEventId] = useState<string | null>(null);
+
+    const { 
+        registrations, 
+        isLoading: isLoadingRegistrations, 
+        addRegistration, 
+        updateRegistration, 
+        deleteRegistration 
+    } = useRegistrations(selectedEventId);
+    
     const { addToast } = useToast();
     const [isAuthenticated, setIsAuthenticated] = useState(false);
     const [view, setView] = useState<View>('list');
     const [previousView, setPreviousView] = useState<View>('list');
-    const [selectedAttendeeId, setSelectedAttendeeId] = useState<string | null>(null);
-    const [attendeeToDelete, setAttendeeToDelete] = useState<Attendee | null>(null);
-    const [attendeePaymentToDelete, setAttendeePaymentToDelete] = useState<Attendee | null>(null);
+    const [selectedRegistrationId, setSelectedRegistrationId] = useState<string | null>(null);
+    const [registrationToDelete, setRegistrationToDelete] = useState<Registration | null>(null);
+    const [registrationPaymentToDelete, setRegistrationPaymentToDelete] = useState<Registration | null>(null);
 
     // State for list persistence
     const [searchQuery, setSearchQuery] = useState('');
@@ -32,20 +45,26 @@ const AppContent: React.FC = () => {
     const [packageFilter, setPackageFilter] = useState<'all' | PackageType>('all');
     const [scrollPosition, setScrollPosition] = useState(0);
 
-    const busAttendeesCount = useMemo(() => attendees.filter(a => a.packageType === PackageType.SITIO_BUS).length, [attendees]);
+    useEffect(() => {
+        if (!selectedEventId && events.length > 0) {
+            setSelectedEventId(events[0].id);
+        }
+    }, [events, selectedEventId]);
+
+    const busAttendeesCount = useMemo(() => registrations.filter(a => a.packageType === PackageType.SITIO_BUS).length, [registrations]);
     const totalBuses = useMemo(() => {
         const BUS_CAPACITY = 50;
         return Math.ceil(busAttendeesCount / BUS_CAPACITY) || (busAttendeesCount > 0 ? 1 : 0);
     }, [busAttendeesCount]);
 
     const busAssignments = useMemo(() => {
-        return attendees.reduce((acc, attendee) => {
-            if (attendee.busNumber) {
-                acc[attendee.busNumber] = (acc[attendee.busNumber] || 0) + 1;
+        return registrations.reduce((acc, registration) => {
+            if (registration.busNumber) {
+                acc[registration.busNumber] = (acc[registration.busNumber] || 0) + 1;
             }
             return acc;
         }, {} as Record<number, number>);
-    }, [attendees]);
+    }, [registrations]);
 
     useEffect(() => {
         const loggedIn = sessionStorage.getItem('isAuthenticated') === 'true';
@@ -66,27 +85,31 @@ const AppContent: React.FC = () => {
     }, []);
 
 
-    const selectedAttendee = useMemo(() => {
-        return attendees.find(a => a.id === selectedAttendeeId) || null;
-    }, [attendees, selectedAttendeeId]);
+    const selectedRegistration = useMemo(() => {
+        return registrations.find(a => a.id === selectedRegistrationId) || null;
+    }, [registrations, selectedRegistrationId]);
+    
+    const selectedEvent = useMemo(() => {
+        return events.find(e => e.id === selectedEventId) || null;
+    }, [events, selectedEventId]);
 
-    const handleSelectAttendee = useCallback((id: string) => {
+    const handleSelectRegistration = useCallback((id: string) => {
         if (view !== 'detail') {
             setPreviousView(view);
         }
         setScrollPosition(window.scrollY); // Store scroll position before navigating
-        setSelectedAttendeeId(id);
+        setSelectedRegistrationId(id);
         setView('detail');
     }, [view]);
 
     const handleAddAttendeeClick = useCallback(() => {
         setPreviousView('list');
-        setSelectedAttendeeId(null);
+        setSelectedRegistrationId(null);
         setView('form');
     }, []);
 
     const handleCancel = useCallback(() => {
-        setSelectedAttendeeId(null);
+        setSelectedRegistrationId(null);
         setView(previousView);
     }, [previousView]);
     
@@ -97,43 +120,39 @@ const AppContent: React.FC = () => {
     const handleShowPaymentForm = useCallback(() => {
         setView('payment');
     }, []);
-    
-    const handleEditPayment = useCallback(() => {
-        setView('editPayment');
-    }, []);
 
-    const handleDeleteRequest = useCallback((attendee: Attendee) => {
-        setAttendeeToDelete(attendee);
+    const handleDeleteRequest = useCallback((registration: Registration) => {
+        setRegistrationToDelete(registration);
     }, []);
 
     const handleConfirmDelete = useCallback(async () => {
-        if (attendeeToDelete) {
+        if (registrationToDelete) {
             try {
-                await deleteAttendee(attendeeToDelete.id);
-                addToast(`Inscrição de ${attendeeToDelete.name} excluída.`, 'success');
-                setAttendeeToDelete(null);
+                await deleteRegistration(registrationToDelete.id);
+                addToast(`Inscrição de ${registrationToDelete.person.name} excluída.`, 'success');
+                setRegistrationToDelete(null);
                 setView('list');
             } catch (error) {
                 addToast('Falha ao excluir inscrição.', 'error');
                 console.error(error);
             }
         }
-    }, [attendeeToDelete, deleteAttendee, addToast]);
+    }, [registrationToDelete, deleteRegistration, addToast]);
     
     const handleCancelDelete = useCallback(() => {
-        setAttendeeToDelete(null);
+        setRegistrationToDelete(null);
     }, []);
 
-    const handleDeletePaymentRequest = useCallback((attendee: Attendee) => {
-        setAttendeePaymentToDelete(attendee);
+    const handleDeletePaymentRequest = useCallback((registration: Registration) => {
+        setRegistrationPaymentToDelete(registration);
     }, []);
 
     const handleConfirmDeletePayment = useCallback(async () => {
-        if (attendeePaymentToDelete) {
-            const attendeeToUpdate: Attendee = {
-                ...attendeePaymentToDelete,
+        if (registrationPaymentToDelete) {
+            const registrationToUpdate: Registration = {
+                ...registrationPaymentToDelete,
                 payment: {
-                    ...attendeePaymentToDelete.payment,
+                    ...registrationPaymentToDelete.payment,
                     status: PaymentStatus.PENDENTE,
                     date: undefined,
                     type: undefined,
@@ -141,33 +160,37 @@ const AppContent: React.FC = () => {
                 }
             };
              try {
-                await updateAttendee(attendeeToUpdate);
+                await updateRegistration(registrationToUpdate);
                 addToast('Pagamento removido com sucesso.', 'success');
-                setAttendeePaymentToDelete(null);
+                setRegistrationPaymentToDelete(null);
                 setView('detail');
             } catch (error) {
                 addToast('Falha ao remover pagamento.', 'error');
                 console.error(error);
             }
         }
-    }, [attendeePaymentToDelete, updateAttendee, addToast]);
+    }, [registrationPaymentToDelete, updateRegistration, addToast]);
     
     const handleCancelDeletePayment = useCallback(() => {
-        setAttendeePaymentToDelete(null);
+        setRegistrationPaymentToDelete(null);
     }, []);
 
 
-    const handleSaveAttendee = useCallback(async (formData: Omit<AttendeeFormData, 'paymentAmount'> & { paymentAmount: number }) => {
-        await addAttendee(formData);
-    }, [addAttendee]);
+    const handleSaveRegistration = useCallback(async (formData: RegistrationFormData) => {
+        if (!selectedEventId) {
+            addToast('Nenhum evento selecionado.', 'error');
+            return;
+        }
+        await addRegistration(formData, selectedEventId);
+    }, [addRegistration, selectedEventId, addToast]);
 
-    const handleUpdateAttendee = useCallback(async (updatedAttendee: Attendee) => {
-        await updateAttendee(updatedAttendee);
-    }, [updateAttendee]);
+    const handleUpdateRegistration = useCallback(async (updatedRegistration: Registration) => {
+        await updateRegistration(updatedRegistration);
+    }, [updateRegistration]);
 
-    const handleRegisterPayment = useCallback(async (updatedAttendee: Attendee) => {
+    const handleRegisterPayment = useCallback(async (updatedRegistration: Registration) => {
         try {
-            await updateAttendee(updatedAttendee);
+            await updateRegistration(updatedRegistration);
             setView('detail');
             addToast('Pagamento salvo com sucesso.', 'success');
         } catch (error) {
@@ -176,33 +199,38 @@ const AppContent: React.FC = () => {
              // Re-throw to allow form to handle its submitting state
              throw error;
         }
-    }, [updateAttendee, addToast]);
+    }, [updateRegistration, addToast]);
 
     const renderContent = () => {
-        if (isLoading) {
+        if (isLoadingEvents || (selectedEventId && isLoadingRegistrations)) {
             return <div className="flex justify-center items-center h-screen"><p>Carregando...</p></div>;
         }
 
         switch (view) {
             case 'detail':
-                return selectedAttendee && <AttendeeDetail attendee={selectedAttendee} onBack={handleCancel} onEdit={handleEdit} onDelete={handleDeleteRequest} onManagePayment={handleShowPaymentForm} onUpdateAttendee={handleUpdateAttendee} totalBuses={totalBuses} busAssignments={busAssignments} />;
+                return selectedRegistration && <AttendeeDetail attendee={selectedRegistration} onBack={handleCancel} onEdit={handleEdit} onDelete={handleDeleteRequest} onManagePayment={handleShowPaymentForm} onUpdateAttendee={handleUpdateRegistration} totalBuses={totalBuses} busAssignments={busAssignments} />;
             case 'form':
-                return <AddAttendeeForm onAddAttendee={handleSaveAttendee} onCancel={handleCancel} attendees={attendees} />;
+                // FIX: Pass registrations to AddAttendeeForm. The prop type in the component was also fixed to match.
+                return <AddAttendeeForm onAddAttendee={handleSaveRegistration} onCancel={handleCancel} registrations={registrations} event={selectedEvent} />;
             case 'editForm':
-                 return selectedAttendee && <AddAttendeeForm onUpdateAttendee={handleUpdateAttendee} onCancel={() => setView('detail')} attendeeToEdit={selectedAttendee} attendees={attendees} />;
+                 // FIX: Pass registrations to AddAttendeeForm. The prop in the component was renamed from 'attendees' to 'registrations'.
+                 return selectedRegistration && <AddAttendeeForm onUpdateAttendee={handleUpdateRegistration} onCancel={() => setView('detail')} attendeeToEdit={selectedRegistration} registrations={registrations} event={selectedEvent} />;
             case 'payment':
-            case 'editPayment':
-                return selectedAttendee && <RegisterPaymentForm attendee={selectedAttendee} onRegisterPayment={handleRegisterPayment} onCancel={() => setView('detail')} onDeletePayment={handleDeletePaymentRequest} />;
+                return selectedRegistration && <RegisterPaymentForm attendee={selectedRegistration} onRegisterPayment={handleRegisterPayment} onCancel={() => setView('detail')} onDeletePayment={handleDeletePaymentRequest} />;
              case 'reports':
-                return <Reports attendees={attendees} onLogout={handleLogout} onUpdateAttendee={updateAttendee} onSelectAttendee={handleSelectAttendee} />;
+                // FIX: Removed unused 'event' prop to match component's props interface.
+                return <Reports attendees={registrations} onLogout={handleLogout} onUpdateAttendee={updateRegistration} onSelectAttendee={handleSelectRegistration} event={selectedEvent} />;
              case 'info':
-                return <InfoPage onLogout={handleLogout} />;
+                return <InfoPage onLogout={handleLogout} event={selectedEvent} />;
+             case 'management':
+                return <ManagementPage events={events} onAddEvent={addEvent} onUpdateEvent={updateEvent} onLogout={handleLogout} />;
             case 'list':
             default:
                 return (
+                    // FIX: Pass events, selectedEventId, and onEventChange to AttendeeList. The component props were updated to accept these.
                     <AttendeeList 
-                        attendees={attendees} 
-                        onSelectAttendee={handleSelectAttendee} 
+                        attendees={registrations} 
+                        onSelectAttendee={handleSelectRegistration} 
                         onAddAttendee={handleAddAttendeeClick} 
                         onLogout={handleLogout}
                         searchQuery={searchQuery}
@@ -213,6 +241,9 @@ const AppContent: React.FC = () => {
                         onPackageFilterChange={setPackageFilter}
                         scrollPosition={scrollPosition}
                         onScrollPositionReset={() => setScrollPosition(0)}
+                        events={events}
+                        selectedEventId={selectedEventId}
+                        onEventChange={setSelectedEventId}
                     />
                 );
         }
@@ -226,11 +257,11 @@ const AppContent: React.FC = () => {
         <div className="bg-zinc-50 font-sans md:max-w-7xl md:mx-auto md:my-8 md:rounded-2xl md:shadow-2xl md:flex flex-grow w-full">
              <SideNav currentView={view} setView={setView} />
             <div className="flex-grow min-h-screen-mobile relative flex flex-col overflow-hidden md:min-h-0">
-                <main key={view} className="flex-grow overflow-y-auto pb-20 md:pb-0">
+                <main key={view + selectedEventId} className="flex-grow overflow-y-auto pb-20 md:pb-0">
                     {renderContent()}
                 </main>
-                {attendeeToDelete && <ConfirmDelete attendee={attendeeToDelete} onConfirm={handleConfirmDelete} onCancel={handleCancelDelete} />}
-                {attendeePaymentToDelete && <ConfirmDeletePayment attendee={attendeePaymentToDelete} onConfirm={handleConfirmDeletePayment} onCancel={handleCancelDeletePayment} />}
+                {registrationToDelete && <ConfirmDelete attendee={registrationToDelete} onConfirm={handleConfirmDelete} onCancel={handleCancelDelete} />}
+                {registrationPaymentToDelete && <ConfirmDeletePayment attendee={registrationPaymentToDelete} onConfirm={handleConfirmDeletePayment} onCancel={handleCancelDeletePayment} />}
                 <BottomNav currentView={view} setView={setView} />
             </div>
         </div>

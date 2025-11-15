@@ -1,9 +1,12 @@
+
 import React, { useState, useMemo } from 'react';
-import type { Attendee, ReportConfig, ReportField } from '../types';
+// FIX: Import Event type
+import type { Attendee, ReportConfig, ReportField, Event } from '../types';
 import { PackageType, PaymentStatus, DocumentType, PaymentType } from '../types';
 import { formatDocument, getDocumentType } from '../utils/formatters';
 import { levenshteinDistance } from '../utils/stringSimilarity';
 import { useToast } from '../contexts/ToastContext';
+import { generateReport } from '../services/geminiService';
 
 // --- Componente: Modal de Confirmação de Mudança de Ônibus ---
 const SpinnerIconModal: React.FC = () => (
@@ -32,19 +35,22 @@ const BusChangeConfirmationModal: React.FC<BusChangeConfirmationModalProps> = ({
         if (assignmentType === 'auto' && newBusNumber !== null) {
             return {
                 title: "Confirmar Designação Manual",
-                description: `Você está movendo "${attendee.name}" para o Ônibus ${newBusNumber}. Isso o tornará um passageiro designado manualmente e o fixará neste ônibus. Deseja continuar?`,
+                // FIX: Access name from the nested person object.
+                description: `Você está movendo "${attendee.person.name}" para o Ônibus ${newBusNumber}. Isso o tornará um passageiro designado manualmente e o fixará neste ônibus. Deseja continuar?`,
             };
         }
         if (currentBusNumber !== null && newBusNumber !== null && currentBusNumber !== newBusNumber) {
             return {
                 title: "Confirmar Mudança de Ônibus",
-                description: `Você tem certeza que deseja mover "${attendee.name}" do Ônibus ${currentBusNumber} para o Ônibus ${newBusNumber}?`,
+                // FIX: Access name from the nested person object.
+                description: `Você tem certeza que deseja mover "${attendee.person.name}" do Ônibus ${currentBusNumber} para o Ônibus ${newBusNumber}?`,
             };
         }
         if (currentBusNumber !== null && newBusNumber === null) {
             return {
                 title: "Remover Designação Manual",
-                description: `Você está removendo a designação manual de "${attendee.name}". Ele voltará a ser alocado automaticamente em um ônibus com vagas. Deseja continuar?`,
+                // FIX: Access name from the nested person object.
+                description: `Você está removendo a designação manual de "${attendee.person.name}". Ele voltará a ser alocado automaticamente em um ônibus com vagas. Deseja continuar?`,
             };
         }
         return { title: "Confirmar Alteração", description: "Por favor, confirme a sua ação." };
@@ -105,17 +111,19 @@ const ShareOptionsModal: React.FC<{
 
 // --- Componente: Formulário de Geração de Relatório ---
 const InteractiveReportForm: React.FC<{ onGenerate: (config: ReportConfig) => void; onCancel: () => void; }> = ({ onGenerate, onCancel }) => {
+    // FIX: Use correct ReportField values with dot notation for person fields.
     const allFields: { id: ReportField; label: string }[] = [
-        { id: 'name', label: 'Nome' },
-        { id: 'document', label: 'Documento' },
-        { id: 'phone', label: 'Telefone' },
+        { id: 'person.name', label: 'Nome' },
+        { id: 'person.document', label: 'Documento' },
+        { id: 'person.phone', label: 'Telefone' },
         { id: 'packageType', label: 'Pacote' },
         { id: 'payment.status', label: 'Status do Pagamento' },
         { id: 'payment.amount', label: 'Valor' },
     ];
 
     const [reportType, setReportType] = useState<'custom' | 'busList'>('custom');
-    const [selectedFields, setSelectedFields] = useState<ReportField[]>(['name', 'phone', 'packageType', 'payment.status']);
+    // FIX: Use correct ReportField values for initial state.
+    const [selectedFields, setSelectedFields] = useState<ReportField[]>(['person.name', 'person.phone', 'packageType', 'payment.status']);
     const [statusFilter, setStatusFilter] = useState<'all' | PaymentStatus>('all');
     const [packageFilter, setPackageFilter] = useState<'all' | PackageType>('all');
 
@@ -131,7 +139,8 @@ const InteractiveReportForm: React.FC<{ onGenerate: (config: ReportConfig) => vo
         }
         onGenerate({
             type: reportType,
-            fields: reportType === 'busList' ? ['name', 'document', 'phone'] : selectedFields,
+            // FIX: Use correct ReportField values for bus list.
+            fields: reportType === 'busList' ? ['person.name', 'person.document', 'person.phone'] : selectedFields,
             filters: { status: statusFilter, packageType: packageFilter }
         });
     };
@@ -218,16 +227,18 @@ const InteractiveReportForm: React.FC<{ onGenerate: (config: ReportConfig) => vo
 const InteractiveReportPreview: React.FC<{ data: Attendee[] | Attendee[][]; config: ReportConfig; onBack: () => void; }> = ({ data, config, onBack }) => {
     const [isShareModalOpen, setIsShareModalOpen] = useState(false);
     
+    // FIX: Update field names to use dot notation.
     const fieldNames: Record<ReportField, string> = {
-        name: 'Nome', document: 'Documento', phone: 'Telefone', packageType: 'Pacote',
+        'person.name': 'Nome', 'person.document': 'Documento', 'person.phone': 'Telefone', packageType: 'Pacote',
         'payment.status': 'Status', 'payment.amount': 'Valor (R$)',
     };
 
     const getNestedProperty = (obj: any, path: string) => path.split('.').reduce((o, i) => (o ? o[i] : undefined), obj);
 
     const formatCustomValue = (attendee: Attendee, field: ReportField): string => {
-        if (field === 'document') {
-            return `${attendee.document} (${attendee.documentType})`;
+        // FIX: Check for 'person.document' and access nested person data.
+        if (field === 'person.document') {
+            return `${attendee.person.document} (${attendee.person.documentType})`;
         }
         let value = getNestedProperty(attendee, field);
         if (field === 'payment.amount') return value.toFixed(2).replace('.', ',');
@@ -257,9 +268,10 @@ const InteractiveReportPreview: React.FC<{ data: Attendee[] | Attendee[][]; conf
                                 <tr>
                                     <td style="text-align: center;">${passengerIndex + 1}</td>
                                     <td style="font-family: 'DejaVu Sans', sans-serif; font-size: 1.5rem; text-align: center; vertical-align: middle; padding: 4px;">&#9744;</td>
-                                    <td>${p.name}</td>
-                                    <td>${p.document}<br><span style="font-size:0.9em; color:#555;">(${p.documentType})</span></td>
-                                    <td>${p.phone}</td>
+                                    {/* FIX: Access nested person data for printing. */}
+                                    <td>${p.person.name}</td>
+                                    <td>${p.person.document}<br><span style="font-size:0.9em; color:#555;">(${p.person.documentType})</span></td>
+                                    <td>${p.person.phone}</td>
                                 </tr>
                             `).join('')}
                         </tbody>
@@ -351,7 +363,8 @@ const InteractiveReportPreview: React.FC<{ data: Attendee[] | Attendee[][]; conf
             buses.forEach((bus, index) => {
                 reportText += `*ÔNIBUS ${index + 1} (${bus.length} passageiros)*\n`;
                 bus.forEach(p => {
-                    reportText += `- ${p.name} (${p.document})\n`;
+                    // FIX: Access nested person data for sharing.
+                    reportText += `- ${p.person.name} (${p.person.document})\n`;
                 });
                 reportText += '\n';
             });
@@ -361,9 +374,11 @@ const InteractiveReportPreview: React.FC<{ data: Attendee[] | Attendee[][]; conf
             title = `Relatório Gira da Mata (${customData.length} registros)`;
             reportText = `${title}\n\n`;
             customData.forEach((attendee) => {
-                reportText += `*${formatCustomValue(attendee, 'name')}*\n`;
+                // FIX: Use 'person.name' to format value.
+                reportText += `*${formatCustomValue(attendee, 'person.name')}*\n`;
                 config.fields.forEach(field => {
-                    if (field !== 'name') {
+                    // FIX: Check for 'person.name' to avoid duplication.
+                    if (field !== 'person.name') {
                         reportText += ` - ${fieldNames[field]}: ${formatCustomValue(attendee, field)}\n`;
                     }
                 });
@@ -420,12 +435,14 @@ const InteractiveReportPreview: React.FC<{ data: Attendee[] | Attendee[][]; conf
                                 {bus.map((p, pIndex) => (
                                     <div key={p.id} className="bg-zinc-50 p-3 rounded-lg border border-zinc-200">
                                         <div className="flex justify-between items-start">
-                                            <p className="font-bold text-zinc-800 mr-2">{p.name}</p>
+                                            {/* FIX: Access nested person data. */}
+                                            <p className="font-bold text-zinc-800 mr-2">{p.person.name}</p>
                                             <p className="text-sm font-semibold text-zinc-500 flex-shrink-0">#{pIndex + 1}</p>
                                         </div>
                                         <div className="mt-1 text-sm text-zinc-600 space-y-1">
-                                            <p>{`${p.document} (${p.documentType})`}</p>
-                                            <p>{p.phone}</p>
+                                            {/* FIX: Access nested person data. */}
+                                            <p>{`${p.person.document} (${p.person.documentType})`}</p>
+                                            <p>{p.person.phone}</p>
                                         </div>
                                     </div>
                                 ))}
@@ -446,9 +463,10 @@ const InteractiveReportPreview: React.FC<{ data: Attendee[] | Attendee[][]; conf
                                         {bus.map((p, pIndex) => (
                                             <tr key={p.id} className="border-b border-zinc-100 last:border-b-0">
                                                 <td className="py-2 pr-2 text-zinc-600">{pIndex + 1}</td>
-                                                <td className="py-2 px-2 text-zinc-800 font-medium">{p.name}</td>
-                                                <td className="py-2 px-2 text-zinc-600">{`${p.document} (${p.documentType})`}</td>
-                                                <td className="py-2 px-2 text-zinc-600">{p.phone}</td>
+                                                {/* FIX: Access nested person data. */}
+                                                <td className="py-2 px-2 text-zinc-800 font-medium">{p.person.name}</td>
+                                                <td className="py-2 px-2 text-zinc-600">{`${p.person.document} (${p.person.documentType})`}</td>
+                                                <td className="py-2 px-2 text-zinc-600">{p.person.phone}</td>
                                             </tr>
                                         ))}
                                     </tbody>
@@ -541,8 +559,10 @@ interface ZeroDocListItemProps {
 
 const ZeroDocListItem: React.FC<ZeroDocListItemProps> = ({ attendee, onUpdate }) => {
     const { addToast } = useToast();
-    const [documentValue, setDocumentValue] = useState(attendee.document);
-    const [docType, setDocType] = useState<DocumentType>(() => getDocumentType(attendee.document).type);
+    // FIX: Access document from the nested person object.
+    const [documentValue, setDocumentValue] = useState(attendee.person.document);
+    // FIX: Access document from the nested person object.
+    const [docType, setDocType] = useState<DocumentType>(() => getDocumentType(attendee.person.document).type);
     const [error, setError] = useState('');
     const [status, setStatus] = useState<'idle' | 'saving' | 'success'>('idle');
     const [isConfirming, setIsConfirming] = useState(false);
@@ -568,14 +588,19 @@ const ZeroDocListItem: React.FC<ZeroDocListItemProps> = ({ attendee, onUpdate })
     const handleConfirmSave = async () => {
         setStatus('saving');
         try {
+            // FIX: Update the nested person object.
             const updatedAttendee: Attendee = {
                 ...attendee,
-                document: documentValue,
-                documentType: docType,
+                person: {
+                    ...attendee.person,
+                    document: documentValue,
+                    documentType: docType,
+                }
             };
             await onUpdate(updatedAttendee);
             setStatus('success');
-            addToast(`Documento de ${attendee.name} salvo.`, 'success');
+            // FIX: Access name from the nested person object.
+            addToast(`Documento de ${attendee.person.name} salvo.`, 'success');
         } catch (err) {
             console.error(err);
             addToast('Falha ao salvar. Tente novamente.', 'error');
@@ -591,7 +616,8 @@ const ZeroDocListItem: React.FC<ZeroDocListItemProps> = ({ attendee, onUpdate })
         <>
             <div className={`bg-white p-3 rounded-xl border border-zinc-200 shadow-sm transition-opacity duration-500 ${status === 'success' ? 'opacity-40' : 'opacity-100'}`}>
                 <div className="flex items-center justify-between gap-3 flex-wrap">
-                    <p className="font-bold text-zinc-800 flex-1 min-w-0">{attendee.name}</p>
+                    {/* FIX: Access name from the nested person object. */}
+                    <p className="font-bold text-zinc-800 flex-1 min-w-0">{attendee.person.name}</p>
                     <div className="flex items-center gap-2">
                         <div className="relative w-40">
                             <input
@@ -624,7 +650,8 @@ const ZeroDocListItem: React.FC<ZeroDocListItemProps> = ({ attendee, onUpdate })
             </div>
             {isConfirming && (
                 <ConfirmDocUpdateModal
-                    attendeeName={attendee.name}
+                    // FIX: Access name from the nested person object.
+                    attendeeName={attendee.person.name}
                     newDocument={documentValue}
                     docType={docType}
                     onConfirm={handleConfirmSave}
@@ -702,8 +729,9 @@ const DuplicateCheckerView: React.FC<DuplicateCheckerViewProps> = ({ groups, onB
                                 {group.map(attendee => (
                                     <button key={attendee.id} onClick={() => onSelectAttendee(attendee.id)} className="w-full text-left p-3 bg-zinc-50 rounded-lg hover:bg-zinc-100 transition-colors flex justify-between items-center border border-zinc-200">
                                         <div>
-                                            <p className="font-semibold text-zinc-900">{attendee.name}</p>
-                                            <p className="text-xs text-zinc-500 mt-1">{attendee.document} &bull; {attendee.phone}</p>
+                                            {/* FIX: Access nested person data. */}
+                                            <p className="font-semibold text-zinc-900">{attendee.person.name}</p>
+                                            <p className="text-xs text-zinc-500 mt-1">{attendee.person.document} &bull; {attendee.person.phone}</p>
                                         </div>
                                         <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-zinc-400" viewBox="0 0 20 20" fill="currentColor">
                                             <path fillRule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clipRule="evenodd" />
@@ -808,8 +836,9 @@ const EditablePassengerRow: React.FC<EditablePassengerRowProps> = ({ attendee, o
     return (
         <div className="w-full text-left p-3 bg-zinc-50 rounded-lg flex flex-col md:flex-row justify-between md:items-center border border-zinc-200 gap-3">
             <div onClick={() => onSelectAttendee(attendee.id)} className="flex-grow cursor-pointer min-w-0">
-                <p className="font-semibold text-zinc-900">{attendee.name}</p>
-                <p className="text-xs text-zinc-500 mt-1">{attendee.document} &bull; {attendee.phone}</p>
+                {/* FIX: Access nested person data. */}
+                <p className="font-semibold text-zinc-900">{attendee.person.name}</p>
+                <p className="text-xs text-zinc-500 mt-1">{attendee.person.document} &bull; {attendee.person.phone}</p>
             </div>
             <div className="flex-shrink-0 flex items-center justify-center pt-2 md:pt-0 w-full md:w-auto">
                 <select
@@ -929,8 +958,9 @@ const SitioOnlyListView: React.FC<{
                             style={{ animationDelay: `${index * 30}ms`, animationFillMode: 'forwards' }}
                         >
                             <div className="min-w-0">
-                                <p className="font-semibold text-zinc-900">{attendee.name}</p>
-                                <p className="text-xs text-zinc-500 mt-1">{attendee.phone}</p>
+                                {/* FIX: Access nested person data. */}
+                                <p className="font-semibold text-zinc-900">{attendee.person.name}</p>
+                                <p className="text-xs text-zinc-500 mt-1">{attendee.person.phone}</p>
                             </div>
                             <div className="flex items-center gap-3 flex-shrink-0">
                                 <span className={`px-2 py-0.5 text-xs font-bold rounded-full ${getStatusClasses(attendee.payment.status)}`}>
@@ -969,7 +999,7 @@ const ProgressBar: React.FC<{ value: number; max: number; colorClass?: string }>
     return (<div className="w-full bg-zinc-200 rounded-full h-2"><div className={`${colorClass} h-2 rounded-full transition-all duration-500`} style={{ width: `${percentage}%` }}></div></div>);
 };
 
-const ReportsDashboard: React.FC<{ attendees: Attendee[]; onGenerateReportClick: () => void; onLogout: () => void; onFixDocsClick: () => void; onCheckDuplicatesClick: () => void; zeroDocCount: number; duplicateGroupCount: number; busStats: BusStat[]; onViewBus: (busNumber: number) => void; onViewFinancials: () => void; onViewSitioOnlyList: () => void; }> = ({ attendees, onGenerateReportClick, onLogout, onFixDocsClick, onCheckDuplicatesClick, zeroDocCount, duplicateGroupCount, busStats, onViewBus, onViewFinancials, onViewSitioOnlyList }) => {
+const ReportsDashboard: React.FC<{ attendees: Attendee[]; onGenerateReportClick: () => void; onLogout: () => void; onFixDocsClick: () => void; onCheckDuplicatesClick: () => void; zeroDocCount: number; duplicateGroupCount: number; busStats: BusStat[]; onViewBus: (busNumber: number) => void; onViewFinancials: () => void; onViewSitioOnlyList: () => void; event: Event | null; }> = ({ attendees, onGenerateReportClick, onLogout, onFixDocsClick, onCheckDuplicatesClick, zeroDocCount, duplicateGroupCount, busStats, onViewBus, onViewFinancials, onViewSitioOnlyList, event }) => {
     const { totalAttendees, paidCount, pendingCount, isentoCount, totalRevenue, pendingRevenue, totalPossibleRevenue, sitioOnlyCount, paymentStats } = useMemo(() => {
         const paidAttendees = attendees.filter(a => a.payment.status === PaymentStatus.PAGO);
         const pendingAttendees = attendees.filter(a => a.payment.status === PaymentStatus.PENDENTE);
@@ -991,12 +1021,12 @@ const ReportsDashboard: React.FC<{ attendees: Attendee[]; onGenerateReportClick:
                 if (attendee.payment.sitePaymentDetails?.isPaid && attendee.payment.sitePaymentDetails.type) {
                     const type = attendee.payment.sitePaymentDetails.type;
                     calculatedPaymentStats[type].count += 1;
-                    calculatedPaymentStats[type].total += 70;
+                    calculatedPaymentStats[type].total += event?.site_price ?? 70;
                 }
                  if (attendee.payment.busPaymentDetails?.isPaid && attendee.payment.busPaymentDetails.type) {
                     const type = attendee.payment.busPaymentDetails.type;
                     calculatedPaymentStats[type].count += 1;
-                    calculatedPaymentStats[type].total += 50;
+                    calculatedPaymentStats[type].total += event?.bus_price ?? 50;
                 }
             } else { // Single payment package
                 if (attendee.payment.status === PaymentStatus.PAGO && attendee.payment.type) {
@@ -1027,8 +1057,8 @@ const ReportsDashboard: React.FC<{ attendees: Attendee[]; onGenerateReportClick:
                 }
                 if (a.packageType === PackageType.SITIO_BUS) {
                     let partialSum = 0;
-                    if (a.payment.sitePaymentDetails?.isPaid) partialSum += 70;
-                    if (a.payment.busPaymentDetails?.isPaid) partialSum += 50;
+                    if (a.payment.sitePaymentDetails?.isPaid) partialSum += (event?.site_price ?? 70);
+                    if (a.payment.busPaymentDetails?.isPaid) partialSum += (event?.bus_price ?? 50);
                     return sum + partialSum;
                 }
                 return sum;
@@ -1049,7 +1079,7 @@ const ReportsDashboard: React.FC<{ attendees: Attendee[]; onGenerateReportClick:
             sitioOnlyCount: attendees.filter(a => a.packageType === PackageType.SITIO_ONLY).length,
             paymentStats: sortedPaymentStats
         };
-    }, [attendees]);
+    }, [attendees, event]);
 
     const IconUsers = <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.653-.124-1.282-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.653.124-1.282.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" /></svg>;
     const IconDollar = <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v.01M12 12v-2m0 2v2m0-2.35V10M12 15v2m0-2v-2m0 0h.01M12 7.02c.164.017.324.041.48.072M7.5 9.51c.418-.472 1.012-.867 1.697-1.126M12 21a9 9 0 100-18 9 9 0 000 18z" /></svg>;
@@ -1195,9 +1225,10 @@ interface ReportsProps {
     onLogout: () => void;
     onUpdateAttendee: (attendee: Attendee) => Promise<void>;
     onSelectAttendee: (id: string) => void;
+    event: Event | null;
 }
 
-const Reports: React.FC<ReportsProps> = ({ attendees, onLogout, onUpdateAttendee, onSelectAttendee }) => {
+const Reports: React.FC<ReportsProps> = ({ attendees, onLogout, onUpdateAttendee, onSelectAttendee, event }) => {
     const { addToast } = useToast();
     const [mode, setMode] = useState<'dashboard' | 'form' | 'preview' | 'zeroDoc' | 'duplicateCheck' | 'busDetail' | 'financialDetail' | 'sitioOnlyList'>('dashboard');
     const [reportConfig, setReportConfig] = useState<ReportConfig | null>(null);
@@ -1209,12 +1240,14 @@ const Reports: React.FC<ReportsProps> = ({ attendees, onLogout, onUpdateAttendee
     const zeroDocAttendees = useMemo(() => {
         return attendees.filter(a =>
             a.packageType === PackageType.SITIO_BUS &&
-            /^0+$/.test(a.document.replace(/[^\d]/g, ''))
+            // FIX: Access document from the nested person object.
+            /^0+$/.test(a.person.document.replace(/[^\d]/g, ''))
         );
     }, [attendees]);
     
     const sitioOnlyAttendees = useMemo(() => 
-        attendees.filter(a => a.packageType === PackageType.SITIO_ONLY).sort((a,b) => a.name.localeCompare(b.name)), 
+        // FIX: Access name from the nested person object for sorting.
+        attendees.filter(a => a.packageType === PackageType.SITIO_ONLY).sort((a,b) => a.person.name.localeCompare(b.person.name)), 
     [attendees]);
 
     const potentialDuplicates = useMemo(() => {
@@ -1229,12 +1262,14 @@ const Reports: React.FC<ReportsProps> = ({ attendees, onLogout, onUpdateAttendee
             if (processedIds.has(attendees[i].id)) continue;
 
             const currentGroup: Attendee[] = [attendees[i]];
-            const name1 = normalize(attendees[i].name);
+            // FIX: Access name from the nested person object.
+            const name1 = normalize(attendees[i].person.name);
 
             for (let j = i + 1; j < attendees.length; j++) {
                 if (processedIds.has(attendees[j].id)) continue;
-
-                const name2 = normalize(attendees[j].name);
+                
+                // FIX: Access name from the nested person object.
+                const name2 = normalize(attendees[j].person.name);
                 
                 // Group if names are identical or very similar (distance <= 2 for typos)
                 if (name1 === name2 || levenshteinDistance(name1, name2) <= 2) {
@@ -1256,25 +1291,28 @@ const Reports: React.FC<ReportsProps> = ({ attendees, onLogout, onUpdateAttendee
         let paidBus = 0;
         let totalBus = 0;
 
+        const sitePrice = event?.site_price ?? 70;
+        const busPrice = event?.bus_price ?? 50;
+
         attendees.forEach(a => {
             if (a.payment.status === PaymentStatus.ISENTO) {
                 return; // Skip exempt attendees from financial calculations
             }
 
             if (a.packageType === PackageType.SITIO_ONLY) {
-                totalSitio += 70;
+                totalSitio += sitePrice;
                 if (a.payment.status === PaymentStatus.PAGO) {
-                    paidSitio += 70;
+                    paidSitio += sitePrice;
                 }
             } else if (a.packageType === PackageType.SITIO_BUS) {
-                totalSitio += 70;
-                totalBus += 50;
+                totalSitio += sitePrice;
+                totalBus += busPrice;
 
                 if (a.payment.sitePaymentDetails?.isPaid) {
-                    paidSitio += 70;
+                    paidSitio += sitePrice;
                 }
                 if (a.payment.busPaymentDetails?.isPaid) {
-                    paidBus += 50;
+                    paidBus += busPrice;
                 }
             }
         });
@@ -1287,7 +1325,7 @@ const Reports: React.FC<ReportsProps> = ({ attendees, onLogout, onUpdateAttendee
             totalBus,
             pendingBus: totalBus - paidBus,
         };
-    }, [attendees]);
+    }, [attendees, event]);
 
     const busAttendees = useMemo(() => attendees.filter(a => a.packageType === PackageType.SITIO_BUS), [attendees]);
     const totalBuses = useMemo(() => {
@@ -1341,14 +1379,17 @@ const Reports: React.FC<ReportsProps> = ({ attendees, onLogout, onUpdateAttendee
         let individuals: Attendee[] = [];
         toAutoAssign.forEach(person => {
             if (processedIds.has(person.id)) return;
-            const relationKey = extractRelationKey(person.name);
-            const relatedPerson = relationKey ? toAutoAssign.find(p => p.name.toLowerCase().includes(relationKey)) : null;
+            // FIX: Access name from the nested person object.
+            const relationKey = extractRelationKey(person.person.name);
+            // FIX: Access name from the nested person object.
+            const relatedPerson = relationKey ? toAutoAssign.find(p => p.person.name.toLowerCase().includes(relationKey)) : null;
             if (relatedPerson && !processedIds.has(relatedPerson.id)) {
                 const group = [person, relatedPerson];
                 processedIds.add(person.id);
                 processedIds.add(relatedPerson.id);
                 toAutoAssign.forEach(other => {
-                    if (!processedIds.has(other.id) && extractRelationKey(other.name) === relationKey) {
+                    // FIX: Access name from the nested person object.
+                    if (!processedIds.has(other.id) && extractRelationKey(other.person.name) === relationKey) {
                         group.push(other);
                         processedIds.add(other.id);
                     }
@@ -1358,7 +1399,8 @@ const Reports: React.FC<ReportsProps> = ({ attendees, onLogout, onUpdateAttendee
         });
         const remainingToGroup = toAutoAssign.filter(p => !processedIds.has(p.id));
         const groupsByLastName = remainingToGroup.reduce((acc, person) => {
-            const lastName = getLastName(person.name);
+            // FIX: Access name from the nested person object.
+            const lastName = getLastName(person.person.name);
             if (lastName) {
                 acc[lastName] = acc[lastName] || [];
                 acc[lastName].push(person);
@@ -1404,7 +1446,8 @@ const Reports: React.FC<ReportsProps> = ({ attendees, onLogout, onUpdateAttendee
                 }
             }
         });
-        buses.forEach(bus => bus.sort((a, b) => a.name.localeCompare(b.name)));
+        // FIX: Access name from the nested person object for sorting.
+        buses.forEach(bus => bus.sort((a, b) => a.person.name.localeCompare(b.person.name)));
         
         return buses.map((passengers, index) => ({
             busNumber: index + 1,
@@ -1439,9 +1482,11 @@ const Reports: React.FC<ReportsProps> = ({ attendees, onLogout, onUpdateAttendee
         const { attendee, newBusNumber } = confirmationRequest;
         try {
             await onUpdateAttendee({ ...attendee, busNumber: newBusNumber });
-            addToast(`"${attendee.name}" movido com sucesso.`, 'success');
+            // FIX: Access name from the nested person object.
+            addToast(`"${attendee.person.name}" movido com sucesso.`, 'success');
         } catch (error) {
-            addToast(`Falha ao mover "${attendee.name}".`, 'error');
+            // FIX: Access name from the nested person object.
+            addToast(`Falha ao mover "${attendee.person.name}".`, 'error');
         } finally {
             setIsSavingChange(false);
             setConfirmationRequest(null);
@@ -1465,7 +1510,8 @@ const Reports: React.FC<ReportsProps> = ({ attendees, onLogout, onUpdateAttendee
                 return statusMatch && packageMatch;
             });
 
-            const sortedData = [...filteredData].sort((a, b) => a.name.localeCompare(b.name));
+            // FIX: Access name from the nested person object for sorting.
+            const sortedData = [...filteredData].sort((a, b) => a.person.name.localeCompare(b.person.name));
 
             setReportConfig(config);
             setReportData(sortedData);
@@ -1524,6 +1570,7 @@ const Reports: React.FC<ReportsProps> = ({ attendees, onLogout, onUpdateAttendee
                     onViewBus={handleViewBus}
                     onViewFinancials={() => setMode('financialDetail')}
                     onViewSitioOnlyList={() => setMode('sitioOnlyList')}
+                    event={event}
                 />;
         }
     };

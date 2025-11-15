@@ -1,4 +1,5 @@
 
+
 import React from 'react';
 import type { Attendee } from '../types';
 import { PaymentStatus, PackageType } from '../types';
@@ -42,7 +43,8 @@ const AttendeeListItem: React.FC<AttendeeListItemProps> = ({ attendee, onSelect,
             style={{ animationDelay: `${index * 50}ms`, animationFillMode: 'forwards' }}
         >
             <div>
-                <p className="font-bold text-zinc-800">{attendee.name}</p>
+                {/* FIX: Access name from the nested person object. */}
+                <p className="font-bold text-zinc-800">{attendee.person.name}</p>
                 <p className="text-sm text-zinc-500 flex items-center mt-1">
                     {packageIcon}
                     <span>{attendee.packageType}</span>

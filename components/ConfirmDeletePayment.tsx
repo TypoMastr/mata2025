@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import type { Attendee } from '../types';
 
@@ -43,7 +44,7 @@ const ConfirmDeletePayment: React.FC<ConfirmDeletePaymentProps> = ({ attendee, o
                         </h3>
                         <div className="mt-2">
                             <p className="text-sm text-zinc-500">
-                                Tem certeza que deseja excluir o pagamento de <strong className="font-semibold text-zinc-700">{attendee.name}</strong>? 
+                                Tem certeza que deseja excluir o pagamento de <strong className="font-semibold text-zinc-700">{attendee.person.name}</strong>? 
                                 O status voltará a ser 'Pendente' e os dados do pagamento (data, tipo, comprovante) serão perdidos.
                             </p>
                         </div>

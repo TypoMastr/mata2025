@@ -1,48 +1,67 @@
 import { useState, useEffect, useCallback } from 'react';
-import type { Attendee, AttendeeFormData, Payment } from '../types';
+import type { Registration, RegistrationFormData, Payment, Person } from '../types';
 import * as api from '../services/api';
 import { getDocumentType } from '../utils/formatters';
 import { PaymentStatus, PackageType } from '../types';
 
-export const useAttendees = () => {
-    const [attendees, setAttendees] = useState<Attendee[]>([]);
+export const useRegistrations = (eventId: string | null) => {
+    const [registrations, setRegistrations] = useState<Registration[]>([]);
     const [isLoading, setIsLoading] = useState(true);
 
-    const fetchAttendees = useCallback(async () => {
+    const fetchRegistrations = useCallback(async (id: string) => {
         setIsLoading(true);
         try {
-            const data = await api.fetchAttendees();
-            setAttendees(data);
+            const data = await api.fetchRegistrations(id);
+            setRegistrations(data);
         } catch (err) {
-            console.error("Failed to fetch attendees:", err);
-            // In a real app, you might want a global error state here
+            console.error("Failed to fetch registrations:", err);
         } finally {
             setIsLoading(false);
         }
     }, []);
 
     useEffect(() => {
-        fetchAttendees();
-    }, [fetchAttendees]);
+        if (eventId) {
+            fetchRegistrations(eventId);
+        } else {
+            setRegistrations([]);
+            setIsLoading(false);
+        }
+    }, [eventId, fetchRegistrations]);
+    
+    const addRegistration = async (formData: RegistrationFormData, eventId: string) => {
+        let personId = formData.personId;
 
-    // FIX: Changed the type of `formData` to correctly override `paymentAmount` from string to number.
-    // The previous type `AttendeeFormData & { paymentAmount: number }` resulted in `paymentAmount: never`.
-    const addAttendee = async (formData: Omit<AttendeeFormData, 'paymentAmount'> & { paymentAmount: number }) => {
-        const { type: documentType } = getDocumentType(formData.document);
+        // Step 1: Find or Create the Person
+        if (!personId) {
+             const { type: documentType } = getDocumentType(formData.document);
+             const newPersonData: Omit<Person, 'id'> = {
+                 name: formData.name,
+                 document: formData.document,
+                 documentType: documentType,
+                 phone: formData.phone,
+             };
+             const newPerson = await api.createPerson(newPersonData);
+             personId = newPerson.id;
+        }
+
+        if (!personId) {
+            throw new Error("Could not determine person to register.");
+        }
+
+        // Step 2: Prepare Payment Details
         const isBusPackage = formData.packageType === PackageType.SITIO_BUS;
-
         const paymentDetails: Payment = {
-            amount: formData.paymentAmount,
-            status: PaymentStatus.PENDENTE, // Default, will be updated based on registration details
+            amount: parseFloat(formData.paymentAmount),
+            status: PaymentStatus.PENDENTE,
             receiptUrl: null,
         };
 
-        if (formData.registerPaymentNow) {
+         if (formData.registerPaymentNow) {
             if (isBusPackage) {
                 const sitePaid = formData.sitePayment.isPaid;
                 const busPaid = formData.busPayment.isPaid;
                 
-                // Overall status is PAGO only if both parts are paid
                 paymentDetails.status = (sitePaid && busPaid) ? PaymentStatus.PAGO : PaymentStatus.PENDENTE;
 
                 paymentDetails.sitePaymentDetails = {
@@ -71,51 +90,57 @@ export const useAttendees = () => {
              }
         }
 
-
-        const newAttendeeData: Omit<Attendee, 'id' | 'registrationDate'> = {
-            name: formData.name,
-            document: formData.document,
-            documentType: documentType,
-            phone: formData.phone,
+        // Step 3: Create the Registration
+        const newRegistrationData = {
+            personId,
+            eventId,
             packageType: formData.packageType,
             payment: paymentDetails,
             notes: formData.notes,
         };
         
         try {
-            const createdAttendee = await api.createAttendee(newAttendeeData);
-            setAttendees(prev => [createdAttendee, ...prev]);
+            const createdRegistration = await api.createRegistration(newRegistrationData);
+            setRegistrations(prev => [createdRegistration, ...prev]);
         } catch (err) {
-            console.error("Failed to add attendee:", err);
+            console.error("Failed to add registration:", err);
             throw err;
         }
     };
 
-    const updateAttendee = async (updatedAttendee: Attendee) => {
+    const updateRegistration = async (updatedRegistration: Registration) => {
         try {
-            const savedAttendee = await api.updateAttendee(updatedAttendee);
-            setAttendees(prev => prev.map(a => a.id === savedAttendee.id ? savedAttendee : a));
+            // Only update the person details if they have changed.
+            const original = registrations.find(r => r.id === updatedRegistration.id);
+            if (original && JSON.stringify(original.person) !== JSON.stringify(updatedRegistration.person)) {
+                 await api.updatePerson(updatedRegistration.person);
+            }
+
+            const savedRegistration = await api.updateRegistration(updatedRegistration);
+            setRegistrations(prev => prev.map(a => a.id === savedRegistration.id ? savedRegistration : a));
         } catch (err) {
-            console.error("Failed to update attendee:", err);
+            console.error("Failed to update registration:", err);
             throw err;
         }
     };
 
-    const deleteAttendee = async (id: string) => {
+    const deleteRegistration = async (id: string) => {
         try {
-            await api.deleteAttendee(id);
-            setAttendees(prev => prev.filter(a => a.id !== id));
+            await api.deleteRegistration(id);
+            setRegistrations(prev => prev.filter(a => a.id !== id));
         } catch (err) {
-            console.error("Failed to delete attendee:", err);
+            console.error("Failed to delete registration:", err);
             throw err;
         }
     };
 
     return {
-        attendees,
+        registrations,
         isLoading,
-        addAttendee,
-        updateAttendee,
-        deleteAttendee,
+        addRegistration,
+        updateRegistration,
+        deleteRegistration,
     };
 };
+// Alias for backwards compatibility
+export const useAttendees = useRegistrations;

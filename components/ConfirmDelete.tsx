@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import type { Attendee } from '../types';
 
@@ -44,7 +45,7 @@ const ConfirmDelete: React.FC<ConfirmDeleteProps> = ({ attendee, onConfirm, onCa
                         </h3>
                         <div className="mt-2">
                             <p className="text-sm text-zinc-500">
-                                Você tem certeza que deseja excluir a inscrição de <strong className="font-semibold text-zinc-700">{attendee.name}</strong>? Esta ação não pode ser desfeita.
+                                Você tem certeza que deseja excluir a inscrição de <strong className="font-semibold text-zinc-700">{attendee.person.name}</strong>? Esta ação não pode ser desfeita.
                             </p>
                         </div>
                     </div>

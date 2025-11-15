@@ -1,5 +1,5 @@
 // Note: The static import of GoogleGenAI has been removed to prevent a load-time crash.
-import type { Attendee } from '../types';
+import type { Attendee, Event } from '../types';
 import { PackageType, PaymentStatus } from "../types";
 
 interface BusInfo {
@@ -8,12 +8,14 @@ interface BusInfo {
     capacity: number;
 }
 
-export const generateReport = async (attendees: Attendee[], buses: BusInfo[]): Promise<string> => {
+export const generateReport = async (attendees: Attendee[], buses: BusInfo[], event: Event | null): Promise<string> => {
     try {
         // Dynamically import the Google AI library only when this function is called.
         const { GoogleGenAI } = await import('@google/genai');
         const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
         const model = 'gemini-2.5-flash';
+        
+        const eventName = event?.name || "o evento atual";
 
         const totalAttendees = attendees.length;
         const paidCount = attendees.filter(a => a.payment.status === PaymentStatus.PAGO).length;
@@ -29,7 +31,7 @@ export const generateReport = async (attendees: Attendee[], buses: BusInfo[]): P
         const totalPossibleRevenue = totalRevenue + pendingRevenue;
 
         const prompt = `
-            Você é um assistente de organização de eventos. Sua tarefa é gerar um resumo objetivo e claro sobre a situação do evento "Gira da Mata 2025" com base nos dados abaixo. A formatação deve ser otimizada para leitura rápida em telas pequenas, usando títulos e listas.
+            Você é um assistente de organização de eventos. Sua tarefa é gerar um resumo objetivo e claro sobre a situação do evento "${eventName}" com base nos dados abaixo. A formatação deve ser otimizada para leitura rápida em telas pequenas, usando títulos e listas.
 
             **Dados:**
             - **Inscrições:** ${totalAttendees} no total (${paidCount} pagas, ${pendingCount} pendentes).

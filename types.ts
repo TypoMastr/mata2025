@@ -43,18 +43,32 @@ export interface Payment {
     busPaymentDetails?: PartialPaymentDetails | null;
 }
 
-export interface Attendee {
+export interface Person {
     id: string;
     name: string;
     document: string;
     documentType: DocumentType;
     phone: string;
+}
+
+// This type represents a registration for an event, joining data from
+// the 'event_registrations' table and the linked 'people' table.
+// It's named 'Registration' to distinguish it from the old 'Attendee' structure.
+export interface Registration {
+    id: string; // This is the ID of the event_registration record
+    person: Person;
+    eventId: string;
     packageType: PackageType;
     registrationDate: string;
     payment: Payment;
     notes?: string;
     busNumber?: number | null;
 }
+
+// Alias for backwards compatibility in components.
+// The data structure is now `Registration`.
+export type Attendee = Registration;
+
 
 export interface PartialPaymentFormDetails {
     isPaid: boolean;
@@ -63,10 +77,15 @@ export interface PartialPaymentFormDetails {
     type: PaymentType;
 }
 
-export interface AttendeeFormData {
+// Form data for creating a new registration
+export interface RegistrationFormData {
+    personId: string | null; // null if it's a new person
+    // Person fields (only used if personId is null)
     name: string;
     document: string;
     phone: string;
+    
+    // Registration fields
     packageType: PackageType;
     paymentAmount: string;
     registerPaymentNow: boolean;
@@ -82,7 +101,9 @@ export interface AttendeeFormData {
     busPayment: PartialPaymentFormDetails;
 }
 
-export type ReportField = 'name' | 'document' | 'phone' | 'packageType' | 'payment.status' | 'payment.amount';
+export type AttendeeFormData = RegistrationFormData; // Alias for form compatibility
+
+export type ReportField = 'person.name' | 'person.document' | 'person.phone' | 'packageType' | 'payment.status' | 'payment.amount';
 
 export interface ReportConfig {
     type: 'custom' | 'busList';
@@ -93,5 +114,20 @@ export interface ReportConfig {
     };
 }
 
+export interface Event {
+    id: string;
+    name: string;
+    event_date: string;
+    location: string;
+    activity_time: string;
+    site_price: number;
+    bus_price: number;
+    pix_key: string;
+    bus_departure_time: string;
+    bus_return_time: string;
 
-export type View = 'list' | 'detail' | 'form' | 'reports' | 'payment' | 'editForm' | 'editPayment' | 'confirmDeletePayment' | 'info';
+    payment_deadline: string;
+}
+
+
+export type View = 'list' | 'detail' | 'form' | 'reports' | 'payment' | 'editForm' | 'info' | 'management';

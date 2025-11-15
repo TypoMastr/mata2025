@@ -1,5 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
-import type { Attendee, Payment, PartialPaymentDetails } from '../types';
+import type { Registration, Payment, PartialPaymentDetails, Person, Event } from '../types';
 import { PackageType, PaymentStatus } from '../types';
 
 // --- Supabase Client Setup ---
@@ -14,39 +14,30 @@ const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
 // --- Data Mapping Helpers ---
 
-/**
- * Converts a Supabase record to an application Attendee object.
- * It handles both the new JSONB `payment_details` structure and falls back to legacy
- * flat columns for backward compatibility.
- */
-const fromSupabase = (record: any): Attendee => {
+const fromSupabase = (record: any): Registration => {
     if (!record) return record;
 
+    const personRecord = record.people || {};
+    const person: Person = {
+        id: personRecord.id,
+        name: personRecord.name,
+        document: personRecord.document,
+        documentType: personRecord.document_type,
+        phone: personRecord.phone,
+    };
+
     const isMultiPayment = record.package_type === PackageType.SITIO_BUS;
-    const paymentDetails = record.payment_details || {}; // Read from the new JSONB column
+    const paymentDetails = record.payment_details || {}; 
 
     const payment: Payment = {
-        amount: record.payment_amount || (record.package_type === PackageType.SITIO_BUS ? 120.00 : 70.00),
-        status: record.payment_status || PaymentStatus.PENDENTE,
-        // Populate from new JSON structure, with fallback to legacy columns
-        date: paymentDetails.date || record.payment_date || undefined,
-        type: paymentDetails.type || record.payment_type || undefined,
-        receiptUrl: paymentDetails.receiptUrl || record.payment_receipt_url || null,
+        amount: record.payment_amount,
+        status: record.payment_status,
+        date: paymentDetails.date,
+        type: paymentDetails.type,
+        receiptUrl: paymentDetails.receiptUrl || null,
         sitePaymentDetails: isMultiPayment ? (paymentDetails.site || null) : null,
         busPaymentDetails: isMultiPayment ? (paymentDetails.bus || null) : null,
     };
-    
-    // Data migration on-the-fly for old 'Pago' records without the new structure
-    if (isMultiPayment && record.payment_status === PaymentStatus.PAGO && !payment.sitePaymentDetails && !payment.busPaymentDetails) {
-        const migratedDetails: PartialPaymentDetails = {
-            isPaid: true,
-            date: record.payment_date || undefined,
-            type: record.payment_type || undefined,
-            receiptUrl: record.payment_receipt_url || null,
-        };
-        payment.sitePaymentDetails = migratedDetails;
-        payment.busPaymentDetails = migratedDetails;
-    }
     
     // Ensure details objects exist for multi-payment records to prevent UI errors
     if (isMultiPayment && !payment.sitePaymentDetails) {
@@ -58,10 +49,8 @@ const fromSupabase = (record: any): Attendee => {
 
     return {
         id: record.id,
-        name: record.name,
-        document: record.document,
-        documentType: record.document_type,
-        phone: record.phone,
+        person,
+        eventId: record.event_id,
         packageType: record.package_type,
         registrationDate: record.registration_date,
         payment: payment,
@@ -70,117 +59,190 @@ const fromSupabase = (record: any): Attendee => {
     };
 };
 
-
-/**
- * Converts an application Attendee object to a Supabase record.
- * It serializes all payment details into a single `payment_details` JSONB column
- * and nullifies legacy columns to facilitate migration.
- */
-const toSupabase = (attendee: Partial<Attendee>): any => {
+const registrationToSupabase = (registration: Partial<Registration>): any => {
     const record: { [key: string]: any } = {};
 
-    if (attendee.name !== undefined) record.name = attendee.name;
-    if (attendee.document !== undefined) record.document = attendee.document;
-    if (attendee.phone !== undefined) record.phone = attendee.phone;
-    if (attendee.documentType !== undefined) record.document_type = attendee.documentType;
-    if (attendee.packageType !== undefined) record.package_type = attendee.packageType;
-    if (attendee.registrationDate !== undefined) record.registration_date = attendee.registrationDate;
-    if (attendee.notes !== undefined) record.notes = attendee.notes;
-    if (attendee.busNumber !== undefined) record.bus_number = attendee.busNumber;
+    if (registration.person?.id) record.person_id = registration.person.id;
+    if (registration.eventId) record.event_id = registration.eventId;
+    if (registration.packageType) record.package_type = registration.packageType;
+    if (registration.notes !== undefined) record.notes = registration.notes;
+    if (registration.busNumber !== undefined) record.bus_number = registration.busNumber;
 
-
-    if (attendee.payment) {
-        record.payment_amount = attendee.payment.amount;
-        record.payment_status = attendee.payment.status;
+    if (registration.payment) {
+        record.payment_amount = registration.payment.amount;
+        record.payment_status = registration.payment.status;
 
         const paymentDetails: { [key: string]: any } = {};
-
-        if (attendee.packageType === PackageType.SITIO_BUS) {
-            const sitePaid = !!attendee.payment.sitePaymentDetails?.isPaid;
-            const busPaid = !!attendee.payment.busPaymentDetails?.isPaid;
+        if (registration.packageType === PackageType.SITIO_BUS) {
+            const sitePaid = !!registration.payment.sitePaymentDetails?.isPaid;
+            const busPaid = !!registration.payment.busPaymentDetails?.isPaid;
             
-            if (attendee.payment.status !== PaymentStatus.ISENTO) {
+            if (registration.payment.status !== PaymentStatus.ISENTO) {
                  record.payment_status = (sitePaid && busPaid) ? PaymentStatus.PAGO : PaymentStatus.PENDENTE;
             }
-
-            paymentDetails.site = attendee.payment.sitePaymentDetails || { isPaid: false, receiptUrl: null };
-            paymentDetails.bus = attendee.payment.busPaymentDetails || { isPaid: false, receiptUrl: null };
-
-        } else { // Single payment package
-             paymentDetails.date = attendee.payment.date || null;
-             paymentDetails.type = attendee.payment.type || null;
-             paymentDetails.receiptUrl = attendee.payment.receiptUrl || null;
+            paymentDetails.site = registration.payment.sitePaymentDetails || { isPaid: false, receiptUrl: null };
+            paymentDetails.bus = registration.payment.busPaymentDetails || { isPaid: false, receiptUrl: null };
+        } else {
+             paymentDetails.date = registration.payment.date || null;
+             paymentDetails.type = registration.payment.type || null;
+             paymentDetails.receiptUrl = registration.payment.receiptUrl || null;
         }
-
         record.payment_details = paymentDetails;
-
-        // Nullify legacy columns to clean up data upon update
-        record.payment_date = null;
-        record.payment_type = null;
-        record.payment_receipt_url = null;
     }
     
     return record;
 };
 
+const personToSupabase = (person: Partial<Person>): any => ({
+    name: person.name,
+    document: person.document,
+    document_type: person.documentType,
+    phone: person.phone,
+});
+
 
 // --- API Functions ---
 
-export const fetchAttendees = async (): Promise<Attendee[]> => {
+// REGISTRATIONS
+export const fetchRegistrations = async (eventId: string): Promise<Registration[]> => {
     const { data, error } = await supabase
-        .from('attendees')
-        .select('*')
+        .from('event_registrations')
+        .select('*, people(*)')
+        .eq('event_id', eventId)
         .order('registration_date', { ascending: false });
 
     if (error) {
-        console.error('Error fetching attendees:', error);
-        throw new Error(`Failed to fetch attendees: ${error.message}`);
+        console.error('Error fetching registrations:', error);
+        throw new Error(`Failed to fetch registrations: ${error.message}`);
     }
     return data.map(fromSupabase);
 };
 
-export const createAttendee = async (attendeeData: Omit<Attendee, 'id' | 'registrationDate'>): Promise<Attendee> => {
-    const recordToInsert = toSupabase(attendeeData);
-    recordToInsert.registration_date = new Date().toISOString();
+export const createRegistration = async (regData: {personId: string, eventId: string, packageType: PackageType, payment: Payment, notes?: string}): Promise<Registration> => {
+    const recordToInsert = {
+        person_id: regData.personId,
+        event_id: regData.eventId,
+        package_type: regData.packageType,
+        payment_amount: regData.payment.amount,
+        payment_status: regData.payment.status,
+        payment_details: {
+            site: regData.payment.sitePaymentDetails,
+            bus: regData.payment.busPaymentDetails,
+            date: regData.payment.date,
+            type: regData.payment.type,
+            receiptUrl: regData.payment.receiptUrl,
+        },
+        notes: regData.notes,
+        registration_date: new Date().toISOString(),
+    };
 
     const { data, error } = await supabase
-        .from('attendees')
+        // FIX: Corrected table name from 'event_registregitrations' to 'event_registrations'
+        .from('event_registrations')
         .insert(recordToInsert)
-        .select()
+        .select('*, people(*)')
         .single();
     
     if (error) {
-        console.error('Error creating attendee:', error);
-        throw new Error(`Failed to create attendee: ${error.message}`);
+        console.error('Error creating registration:', error);
+        throw new Error(`Failed to create registration: ${error.message}`);
     }
     return fromSupabase(data);
 };
 
-export const updateAttendee = async (attendeeToUpdate: Attendee): Promise<Attendee> => {
-    const { id, ...updateData } = attendeeToUpdate;
+export const updateRegistration = async (registration: Registration): Promise<Registration> => {
+    const { id, person, ...updateData } = registration;
+    const record = registrationToSupabase(updateData);
 
     const { data, error } = await supabase
-        .from('attendees')
-        .update(toSupabase(updateData))
+        .from('event_registrations')
+        .update(record)
         .eq('id', id)
-        .select()
+        .select('*, people(*)')
         .single();
     
     if (error) {
-        console.error('Error updating attendee:', error);
-        throw new Error(`Failed to update attendee: ${error.message}`);
+        console.error('Error updating registration:', error);
+        throw new Error(`Failed to update registration: ${error.message}`);
     }
     return fromSupabase(data);
 };
 
-export const deleteAttendee = async (id: string): Promise<void> => {
+export const deleteRegistration = async (id: string): Promise<void> => {
     const { error } = await supabase
-        .from('attendees')
+        .from('event_registrations')
         .delete()
         .eq('id', id);
 
     if (error) {
-        console.error('Error deleting attendee:', error);
-        throw new Error(`Failed to delete attendee: ${error.message}`);
+        console.error('Error deleting registration:', error);
+        throw new Error(`Failed to delete registration: ${error.message}`);
     }
+};
+
+// PEOPLE
+export const searchPeople = async (query: string): Promise<Person[]> => {
+    const { data, error } = await supabase
+        .from('people')
+        .select('*')
+        .ilike('name', `%${query}%`)
+        .limit(10);
+    
+    if (error) throw new Error(error.message);
+    return data as Person[];
+}
+
+export const createPerson = async (personData: Omit<Person, 'id'>): Promise<Person> => {
+    const { data, error } = await supabase
+        .from('people')
+        .insert(personToSupabase(personData))
+        .select()
+        .single();
+    if (error) throw new Error(error.message);
+    return data as Person;
+};
+
+export const updatePerson = async (person: Person): Promise<Person> => {
+    const { id, ...updateData } = person;
+    const { data, error } = await supabase
+        .from('people')
+        .update(personToSupabase(updateData))
+        .eq('id', id)
+        .select()
+        .single();
+    if (error) throw new Error(error.message);
+    return data as Person;
+};
+
+// EVENTS
+export const fetchEvents = async (): Promise<Event[]> => {
+    const { data, error } = await supabase
+        .from('events')
+        .select('*')
+        .order('event_date', { ascending: false });
+    
+    if (error) throw new Error(error.message);
+    return data as Event[];
+};
+
+export const createEvent = async (eventData: Omit<Event, 'id'>): Promise<Event> => {
+    const { data, error } = await supabase
+        .from('events')
+        .insert(eventData)
+        .select()
+        .single();
+    if (error) throw new Error(error.message);
+    return data as Event;
+};
+
+export const updateEvent = async (eventData: Event): Promise<Event> => {
+    const { id, ...updateData } = eventData;
+    const { data, error } = await supabase
+        .from('events')
+        .update(updateData)
+        .eq('id', id)
+        .select()
+        .single();
+    if (error) throw new Error(error.message);
+    return data as Event;
 };

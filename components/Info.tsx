@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import * as authService from '../services/authService';
 import type { Event } from '../types';
@@ -11,80 +12,6 @@ const InfoCard: React.FC<{ icon: React.ReactElement; title: string; children: Re
         <div className="space-y-3 text-sm text-zinc-700">{children}</div>
     </div>
 );
-
-const BiometricsCard: React.FC = () => {
-    const [isSupported, setIsSupported] = useState(false);
-    const [isEnabled, setIsEnabled] = useState(false);
-    const [status, setStatus] = useState<'idle' | 'loading' | 'error'>('idle');
-    const [errorMessage, setErrorMessage] = useState('');
-
-    const IconFingerPrint = <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M7.864 4.243A7.5 7.5 0 0119.5 12c0 2.252-.903 4.34-2.378 5.855A7.5 7.5 0 019.622 4.145m1.503 1.498a5.25 5.25 0 00-6.236 6.236l-3.5 3.5a.75.75 0 001.06 1.06l3.5-3.5a5.25 5.25 0 006.236-6.236-1.503-1.503z" /></svg>;
-
-    useEffect(() => {
-        const supported = authService.isBiometricSupportAvailable();
-        setIsSupported(supported);
-        if (supported) {
-            setIsEnabled(authService.hasBiometricCredential());
-        }
-    }, []);
-
-    const handleEnableBiometrics = async () => {
-        setStatus('loading');
-        setErrorMessage('');
-        try {
-            await authService.registerBiometricCredential();
-            setIsEnabled(true);
-            setStatus('idle');
-        } catch (err: any) {
-            setStatus('error');
-            if (err.name === 'NotAllowedError') {
-                setErrorMessage('Permissão negada. Tente novamente.');
-            } else {
-                setErrorMessage('Falha ao habilitar. Tente novamente.');
-            }
-        }
-    };
-
-    const handleDisableBiometrics = () => {
-        authService.removeBiometricCredential();
-        setIsEnabled(false);
-    };
-
-    if (!isSupported) {
-        return (
-            <InfoCard icon={IconFingerPrint} title="Acesso Rápido" delay={100}>
-                <p className="text-sm text-zinc-500">Seu navegador ou dispositivo não é compatível com login por biometria (Face ID/Touch ID).</p>
-            </InfoCard>
-        );
-    }
-
-    return (
-        <InfoCard icon={IconFingerPrint} title="Acesso Rápido com Biometria" delay={100}>
-            {isEnabled ? (
-                <>
-                    <p className="text-sm text-green-700 font-semibold">Login por biometria está ativado.</p>
-                    <p className="text-xs text-zinc-500">Você pode entrar no aplicativo usando o Face ID ou Touch ID do seu dispositivo.</p>
-                    <button onClick={handleDisableBiometrics} className="mt-2 text-sm text-red-600 font-semibold hover:underline">
-                        Desabilitar
-                    </button>
-                </>
-            ) : (
-                <>
-                    <p className="text-sm text-zinc-600">Habilite o login com sua impressão digital ou reconhecimento facial para um acesso mais rápido e seguro.</p>
-                    <button
-                        onClick={handleEnableBiometrics}
-                        disabled={status === 'loading'}
-                        className="mt-3 w-full bg-green-500 text-white font-bold py-2 px-4 rounded-full hover:bg-green-600 transition-colors shadow-sm flex items-center justify-center gap-2 disabled:bg-green-400"
-                    >
-                        {status === 'loading' ? 'Aguardando...' : 'Habilitar Biometria'}
-                    </button>
-                    {errorMessage && <p className="mt-2 text-sm text-red-600 text-center">{errorMessage}</p>}
-                </>
-            )}
-        </InfoCard>
-    );
-};
-
 
 const InfoItem: React.FC<{ label: string; children: React.ReactNode; }> = ({ label, children }) => (
     <div className="border-b border-zinc-100 pb-2 last:border-b-0 last:pb-0">
@@ -135,7 +62,6 @@ const InfoPage: React.FC<{ onLogout: () => void; event: Event | null }> = ({ onL
                 </button>
             </header>
             <main className="p-4 space-y-4 md:grid md:grid-cols-2 md:gap-4 md:space-y-0">
-                <BiometricsCard />
                 <InfoCard icon={IconCalendar} title={event.name} delay={150}>
                     <InfoItem label="Data"><Highlight>{formatDate(event.event_date)}</Highlight></InfoItem>
                     <InfoItem label="Local"><p>{event.location}</p></InfoItem>

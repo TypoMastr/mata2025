@@ -1,13 +1,100 @@
-import React, { useState } from 'react';
+
+import React, { useState, useEffect } from 'react';
 import type { Event } from '../../types';
 import EventForm from './EventForm';
+import * as authService from '../../services/authService';
 
 interface ManagementPageProps {
     events: Event[];
     onAddEvent: (eventData: Omit<Event, 'id'>) => Promise<Event>;
     onUpdateEvent: (eventData: Event) => Promise<Event>;
     onLogout: () => void;
+    selectedEventId: string | null;
+    onEventChange: (id: string | null) => void;
 }
+
+const InfoCard: React.FC<{ icon: React.ReactElement; title: string; children: React.ReactNode; delay: number; }> = ({ icon, title, children, delay }) => (
+    <div className="bg-white p-4 rounded-xl border border-zinc-200 shadow-sm opacity-0 animate-fadeInUp" style={{ animationDelay: `${delay}ms`, animationFillMode: 'forwards' }}>
+        <div className="flex items-center gap-3 mb-3">
+            <div className="text-green-500">{icon}</div>
+            <h2 className="text-md font-bold text-zinc-800">{title}</h2>
+        </div>
+        <div className="space-y-3 text-sm text-zinc-700">{children}</div>
+    </div>
+);
+
+const BiometricsCard: React.FC = () => {
+    const [isSupported, setIsSupported] = useState(false);
+    const [isEnabled, setIsEnabled] = useState(false);
+    const [status, setStatus] = useState<'idle' | 'loading' | 'error'>('idle');
+    const [errorMessage, setErrorMessage] = useState('');
+
+    const IconFingerPrint = <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M7.864 4.243A7.5 7.5 0 0119.5 12c0 2.252-.903 4.34-2.378 5.855A7.5 7.5 0 019.622 4.145m1.503 1.498a5.25 5.25 0 00-6.236 6.236l-3.5 3.5a.75.75 0 001.06 1.06l3.5-3.5a5.25 5.25 0 006.236-6.236-1.503-1.503z" /></svg>;
+
+    useEffect(() => {
+        const supported = authService.isBiometricSupportAvailable();
+        setIsSupported(supported);
+        if (supported) {
+            setIsEnabled(authService.hasBiometricCredential());
+        }
+    }, []);
+
+    const handleEnableBiometrics = async () => {
+        setStatus('loading');
+        setErrorMessage('');
+        try {
+            await authService.registerBiometricCredential();
+            setIsEnabled(true);
+            setStatus('idle');
+        } catch (err: any) {
+            setStatus('error');
+            if (err.name === 'NotAllowedError') {
+                setErrorMessage('Permissão negada. Tente novamente.');
+            } else {
+                setErrorMessage('Falha ao habilitar. Tente novamente.');
+            }
+        }
+    };
+
+    const handleDisableBiometrics = () => {
+        authService.removeBiometricCredential();
+        setIsEnabled(false);
+    };
+
+    if (!isSupported) {
+        return (
+            <InfoCard icon={IconFingerPrint} title="Acesso Rápido" delay={100}>
+                <p className="text-sm text-zinc-500">Seu navegador ou dispositivo não é compatível com login por biometria (Face ID/Touch ID).</p>
+            </InfoCard>
+        );
+    }
+
+    return (
+        <InfoCard icon={IconFingerPrint} title="Acesso Rápido com Biometria" delay={100}>
+            {isEnabled ? (
+                <>
+                    <p className="text-sm text-green-700 font-semibold">Login por biometria está ativado.</p>
+                    <p className="text-xs text-zinc-500">Você pode entrar no aplicativo usando o Face ID ou Touch ID do seu dispositivo.</p>
+                    <button onClick={handleDisableBiometrics} className="mt-2 text-sm text-red-600 font-semibold hover:underline">
+                        Desabilitar
+                    </button>
+                </>
+            ) : (
+                <>
+                    <p className="text-sm text-zinc-600">Habilite o login com sua impressão digital ou reconhecimento facial para um acesso mais rápido e seguro.</p>
+                    <button
+                        onClick={handleEnableBiometrics}
+                        disabled={status === 'loading'}
+                        className="mt-3 w-full bg-green-500 text-white font-bold py-2 px-4 rounded-full hover:bg-green-600 transition-colors shadow-sm flex items-center justify-center gap-2 disabled:bg-green-400"
+                    >
+                        {status === 'loading' ? 'Aguardando...' : 'Habilitar Biometria'}
+                    </button>
+                    {errorMessage && <p className="mt-2 text-sm text-red-600 text-center">{errorMessage}</p>}
+                </>
+            )}
+        </InfoCard>
+    );
+};
 
 const formatDate = (dateString?: string) => {
     if (!dateString) return 'N/A';
@@ -16,7 +103,7 @@ const formatDate = (dateString?: string) => {
     });
 };
 
-const ManagementPage: React.FC<ManagementPageProps> = ({ events, onAddEvent, onUpdateEvent, onLogout }) => {
+const ManagementPage: React.FC<ManagementPageProps> = ({ events, onAddEvent, onUpdateEvent, onLogout, selectedEventId, onEventChange }) => {
     const [isFormOpen, setIsFormOpen] = useState(false);
     const [eventToEdit, setEventToEdit] = useState<Event | null>(null);
 
@@ -34,7 +121,7 @@ const ManagementPage: React.FC<ManagementPageProps> = ({ events, onAddEvent, onU
         <div className="animate-fadeIn">
             <header className="sticky top-0 md:static bg-white md:bg-transparent z-10 p-4 border-b border-zinc-200 md:border-b-0 md:pt-6">
                 <div className="flex justify-between items-center">
-                    <h1 className="text-xl md:text-2xl font-bold text-zinc-800">Gestão de Eventos</h1>
+                    <h1 className="text-xl md:text-2xl font-bold text-zinc-800">Gestão</h1>
                     <div className="flex items-center gap-2">
                          <button
                             onClick={() => handleOpenForm()}
@@ -52,31 +139,53 @@ const ManagementPage: React.FC<ManagementPageProps> = ({ events, onAddEvent, onU
                 </div>
             </header>
 
-            <main className="p-4 space-y-3">
-                {events.length > 0 ? (
-                    events.map((event, index) => (
-                        <div key={event.id}
-                            className="bg-white p-4 rounded-xl border border-zinc-200 shadow-sm flex justify-between items-center opacity-0 animate-fadeInUp"
-                            style={{ animationDelay: `${index * 50}ms`, animationFillMode: 'forwards' }}
-                        >
-                            <div>
-                                <p className="font-bold text-zinc-800">{event.name}</p>
-                                <p className="text-sm text-zinc-500 mt-1">{formatDate(event.event_date)}</p>
-                            </div>
-                            <button
-                                onClick={() => handleOpenForm(event)}
-                                className="text-sm font-semibold text-green-600 hover:bg-green-50 px-3 py-1.5 rounded-lg transition-colors"
+            <main className="p-4 space-y-4">
+                 <div className="space-y-3">
+                    <h2 className="text-lg font-bold text-zinc-700">Eventos Criados</h2>
+                    {events.length > 0 ? (
+                        events.map((event, index) => (
+                            <div key={event.id}
+                                className="bg-white p-4 rounded-xl border border-zinc-200 shadow-sm flex flex-col md:flex-row justify-between md:items-center gap-3 opacity-0 animate-fadeInUp"
+                                style={{ animationDelay: `${index * 50}ms`, animationFillMode: 'forwards' }}
                             >
-                                Editar
-                            </button>
+                                <div className="flex-grow">
+                                    <p className="font-bold text-zinc-800">{event.name}</p>
+                                    <p className="text-sm text-zinc-500 mt-1">{formatDate(event.event_date)}</p>
+                                </div>
+                                <div className="flex items-center gap-2 self-end md:self-center">
+                                     {selectedEventId === event.id ? (
+                                        <span className="px-3 py-1.5 text-xs font-bold text-green-700 bg-green-100 rounded-full">
+                                            Ativo
+                                        </span>
+                                    ) : (
+                                        <button
+                                            onClick={() => onEventChange(event.id)}
+                                            className="text-sm font-semibold text-zinc-600 hover:bg-zinc-100 px-3 py-1.5 rounded-lg transition-colors"
+                                        >
+                                            Tornar Ativo
+                                        </button>
+                                    )}
+                                    <button
+                                        onClick={() => handleOpenForm(event)}
+                                        className="text-sm font-semibold text-green-600 hover:bg-green-50 px-3 py-1.5 rounded-lg transition-colors"
+                                    >
+                                        Editar
+                                    </button>
+                                </div>
+                            </div>
+                        ))
+                    ) : (
+                        <div className="text-center py-12 text-zinc-500 bg-white rounded-xl border border-zinc-200">
+                            <p className="font-semibold">Nenhum evento criado.</p>
+                            <p className="mt-2 text-sm">Clique em "Novo Evento" para começar.</p>
                         </div>
-                    ))
-                ) : (
-                    <div className="text-center py-20 text-zinc-500">
-                        <p className="font-semibold">Nenhum evento criado.</p>
-                        <p className="mt-2 text-sm">Clique em "Novo Evento" para começar.</p>
-                    </div>
-                )}
+                    )}
+                </div>
+                
+                <div className="pt-4 border-t border-zinc-200">
+                     <h2 className="text-lg font-bold text-zinc-700 mb-3">Configurações</h2>
+                     <BiometricsCard />
+                </div>
             </main>
 
             {isFormOpen && (

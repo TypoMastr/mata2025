@@ -223,7 +223,7 @@ const AppContent: React.FC = () => {
              case 'info':
                 return <InfoPage onLogout={handleLogout} event={selectedEvent} />;
              case 'management':
-                return <ManagementPage events={events} onAddEvent={addEvent} onUpdateEvent={updateEvent} onLogout={handleLogout} />;
+                return <ManagementPage events={events} onAddEvent={addEvent} onUpdateEvent={updateEvent} onLogout={handleLogout} selectedEventId={selectedEventId} onEventChange={setSelectedEventId} />;
             case 'list':
             default:
                 return (

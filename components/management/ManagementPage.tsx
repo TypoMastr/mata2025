@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import type { Event, View, ActionHistory } from '../../types';
 import EventForm from './EventForm';
 import ConfirmDeleteEvent from '../ConfirmDeleteEvent';
@@ -110,6 +110,10 @@ const ManagementPage: React.FC<ManagementPageProps> = ({ events, onAddEvent, onU
     const [isFormOpen, setIsFormOpen] = useState(false);
     const [eventToEdit, setEventToEdit] = useState<Event | null>(null);
     const [eventToDelete, setEventToDelete] = useState<Event | null>(null);
+    const [openMenuId, setOpenMenuId] = useState<string | null>(null);
+
+    const activeEvents = useMemo(() => events.filter(e => !e.is_archived), [events]);
+    const archivedEvents = useMemo(() => events.filter(e => e.is_archived), [events]);
 
     const handleOpenForm = (event?: Event) => {
         setEventToEdit(event || null);
@@ -125,12 +129,37 @@ const ManagementPage: React.FC<ManagementPageProps> = ({ events, onAddEvent, onU
         if (eventToDelete) {
             await onDeleteEvent(eventToDelete.id);
             if (selectedEventId === eventToDelete.id) {
-                const remainingEvents = events.filter(e => e.id !== eventToDelete.id);
+                const remainingEvents = events.filter(e => e.id !== eventToDelete.id && !e.is_archived);
                 onEventChange(remainingEvents.length > 0 ? remainingEvents[0].id : null);
             }
             setEventToDelete(null);
         }
     };
+    
+    const handleToggleArchive = async (event: Event) => {
+        try {
+            await onUpdateEvent({ ...event, is_archived: !event.is_archived });
+        } catch (error) {
+            console.error("Failed to toggle archive status:", error);
+        }
+    };
+
+    const handleMenuToggle = (eventId: string) => {
+        setOpenMenuId(prev => (prev === eventId ? null : eventId));
+    };
+
+    useEffect(() => {
+        const handleClickOutside = (event: MouseEvent) => {
+            const target = event.target as HTMLElement;
+            if (openMenuId && !target.closest(`[data-menu-id="${openMenuId}"]`)) {
+                setOpenMenuId(null);
+            }
+        };
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => {
+            document.removeEventListener('mousedown', handleClickOutside);
+        };
+    }, [openMenuId]);
 
     const IconDatabase = <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M20.25 6.375c0 2.278-3.694 4.125-8.25 4.125S3.75 8.653 3.75 6.375m16.5 0c0-2.278-3.694-4.125-8.25-4.125S3.75 4.097 3.75 6.375m16.5 0v11.25c0 2.278-3.694 4.125-8.25 4.125s-8.25-1.847-8.25-4.125V6.375m16.5 0v3.75m-16.5-3.75v3.75m16.5 0v3.75C20.25 16.153 16.556 18 12 18s-8.25-1.847-8.25-4.125v-3.75m16.5 0c0 2.278-3.694 4.125-8.25 4.125s-8.25-1.847-8.25-4.125" /></svg>;
 
@@ -149,10 +178,10 @@ const ManagementPage: React.FC<ManagementPageProps> = ({ events, onAddEvent, onU
                 </div>
             </header>
 
-            <main className="p-4 space-y-4">
+            <main className="p-4 space-y-6">
                  <div className="bg-white p-4 rounded-xl border border-zinc-200 shadow-sm space-y-3">
                     <div className="flex justify-between items-center">
-                        <h2 className="text-lg font-bold text-zinc-700">Eventos</h2>
+                        <h2 className="text-lg font-bold text-zinc-700">Eventos Ativos</h2>
                         <button
                             onClick={() => handleOpenForm()}
                             className="bg-green-500 text-white font-bold py-2 px-4 rounded-full flex items-center gap-2 hover:bg-green-600 transition-colors shadow-sm"
@@ -162,53 +191,108 @@ const ManagementPage: React.FC<ManagementPageProps> = ({ events, onAddEvent, onU
                             <span className="sm:hidden">Novo</span>
                         </button>
                     </div>
-                    {events.length > 0 ? (
-                        events.map((event, index) => (
-                            <div key={event.id}
-                                className="bg-zinc-50 p-3 rounded-lg border border-zinc-200 flex flex-col md:flex-row justify-between md:items-center gap-3 opacity-0 animate-fadeInUp"
-                                style={{ animationDelay: `${index * 50}ms`, animationFillMode: 'forwards' }}
-                            >
-                                <div className="flex-grow">
-                                    <p className="font-bold text-zinc-800">{event.name}</p>
-                                    <p className="text-sm text-zinc-500 mt-1">{formatDate(event.event_date)}</p>
-                                </div>
-                                <div className="flex items-center gap-2 self-end md:self-center">
-                                     {selectedEventId === event.id ? (
-                                        <span className="px-3 py-1.5 text-xs font-bold text-green-700 bg-green-100 rounded-full">
-                                            Ativo
-                                        </span>
-                                    ) : (
+                    {activeEvents.length > 0 ? (
+                        activeEvents.map((event, index) => {
+                            const isActive = selectedEventId === event.id;
+                            return (
+                                <div
+                                    key={event.id}
+                                    className={`relative p-3 rounded-lg border flex flex-col md:flex-row justify-between md:items-center gap-3 opacity-0 animate-fadeInUp transition-colors ${
+                                        isActive ? 'bg-green-50 border-green-300 shadow-md' : 'bg-zinc-50 border-zinc-200'
+                                    } ${openMenuId === event.id ? 'z-10' : ''}`}
+                                    style={{ animationDelay: `${index * 50}ms`, animationFillMode: 'forwards' }}
+                                >
+                                    <div className="flex-grow">
+                                        <p className={`font-bold ${isActive ? 'text-green-900' : 'text-zinc-800'}`}>{event.name}</p>
+                                        <p className={`text-sm ${isActive ? 'text-green-700' : 'text-zinc-500'} mt-1`}>{formatDate(event.event_date)}</p>
+                                    </div>
+                                    <div className="flex items-center gap-2 self-end md:self-center">
+                                        {isActive ? (
+                                            <span className="px-4 py-2 text-sm font-bold text-green-700 bg-white border border-green-300 rounded-full">
+                                                Ativo
+                                            </span>
+                                        ) : (
+                                            <button
+                                                onClick={() => onEventChange(event.id)}
+                                                className="text-sm font-semibold text-zinc-700 bg-zinc-200 hover:bg-zinc-300 px-4 py-2 rounded-full transition-colors"
+                                            >
+                                                Tornar Ativo
+                                            </button>
+                                        )}
                                         <button
-                                            onClick={() => onEventChange(event.id)}
-                                            className="text-sm font-semibold text-zinc-600 hover:bg-zinc-100 px-3 py-1.5 rounded-lg transition-colors"
+                                            onClick={() => handleOpenForm(event)}
+                                            className={`text-sm font-semibold border px-4 py-2 rounded-full transition-colors ${isActive ? 'text-green-800 bg-white/70 border-green-300 hover:bg-white' : 'text-green-700 border-zinc-300 hover:bg-green-50'}`}
                                         >
-                                            Tornar Ativo
+                                            Editar
                                         </button>
-                                    )}
-                                    <button
-                                        onClick={() => handleOpenForm(event)}
-                                        className="text-sm font-semibold text-green-600 hover:bg-green-50 px-3 py-1.5 rounded-lg transition-colors"
-                                    >
-                                        Editar
-                                    </button>
-                                    {selectedEventId !== event.id && (
-                                        <button
-                                            onClick={() => setEventToDelete(event)}
-                                            className="text-sm font-semibold text-red-600 hover:bg-red-50 px-3 py-1.5 rounded-lg transition-colors"
-                                        >
-                                            Excluir
-                                        </button>
-                                    )}
+                                        <div className="relative" data-menu-id={event.id}>
+                                            <button 
+                                                onClick={() => handleMenuToggle(event.id)} 
+                                                className={`p-2 rounded-full hover:bg-zinc-200 ${isActive ? 'text-zinc-600' : 'text-zinc-500'}`}
+                                                aria-label="Mais opções"
+                                            >
+                                                <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z" /></svg>
+                                            </button>
+
+                                            {openMenuId === event.id && (
+                                                <div className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-xl z-20 animate-popIn origin-top-right border border-zinc-200">
+                                                    <div className="py-1">
+                                                        <button
+                                                            onClick={() => { handleToggleArchive(event); setOpenMenuId(null); }}
+                                                            disabled={isActive}
+                                                            className="w-full text-left px-4 py-2 text-sm text-zinc-700 hover:bg-zinc-100 disabled:text-zinc-400 disabled:bg-transparent disabled:cursor-not-allowed flex items-center gap-2"
+                                                            title={isActive ? "Não é possível arquivar o evento ativo" : ""}
+                                                        >
+                                                            Arquivar
+                                                        </button>
+                                                        {!isActive && (
+                                                            <button
+                                                                onClick={() => { setEventToDelete(event); setOpenMenuId(null); }}
+                                                                className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50 flex items-center gap-2"
+                                                            >
+                                                                Excluir
+                                                            </button>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                            )}
+                                        </div>
+                                    </div>
                                 </div>
-                            </div>
-                        ))
+                            )
+                        })
                     ) : (
                         <div className="text-center py-12 text-zinc-500">
-                            <p className="font-semibold">Nenhum evento criado.</p>
-                            <p className="mt-2 text-sm">Clique em "Novo Evento" para começar.</p>
+                            <p className="font-semibold">Nenhum evento ativo.</p>
+                            <p className="mt-2 text-sm">Crie um novo evento ou desarquive um existente.</p>
                         </div>
                     )}
                 </div>
+
+                {archivedEvents.length > 0 && (
+                     <div className="bg-white p-4 rounded-xl border border-zinc-200 shadow-sm space-y-3">
+                        <h2 className="text-lg font-bold text-zinc-700">Eventos Arquivados</h2>
+                        {archivedEvents.map((event, index) => (
+                             <div key={event.id}
+                                className="bg-zinc-100 p-3 rounded-lg border border-zinc-200 flex flex-col md:flex-row justify-between md:items-center gap-3 opacity-60"
+                            >
+                                <div className="flex-grow">
+                                    <p className="font-bold text-zinc-600">{event.name}</p>
+                                    <p className="text-sm text-zinc-500 mt-1">{formatDate(event.event_date)}</p>
+                                </div>
+                                <div className="flex items-center gap-2 self-end md:self-center">
+                                     <button
+                                        onClick={() => handleToggleArchive(event)}
+                                        className="text-sm font-semibold text-white bg-green-500 hover:bg-green-600 px-4 py-2 rounded-full transition-colors shadow-sm"
+                                    >
+                                        Desarquivar
+                                    </button>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                )}
+
 
                  <div className="bg-white p-4 rounded-xl border border-zinc-200 shadow-sm space-y-3">
                     <h2 className="text-lg font-bold text-zinc-700">Histórico de Ações</h2>

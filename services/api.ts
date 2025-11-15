@@ -1,3 +1,4 @@
+
 import { createClient } from '@supabase/supabase-js';
 import type { Registration, Payment, Person, Event, ActionHistory } from '../types';
 import { PackageType, PaymentStatus } from '../types';
@@ -120,7 +121,7 @@ const eventToSupabase = (event: Partial<Event>): any => ({
     name: event.name, event_date: event.event_date, location: event.location, activity_time: event.activity_time,
     site_price: event.site_price, bus_price: event.bus_price, pix_key: event.pix_key,
     bus_departure_time: event.bus_departure_time, bus_return_time: event.bus_return_time,
-    payment_deadline: event.payment_deadline, is_deleted: event.is_deleted,
+    payment_deadline: event.payment_deadline, is_deleted: event.is_deleted, is_archived: event.is_archived,
 });
 
 // --- Contextual Description Generator ---
@@ -204,7 +205,14 @@ const generateActionDescription = async (action_type: string, previous_data: any
             }
             case 'CREATE_EVENT': return `Evento '${new_data.name}' criado.`;
             case 'DELETE_EVENT': return `Evento '${previous_data.name}' excluído.`;
-            case 'UPDATE_EVENT': return `Dados do evento '${new_data.name}' atualizados.`;
+            case 'UPDATE_EVENT': {
+                const before = previous_data as Event;
+                const after = new_data as Event;
+                if (before.is_archived !== after.is_archived) {
+                    return after.is_archived ? `Evento '${after.name}' arquivado.` : `Evento '${after.name}' desarquivado.`;
+                }
+                return `Dados do evento '${after.name}' atualizados.`;
+            }
             case 'UNDO_ACTION': return `Ação "${previous_data.description.split('\n')[0]}" foi desfeita.`;
             default: return `Ação do tipo ${action_type} executada.`;
         }
@@ -299,6 +307,7 @@ export const deleteRegistration = async (id: string): Promise<void> => {
 
     const { error } = await supabase.from('event_registrations').update({ is_deleted: true }).eq('id', id);
     if (error) throw new Error(`Failed to delete registration: ${error.message}`);
+    // FIX: Replaced incorrect function call with separate calls to generate description and log the action, consistent with other delete functions.
     const description = await generateActionDescription('DELETE_REGISTRATION', registration, null);
     await logAction('DELETE_REGISTRATION', 'event_registrations', id, description, registration, { ...registration, is_deleted: true });
 };

@@ -129,6 +129,7 @@ export interface Event {
     bus_return_time: string;
     payment_deadline: string;
     is_deleted?: boolean;
+    is_archived?: boolean;
 }
 
 export interface ActionHistory {

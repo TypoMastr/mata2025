@@ -51,12 +51,14 @@ const AppContent: React.FC = () => {
     const [packageFilter, setPackageFilter] = useState<'all' | PackageType>('all');
     const [scrollPosition, setScrollPosition] = useState(0);
 
+    const activeEvents = useMemo(() => events.filter(e => !e.is_archived), [events]);
+
     useEffect(() => {
-        if (!selectedEventId && events.length > 0) {
-            const activeEvent = events.find(e => !e.is_deleted);
+        if (!selectedEventId && activeEvents.length > 0) {
+            const activeEvent = activeEvents.find(e => !e.is_deleted);
             if(activeEvent) setSelectedEventId(activeEvent.id);
         }
-    }, [events, selectedEventId]);
+    }, [activeEvents, selectedEventId]);
 
     useEffect(() => {
         historyHook.fetchLatestHistory();
@@ -218,7 +220,7 @@ const AppContent: React.FC = () => {
                         attendees={registrations} onSelectAttendee={handleSelectRegistration} onAddAttendee={handleAddAttendeeClick} onLogout={handleLogout}
                         searchQuery={searchQuery} onSearchQueryChange={setSearchQuery} statusFilter={statusFilter} onStatusFilterChange={setStatusFilter}
                         packageFilter={packageFilter} onPackageFilterChange={setPackageFilter} scrollPosition={scrollPosition} onScrollPositionReset={() => setScrollPosition(0)}
-                        events={events} selectedEventId={selectedEventId} onEventChange={setSelectedEventId}
+                        events={activeEvents} selectedEventId={selectedEventId} onEventChange={setSelectedEventId}
                     />
                 );
         }

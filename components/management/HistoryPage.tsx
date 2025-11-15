@@ -32,7 +32,7 @@ const ActionCard: React.FC<{ item: ActionHistory; onUndoClick: (item: ActionHist
     const [isExpanded, setIsExpanded] = useState(false);
     const time = new Date(item.created_at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
     const isUndoable = !item.is_undone && !item.action_type.startsWith('UNDO');
-    const hasDetails = !!item.ip_address;
+    const hasDetails = !!item.previous_data || !!item.new_data || !!item.ip_address;
 
     return (
         <div className="bg-white rounded-xl border border-zinc-200 shadow-sm overflow-hidden">

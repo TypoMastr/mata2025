@@ -16,8 +16,20 @@ const SpinnerIcon: React.FC = () => (
 
 const ConfirmDeletePerson: React.FC<ConfirmDeletePersonProps> = ({ person, onConfirm, onCancel }) => {
     const [isDeleting, setIsDeleting] = useState(false);
+    const [password, setPassword] = useState('');
+    const [error, setError] = useState('');
+    const [shakeError, setShakeError] = useState(false);
+
 
     const handleConfirmClick = async () => {
+         if (password !== 'umbanda396') {
+            setError('Senha incorreta.');
+            setPassword('');
+            setShakeError(true);
+            setTimeout(() => setShakeError(false), 500);
+            return;
+        }
+        setError('');
         setIsDeleting(true);
         try {
             await onConfirm();
@@ -32,7 +44,7 @@ const ConfirmDeletePerson: React.FC<ConfirmDeletePersonProps> = ({ person, onCon
 
     return (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 animate-fadeIn">
-            <div className="bg-white rounded-xl shadow-lg p-6 max-w-sm w-full animate-popIn">
+            <div className={`bg-white rounded-xl shadow-lg p-6 max-w-sm w-full animate-popIn ${shakeError ? 'animate-shake' : ''}`}>
                 <div className="sm:flex sm:items-start">
                     <div className="mx-auto flex-shrink-0 flex items-center justify-center h-12 w-12 rounded-full bg-red-100 sm:mx-0 sm:h-10 sm:w-10">
                         <svg className="h-6 w-6 text-red-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
@@ -48,6 +60,20 @@ const ConfirmDeletePerson: React.FC<ConfirmDeletePersonProps> = ({ person, onCon
                                 Você tem certeza que deseja excluir <strong className="font-semibold text-zinc-700">{person.name}</strong>? 
                                 Esta ação removerá o registro da pessoa permanentemente. Esta ação não pode ser desfeita.
                             </p>
+                             <div className="mt-4">
+                                <label htmlFor="password-confirm-person" className="sr-only">Senha de confirmação</label>
+                                <input
+                                    id="password-confirm-person"
+                                    type="password"
+                                    value={password}
+                                    onChange={(e) => setPassword(e.target.value)}
+                                    placeholder="Senha para confirmar"
+                                    className={`w-full px-3 py-2 bg-white border ${error ? 'border-red-500' : 'border-zinc-300'} rounded-md shadow-sm sm:text-sm focus:outline-none focus:ring-2 focus:ring-red-500`}
+                                    required
+                                    autoComplete="off"
+                                />
+                                {error && <p className="mt-1 text-xs text-red-600 animate-fadeIn">{error}</p>}
+                            </div>
                         </div>
                     </div>
                 </div>

@@ -1155,7 +1155,8 @@ const ReportsDashboard: React.FC<{ attendees: Attendee[]; onGenerateReportClick:
                     </div>
                 </StatCard>
                 <StatCard title="Formas de Pagamento" icon={IconCreditCard} delay={350 + (busStats.length * 50)}>
-                    {paidCount > 0 || Object.values(paymentStats).some(s => s.count > 0) ? (
+                    {/* FIX: Explicitly type `s` as `{ count: number }` to fix a TypeScript inference issue where it was being treated as `unknown`. */}
+                    {paidCount > 0 || Object.values(paymentStats).some((s: { count: number }) => s.count > 0) ? (
                         <div className="space-y-3">
                             {(Object.entries(paymentStats) as [string, { count: number; total: number }][]).map(([type, stats]) => (
                                 stats.count > 0 &&

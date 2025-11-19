@@ -270,12 +270,63 @@ export const fetchRegistrations = async (eventId: string): Promise<Registration[
 };
 
 export const createRegistration = async (regData: {personId: string, eventId: string, packageType: PackageType, payment: Payment, notes?: string}): Promise<Registration> => {
-    const recordToInsert = { /* ... as before ... */
-        person_id: regData.personId, event_id: regData.eventId, package_type: regData.packageType,
-        payment_amount: regData.payment.amount, payment_status: regData.payment.status,
-        payment_details: { site: regData.payment.sitePaymentDetails, bus: regData.payment.busPaymentDetails, date: regData.payment.date, type: regData.payment.type, receiptUrl: regData.payment.receiptUrl },
-        notes: regData.notes, registration_date: new Date().toISOString(), is_deleted: false,
+    // 1. Check if registration already exists (active or soft-deleted)
+    const { data: existing } = await supabase
+        .from('event_registrations')
+        .select('id, is_deleted')
+        .eq('person_id', regData.personId)
+        .eq('event_id', regData.eventId)
+        .maybeSingle();
+
+    const paymentDetails: any = {};
+    if (regData.packageType === PackageType.SITIO_BUS) {
+        paymentDetails.site = regData.payment.sitePaymentDetails || { isPaid: false, receiptUrl: null };
+        paymentDetails.bus = regData.payment.busPaymentDetails || { isPaid: false, receiptUrl: null };
+    } else {
+        paymentDetails.date = regData.payment.date || null;
+        paymentDetails.type = regData.payment.type || null;
+        paymentDetails.receiptUrl = regData.payment.receiptUrl || null;
+    }
+
+    const commonData = {
+        package_type: regData.packageType,
+        payment_amount: regData.payment.amount,
+        payment_status: regData.payment.status,
+        payment_details: paymentDetails,
+        notes: regData.notes,
+        is_deleted: false,
+        registration_date: new Date().toISOString(),
     };
+
+    if (existing) {
+        if (existing.is_deleted) {
+            // Restore soft-deleted registration
+            const { data, error } = await supabase.from('event_registrations')
+                .update(commonData)
+                .eq('id', existing.id)
+                .select('*, people(*)')
+                .single();
+            
+            if (error) throw new Error(`Failed to restore registration: ${error.message}`);
+            
+            const newRegistration = fromSupabase(data);
+            // Log as CREATE because for the user it is a new registration
+            const description = await generateActionDescription('CREATE_REGISTRATION', null, newRegistration);
+            await logAction('CREATE_REGISTRATION', 'event_registrations', newRegistration.id, description, null, newRegistration);
+            return newRegistration;
+        } else {
+            // It exists and is active. Throw specific error to be caught by UI.
+            throw new Error(`duplicate key value violates unique constraint "event_registrations_person_id_event_id_key"`);
+        }
+    }
+
+    // 2. Insert new registration
+    const recordToInsert = {
+        person_id: regData.personId, 
+        event_id: regData.eventId, 
+        ...commonData
+    };
+    
     const { data, error } = await supabase.from('event_registrations').insert(recordToInsert).select('*, people(*)').single();
     if (error) throw new Error(`Failed to create registration: ${error.message}`);
     const newRegistration = fromSupabase(data);

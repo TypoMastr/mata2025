@@ -229,7 +229,15 @@ const AddAttendeeForm: React.FC<AddAttendeeFormProps> = ({ onAddAttendee, onUpda
 
         if (!formData.phone.trim() || formData.phone.replace(/\D/g, '').length < 10) newErrors.phone = 'Telefone inválido.';
         
-        // Only check for duplicates if it's a new person being registered
+        // Check for duplicate person ID selection
+        if (isPersonSelected && formData.personId) {
+             const duplicate = registrations.find(r => r.person.id === formData.personId);
+             if (duplicate) {
+                 newErrors.name = `"${formData.name}" já está na lista deste evento.`;
+             }
+        }
+
+        // Only check for duplicates by text if it's a new person being registered
         if (!isPersonSelected) {
             const normalizedName = normalizeString(formData.name);
             const normalizedDocument = formData.document.replace(/[^\d]/g, '');

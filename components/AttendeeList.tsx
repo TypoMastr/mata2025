@@ -18,7 +18,6 @@ interface AttendeeListProps {
     onPackageFilterChange: (filter: 'all' | PackageType) => void;
     scrollPosition: number;
     onScrollPositionReset: () => void;
-    // FIX: Add props for event selection
     events: Event[];
     selectedEventId: string | null;
     onEventChange: (id: string | null) => void;
@@ -113,7 +112,6 @@ const AttendeeList: React.FC<AttendeeListProps> = ({
         const normalizedSearchQuery = normalizeString(searchQuery);
         const filtered = attendees
             .filter(attendee =>
-                // FIX: Access name from the nested person object.
                 normalizeString(attendee.person.name).includes(normalizedSearchQuery)
             )
             .filter(attendee =>
@@ -123,14 +121,12 @@ const AttendeeList: React.FC<AttendeeListProps> = ({
                 packageFilter === 'all' || attendee.packageType === packageFilter
             );
         
-        // FIX: Access name from the nested person object for sorting.
         return [...filtered].sort((a, b) => a.person.name.localeCompare(b.person.name));
     }, [attendees, searchQuery, statusFilter, packageFilter]);
 
 
     return (
         <div className="animate-fadeIn">
-            {/* Removed sticky, top-0 and z-10 to allow header to scroll out of view */}
             <header className="bg-white md:bg-transparent p-4 border-b border-zinc-200 md:border-b-0 md:pt-6 space-y-4">
                  <div className="flex justify-between items-center">
                     <h1 className="text-xl md:text-2xl font-bold text-zinc-800">Inscrições ({sortedAttendees.length})</h1>
@@ -227,11 +223,9 @@ const AttendeeList: React.FC<AttendeeListProps> = ({
                                 <tbody className="bg-white divide-y divide-zinc-200">
                                     {sortedAttendees.map((attendee) => (
                                         <tr key={attendee.id} onClick={() => onSelectAttendee(attendee.id)} className="hover:bg-zinc-50 cursor-pointer transition-colors">
-                                            {/* FIX: Access name from the nested person object. */}
                                             <td className="px-6 py-4"><div className="text-sm font-medium text-zinc-900">{attendee.person.name}</div></td>
                                             <td className="px-6 py-4"><div className="flex items-center text-sm text-zinc-500"><PackageIcon packageType={attendee.packageType} />{attendee.packageType}</div></td>
                                             <td className="px-6 py-4"><StatusBadge attendee={attendee} /></td>
-                                            {/* FIX: Access phone from the nested person object. */}
                                             <td className="px-6 py-4 text-sm text-zinc-500">{attendee.person.phone}</td>
                                             <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                                                 <span className="text-green-600 hover:text-green-900 flex items-center justify-end">

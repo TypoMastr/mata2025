@@ -9,7 +9,7 @@ interface AttendeeListItemProps {
     index: number;
 }
 
-const AttendeeListItem: React.FC<AttendeeListItemProps> = ({ attendee, onSelect, index }) => {
+const AttendeeListItem: React.FC<AttendeeListItemProps> = ({ attendee, onSelect }) => {
     let statusClasses = '';
     const { status, sitePaymentDetails, busPaymentDetails } = attendee.payment;
     
@@ -38,18 +38,16 @@ const AttendeeListItem: React.FC<AttendeeListItemProps> = ({ attendee, onSelect,
     return (
         <button 
             onClick={() => onSelect(attendee.id)} 
-            className="w-full text-left p-4 bg-white rounded-xl border border-zinc-200 shadow-sm flex justify-between items-center opacity-0 animate-fadeInUp select-none touch-manipulation active:bg-zinc-200 transition-colors"
-            style={{ animationDelay: `${index * 50}ms`, animationFillMode: 'forwards' }}
+            className="w-full text-left p-4 bg-white rounded-xl border border-zinc-200 shadow-sm flex justify-between items-center select-none touch-manipulation active:bg-zinc-100 transition-colors"
         >
-            {/* pointer-events-none ensures the click is always registered on the button, not the text */}
-            <div className="min-w-0 pr-2 pointer-events-none">
+            <div className="min-w-0 pr-2">
                 <p className="font-bold text-zinc-800 truncate">{attendee.person.name}</p>
                 <p className="text-sm text-zinc-500 flex items-center mt-1">
                     {packageIcon}
                     <span className="truncate">{attendee.packageType}</span>
                 </p>
             </div>
-            <div className="flex items-center gap-2 flex-shrink-0 pointer-events-none">
+            <div className="flex items-center gap-2 flex-shrink-0">
                  <div className="flex flex-col items-end gap-1.5">
                     <span className={`px-3 py-1 text-xs font-bold rounded-full ${statusClasses}`}>
                         {attendee.payment.status.toUpperCase()}

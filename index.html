@@ -96,6 +96,12 @@
       .pb-safe {
         padding-bottom: env(safe-area-inset-bottom);
       }
+
+      /* FIX 4: Explicitly tell the browser to handle vertical pans, 
+         making clicks immediate if there is no vertical movement. */
+      .touch-pan-y {
+        touch-action: pan-y;
+      }
     </style>
 <script type="importmap">
 {

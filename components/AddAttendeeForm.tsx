@@ -188,6 +188,13 @@ const AddAttendeeForm: React.FC<AddAttendeeFormProps> = ({ onAddAttendee, onUpda
     }, [formData.packageType, isEditMode, event]);
 
     const handleSelectPerson = (person: Person) => {
+        // Immediate check for duplicates when selecting a person
+        const duplicate = registrations.find(r => r.person.id === person.id);
+        if (duplicate) {
+            addToast(`"${person.name}" já está inscrito neste evento.`, 'error');
+            return;
+        }
+
         setFormData(prev => ({
             ...prev,
             personId: person.id,

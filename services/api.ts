@@ -271,6 +271,7 @@ export const fetchRegistrations = async (eventId: string): Promise<Registration[
 
 export const createRegistration = async (regData: {personId: string, eventId: string, packageType: PackageType, payment: Payment, notes?: string}): Promise<Registration> => {
     // 1. Check if registration already exists (active or soft-deleted)
+    // Note: maybeSingle() finds rows that are visible. If RLS hides soft-deleted rows, this might return null.
     const { data: existing } = await supabase
         .from('event_registrations')
         .select('id, is_deleted')
@@ -328,7 +329,31 @@ export const createRegistration = async (regData: {personId: string, eventId: st
     };
     
     const { data, error } = await supabase.from('event_registrations').insert(recordToInsert).select('*, people(*)').single();
-    if (error) throw new Error(`Failed to create registration: ${error.message}`);
+    
+    if (error) {
+        // FIX: Handle soft-deleted records that might be hidden from SELECT by RLS but still trigger unique constraint on INSERT.
+        if (error.message.includes('duplicate key value') || error.code === '23505') {
+             // Attempt to restore the "hidden" soft-deleted record
+             const { data: restoredData, error: restoreError } = await supabase
+                .from('event_registrations')
+                .update(commonData)
+                .eq('person_id', regData.personId)
+                .eq('event_id', regData.eventId)
+                .select('*, people(*)')
+                .single();
+
+             if (restoreError) {
+                 // If restore also fails, we really have a problem or it's a genuine conflict we can't resolve.
+                 throw new Error(`Failed to create registration: ${error.message}`);
+             }
+             
+             const restoredRegistration = fromSupabase(restoredData);
+             const description = await generateActionDescription('CREATE_REGISTRATION', null, restoredRegistration);
+             await logAction('CREATE_REGISTRATION', 'event_registrations', restoredRegistration.id, description, null, restoredRegistration);
+             return restoredRegistration;
+        }
+        throw new Error(`Failed to create registration: ${error.message}`);
+    }
     const newRegistration = fromSupabase(data);
     const description = await generateActionDescription('CREATE_REGISTRATION', null, newRegistration);
     await logAction('CREATE_REGISTRATION', 'event_registrations', newRegistration.id, description, null, newRegistration);

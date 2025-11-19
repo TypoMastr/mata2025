@@ -14,7 +14,7 @@ const NavItem: React.FC<{ icon: React.ReactElement; label: string; isActive: boo
     return (
         <button 
             onClick={onClick} 
-            className={`flex flex-col items-center justify-center gap-1 w-full h-full select-none touch-manipulation active:bg-zinc-100 active:opacity-60 transition-opacity duration-200 outline-none ${isActive ? activeClasses : inactiveClasses}`}
+            className={`flex flex-col items-center justify-center gap-1 w-full h-full select-none touch-manipulation active:bg-zinc-100 active:opacity-60 outline-none ${isActive ? activeClasses : inactiveClasses}`}
         >
             {icon}
             <span className="text-[10px] font-bold uppercase tracking-wide">{label}</span>
@@ -36,9 +36,6 @@ const BottomNav: React.FC<BottomNavProps> = ({ currentView, setView }) => {
     const IconAdjustments = <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M10.5 6h9.75M10.5 6a1.5 1.5 0 1 1-3 0m3 0a1.5 1.5 0 1 0-3 0M3.75 6H7.5m3 12h9.75m-9.75 0a1.5 1.5 0 0 1-3 0m3 0a1.5 1.5 0 0 0-3 0m-3.75 0H7.5m9-6h3.75m-3.75 0a1.5 1.5 0 0 1-3 0m3 0a1.5 1.5 0 0 0-3 0m-9.75 0h9.75" /></svg>;
 
     return (
-        // Using padding-bottom: env(safe-area-inset-bottom) handles the iPhone X+ Home Indicator.
-        // Positioning is handled by the parent container in App.tsx now to prevent scroll issues,
-        // but keeping styling self-contained here.
         <footer
             className="bg-white/95 backdrop-blur-sm border-t border-zinc-200 w-full select-none"
             style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}

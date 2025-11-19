@@ -16,8 +16,9 @@ const NavItem: React.FC<{ icon: React.ReactElement; label: string; isActive: boo
             onClick={onClick} 
             className={`flex flex-col items-center justify-center gap-1 w-full h-full select-none touch-manipulation active:bg-zinc-100 active:opacity-60 outline-none ${isActive ? activeClasses : inactiveClasses}`}
         >
-            {icon}
-            <span className="text-[10px] font-bold uppercase tracking-wide">{label}</span>
+            {/* pointer-events-none passes the touch/click through to the button immediately */}
+            <span className="pointer-events-none">{icon}</span>
+            <span className="text-[10px] font-bold uppercase tracking-wide pointer-events-none">{label}</span>
         </button>
     );
 };

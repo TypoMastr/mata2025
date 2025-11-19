@@ -14,30 +14,48 @@
     
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
+      /* FIX 1: Lock the body scroll to prevent elastic effect on the whole viewport */
       html, body {
         height: 100%;
         width: 100%;
-        overflow: hidden; /* Prevent elastic scroll on body */
+        overflow: hidden; 
         overscroll-behavior: none;
         color-scheme: light;
+        -webkit-font-smoothing: antialiased;
+        background-color: #FAFAFA; /* Zinc-50 match */
       }
+      
       #root {
         height: 100%;
         width: 100%;
         display: flex;
         flex-direction: column;
+        isolation: isolate;
       }
       
-      /* Global styles for transitions and touch responsiveness */
-      * {
-        transition: background-color 0.2s ease-in-out, color 0.2s ease-in-out, border-color 0.2s ease-in-out, opacity 0.2s ease-in-out;
-        /* Improve touch responsiveness on iOS and other touch devices */
-        touch-action: manipulation; /* Disables double-tap to zoom, making single taps faster */
-        -webkit-tap-highlight-color: transparent; /* Removes the gray highlight on tap */
+      /* FIX 2: Improve Touch Responsiveness & Remove Input Lag */
+      *, *::before, *::after {
+        /* Disables double-tap to zoom delay (300ms removal) */
+        touch-action: manipulation; 
+        /* Removes grey highlight box on tap in Android/iOS */
+        -webkit-tap-highlight-color: transparent;
+        box-sizing: border-box;
       }
-      /* Ensures interactive elements have a pointer cursor, which can also help with touch event registration on some browsers */
-      button, a, select, input[type="button"], input[type="submit"], [role="button"] {
+
+      /* FIX 3: Prevent text selection on interactive elements 
+         This solves the issue where tapping a name tries to select text instead of clicking.
+      */
+      button, a, [role="button"], input[type="submit"], input[type="button"], .select-none {
+        user-select: none;
+        -webkit-user-select: none; /* Safari */
+        -webkit-touch-callout: none; /* Safari disable context menu on long press */
         cursor: pointer;
+      }
+
+      /* Allow text selection only on inputs where user needs to type */
+      input[type="text"], input[type="search"], input[type="tel"], input[type="email"], input[type="number"], input[type="password"], textarea {
+        user-select: text;
+        -webkit-user-select: text;
       }
 
       /* Custom animations */
@@ -63,18 +81,9 @@
           to { opacity: 1; transform: scale(1); }
       }
       @keyframes toast-in-out {
-          0% {
-              opacity: 0;
-              transform: translateX(100%);
-          }
-          10%, 90% {
-              opacity: 1;
-              transform: translateX(0);
-          }
-          100% {
-              opacity: 0;
-              transform: translateX(100%);
-          }
+          0% { opacity: 0; transform: translateX(100%); }
+          10%, 90% { opacity: 1; transform: translateX(0); }
+          100% { opacity: 0; transform: translateX(100%); }
       }
       .animate-fadeInUp { animation: fadeInUp 0.5s ease-out; }
       .animate-fadeOutDown { animation: fadeOutDown 0.5s ease-in; }
@@ -83,7 +92,7 @@
       .animate-popIn { animation: popIn 0.3s ease-out; }
       .animate-toast-in-out { animation: toast-in-out 5s ease-in-out forwards; }
 
-      /* Utility to use safe area in CSS if needed */
+      /* Utility for iOS Safe Areas */
       .pb-safe {
         padding-bottom: env(safe-area-inset-bottom);
       }

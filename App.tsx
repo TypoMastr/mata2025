@@ -106,7 +106,6 @@ const AppContent: React.FC = () => {
 
     const handleSelectRegistration = useCallback((id: string) => {
         if (view !== 'detail') setPreviousView(view);
-        // Scrolling to top on view change is handled by new layout structure mostly
         setScrollPosition(0); 
         setSelectedRegistrationId(id);
         setView('detail');
@@ -237,16 +236,29 @@ const AppContent: React.FC = () => {
     if (!isAuthenticated) return <Login onLoginSuccess={handleLoginSuccess} />;
 
     return (
-        <div className="bg-zinc-50 font-sans h-full md:h-auto md:max-w-7xl md:mx-auto md:my-8 md:rounded-2xl md:shadow-2xl md:flex flex-grow w-full">
+        // Layout structure updated for iOS PWA scrolling:
+        // 1. Outer container handles the flexbox layout and ensures 100% height.
+        // 2. The content area uses `flex-grow` and `overflow-hidden` to contain the scroll area.
+        // 3. The <main> element provides the scrollable area (`overflow-y-auto`), independent of the body.
+        // 4. BottomNav sits outside the scrolling area but inside the flex container.
+        <div className="bg-zinc-50 font-sans h-full flex flex-col md:flex-row md:h-auto md:max-w-7xl md:mx-auto md:my-8 md:rounded-2xl md:shadow-2xl md:overflow-hidden">
              <SideNav currentView={view} setView={setView} />
-            <div className="flex-grow h-full relative flex flex-col overflow-hidden md:min-h-0">
-                <main key={view + selectedEventId} className="flex-grow overflow-y-auto pb-28 md:pb-0 overscroll-contain">
+            
+            <div className="flex-grow flex flex-col h-full overflow-hidden relative md:min-h-[800px]">
+                {/* Main content scrolls independently */}
+                <main key={view + selectedEventId} className="flex-grow overflow-y-auto overscroll-contain pb-24 md:pb-0">
                     {renderContent()}
                 </main>
-                {registrationToDelete && <ConfirmDelete attendee={registrationToDelete} onConfirm={handleConfirmDelete} onCancel={handleCancelDelete} />}
-                {registrationPaymentToDelete && <ConfirmDeletePayment attendee={registrationPaymentToDelete} onConfirm={handleConfirmDeletePayment} onCancel={handleCancelDeletePayment} />}
-                <BottomNav currentView={view} setView={setView} />
+                
+                {/* Bottom Nav is fixed at the bottom of the flex container, not fixed to window */}
+                <div className="md:hidden flex-shrink-0 z-50">
+                     <BottomNav currentView={view} setView={setView} />
+                </div>
             </div>
+
+            {/* Modals sit on top of everything */}
+            {registrationToDelete && <ConfirmDelete attendee={registrationToDelete} onConfirm={handleConfirmDelete} onCancel={handleCancelDelete} />}
+            {registrationPaymentToDelete && <ConfirmDeletePayment attendee={registrationPaymentToDelete} onConfirm={handleConfirmDeletePayment} onCancel={handleCancelDeletePayment} />}
         </div>
     );
 };
@@ -264,7 +276,6 @@ const AppInitializer: React.FC = () => {
                 }
             } catch (e) {
                 console.error("Error verifying schema:", e);
-                // Fallback for unexpected errors during verification
                 setSchemaErrors(['desconhecido']);
             } finally {
                 setIsVerifying(false);

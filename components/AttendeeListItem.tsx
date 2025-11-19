@@ -1,5 +1,4 @@
 
-
 import React from 'react';
 import type { Attendee } from '../types';
 import { PaymentStatus, PackageType } from '../types';
@@ -39,18 +38,19 @@ const AttendeeListItem: React.FC<AttendeeListItemProps> = ({ attendee, onSelect,
     return (
         <button 
             onClick={() => onSelect(attendee.id)} 
-            className="w-full text-left p-4 bg-white rounded-xl border border-zinc-200 shadow-sm hover:bg-zinc-50 hover:border-zinc-300 transition-all duration-200 flex justify-between items-center opacity-0 animate-fadeInUp"
+            className="w-full text-left p-4 bg-white rounded-xl border border-zinc-200 shadow-sm flex justify-between items-center opacity-0 animate-fadeInUp select-none touch-manipulation active:bg-zinc-100 active:scale-[0.98] transition-transform duration-75"
             style={{ animationDelay: `${index * 50}ms`, animationFillMode: 'forwards' }}
         >
-            <div>
-                {/* FIX: Access name from the nested person object. */}
-                <p className="font-bold text-zinc-800">{attendee.person.name}</p>
+            <div className="min-w-0 pr-2 pointer-events-none">
+                {/* Pointer events none on children ensures the click hits the button container properly in some older iOS versions, 
+                    but primarily select-none on the button handles the text selection issue. */}
+                <p className="font-bold text-zinc-800 truncate">{attendee.person.name}</p>
                 <p className="text-sm text-zinc-500 flex items-center mt-1">
                     {packageIcon}
-                    <span>{attendee.packageType}</span>
+                    <span className="truncate">{attendee.packageType}</span>
                 </p>
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 flex-shrink-0 pointer-events-none">
                  <div className="flex flex-col items-end gap-1.5">
                     <span className={`px-3 py-1 text-xs font-bold rounded-full ${statusClasses}`}>
                         {attendee.payment.status.toUpperCase()}

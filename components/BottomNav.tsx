@@ -9,12 +9,15 @@ interface BottomNavProps {
 
 const NavItem: React.FC<{ icon: React.ReactElement; label: string; isActive: boolean; onClick: () => void }> = ({ icon, label, isActive, onClick }) => {
     const activeClasses = 'text-green-500';
-    const inactiveClasses = 'text-zinc-500 hover:text-green-500';
+    const inactiveClasses = 'text-zinc-500';
 
     return (
-        <button onClick={onClick} className={`flex flex-col items-center justify-center gap-1 w-full transition-colors ${isActive ? activeClasses : inactiveClasses}`}>
+        <button 
+            onClick={onClick} 
+            className={`flex flex-col items-center justify-center gap-1 w-full h-full select-none touch-manipulation active:scale-95 transition-transform duration-100 outline-none ${isActive ? activeClasses : inactiveClasses}`}
+        >
             {icon}
-            <span className="text-xs font-bold">{label}</span>
+            <span className="text-[10px] font-bold uppercase tracking-wide">{label}</span>
         </button>
     );
 };
@@ -32,17 +35,19 @@ const BottomNav: React.FC<BottomNavProps> = ({ currentView, setView }) => {
     const IconInfo = <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>;
     const IconAdjustments = <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M10.5 6h9.75M10.5 6a1.5 1.5 0 1 1-3 0m3 0a1.5 1.5 0 1 0-3 0M3.75 6H7.5m3 12h9.75m-9.75 0a1.5 1.5 0 0 1-3 0m3 0a1.5 1.5 0 0 0-3 0m-3.75 0H7.5m9-6h3.75m-3.75 0a1.5 1.5 0 0 1-3 0m3 0a1.5 1.5 0 0 0-3 0m-9.75 0h9.75" /></svg>;
 
-
     return (
+        // Using padding-bottom: env(safe-area-inset-bottom) handles the iPhone X+ Home Indicator.
+        // Positioning is handled by the parent container in App.tsx now to prevent scroll issues,
+        // but keeping styling self-contained here.
         <footer
-            className="fixed bottom-0 left-0 right-0 bg-white/90 backdrop-blur-sm border-t border-zinc-200 md:hidden z-50"
+            className="bg-white/95 backdrop-blur-sm border-t border-zinc-200 w-full select-none"
             style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
         >
             <div className="flex justify-around items-stretch h-16">
                 <NavItem icon={IconUsers} label="Inscrições" isActive={isCadastroActive} onClick={() => setView('list')} />
                 <NavItem icon={IconChart} label="Relatórios" isActive={isReportsActive} onClick={() => setView('reports')} />
                 <NavItem icon={IconAdjustments} label="Gestão" isActive={isManagementActive} onClick={() => setView('management')} />
-                <NavItem icon={IconInfo} label="Informações" isActive={isInfoActive} onClick={() => setView('info')} />
+                <NavItem icon={IconInfo} label="Info" isActive={isInfoActive} onClick={() => setView('info')} />
             </div>
         </footer>
     );

@@ -1,3 +1,4 @@
+
 import React from 'react';
 import type { View } from '../types';
 
@@ -34,9 +35,10 @@ const BottomNav: React.FC<BottomNavProps> = ({ currentView, setView }) => {
 
     return (
         <footer
-            className="fixed bottom-0 left-0 right-0 h-20 bg-white/90 backdrop-blur-sm border-t border-zinc-200 md:hidden"
+            className="fixed bottom-0 left-0 right-0 bg-white/90 backdrop-blur-sm border-t border-zinc-200 md:hidden z-50"
+            style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
         >
-            <div className="flex justify-around items-stretch h-full">
+            <div className="flex justify-around items-stretch h-16">
                 <NavItem icon={IconUsers} label="Inscrições" isActive={isCadastroActive} onClick={() => setView('list')} />
                 <NavItem icon={IconChart} label="Relatórios" isActive={isReportsActive} onClick={() => setView('reports')} />
                 <NavItem icon={IconAdjustments} label="Gestão" isActive={isManagementActive} onClick={() => setView('management')} />

@@ -1,8 +1,9 @@
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
     <title>Gira da Mata</title>
 
     <!-- PWA and Icon configuration -->
@@ -13,15 +14,20 @@
     
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
+      html, body {
+        height: 100%;
+        width: 100%;
+        overflow: hidden; /* Prevent elastic scroll on body */
+        overscroll-behavior: none;
+        color-scheme: light;
+      }
       #root {
-        min-height: 100vh;
+        height: 100%;
+        width: 100%;
         display: flex;
         flex-direction: column;
       }
-      /* Force light mode for form controls */
-      html {
-        color-scheme: light;
-      }
+      
       /* Global styles for transitions and touch responsiveness */
       * {
         transition: background-color 0.2s ease-in-out, color 0.2s ease-in-out, border-color 0.2s ease-in-out, opacity 0.2s ease-in-out;
@@ -77,10 +83,9 @@
       .animate-popIn { animation: popIn 0.3s ease-out; }
       .animate-toast-in-out { animation: toast-in-out 5s ease-in-out forwards; }
 
-      /* Custom class to fix 100vh issue on mobile browsers */
-      .min-h-screen-mobile {
-        min-height: 100vh; /* Fallback */
-        min-height: calc(var(--vh, 1vh) * 100);
+      /* Utility to use safe area in CSS if needed */
+      .pb-safe {
+        padding-bottom: env(safe-area-inset-bottom);
       }
     </style>
 <script type="importmap">
@@ -97,16 +102,6 @@
 </head>
 <body class="bg-zinc-50 antialiased">
     <div id="root"></div>
-    <script>
-      // Fix for 100vh on mobile browsers
-      function setVh() {
-        let vh = window.innerHeight * 0.01;
-        document.documentElement.style.setProperty('--vh', `${vh}px`);
-      }
-      window.addEventListener('resize', setVh);
-      window.addEventListener('orientationchange', setVh);
-      setVh();
-    </script>
     <script type="module" src="/index.tsx"></script>
 </body>
 </html>

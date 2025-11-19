@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useMemo } from 'react';
 import type { Attendee, Event } from '../types';
 import AttendeeListItem from './AttendeeListItem';
@@ -98,7 +99,10 @@ const AttendeeList: React.FC<AttendeeListProps> = ({
         if (scrollPosition > 0) {
             // Use a timeout to ensure the DOM has rendered before scrolling
             setTimeout(() => {
-                window.scrollTo({ top: scrollPosition, behavior: 'auto' });
+                const mainElement = document.querySelector('main');
+                if (mainElement) {
+                    mainElement.scrollTo({ top: scrollPosition, behavior: 'auto' });
+                }
                 onScrollPositionReset(); // Reset after scrolling to prevent re-scrolling
             }, 0);
         }
@@ -126,7 +130,8 @@ const AttendeeList: React.FC<AttendeeListProps> = ({
 
     return (
         <div className="animate-fadeIn">
-            <header className="sticky top-0 md:static bg-white md:bg-transparent z-10 p-4 border-b border-zinc-200 md:border-b-0 md:pt-6 space-y-4">
+            {/* Removed sticky, top-0 and z-10 to allow header to scroll out of view */}
+            <header className="bg-white md:bg-transparent p-4 border-b border-zinc-200 md:border-b-0 md:pt-6 space-y-4">
                  <div className="flex justify-between items-center">
                     <h1 className="text-xl md:text-2xl font-bold text-zinc-800">Inscrições ({sortedAttendees.length})</h1>
                     <div className="flex items-center gap-2">

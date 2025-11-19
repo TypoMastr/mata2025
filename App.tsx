@@ -246,7 +246,7 @@ const AppContent: React.FC = () => {
             
             <div className="flex-grow flex flex-col h-full overflow-hidden relative md:min-h-[800px]">
                 {/* Main content scrolls independently */}
-                <main key={view + selectedEventId} className="flex-grow overflow-y-auto overscroll-contain pb-24 md:pb-0">
+                <main key={view + selectedEventId} className="flex-grow overflow-y-auto overscroll-contain pb-32 md:pb-0">
                     {renderContent()}
                 </main>
                 

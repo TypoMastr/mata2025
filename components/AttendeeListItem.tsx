@@ -38,7 +38,7 @@ const AttendeeListItem: React.FC<AttendeeListItemProps> = ({ attendee, onSelect,
     return (
         <button 
             onClick={() => onSelect(attendee.id)} 
-            className="w-full text-left p-4 bg-white rounded-xl border border-zinc-200 shadow-sm flex justify-between items-center opacity-0 animate-fadeInUp select-none touch-manipulation active:bg-zinc-100 active:scale-[0.98] transition-transform duration-75"
+            className="w-full text-left p-4 bg-white rounded-xl border border-zinc-200 shadow-sm flex justify-between items-center opacity-0 animate-fadeInUp select-none touch-manipulation active:bg-zinc-200 transition-colors duration-200"
             style={{ animationDelay: `${index * 50}ms`, animationFillMode: 'forwards' }}
         >
             <div className="min-w-0 pr-2 pointer-events-none">

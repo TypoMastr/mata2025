@@ -14,7 +14,7 @@ const NavItem: React.FC<{ icon: React.ReactElement; label: string; isActive: boo
     return (
         <button 
             onClick={onClick} 
-            className={`flex flex-col items-center justify-center gap-1 w-full h-full select-none touch-manipulation active:scale-95 transition-transform duration-100 outline-none ${isActive ? activeClasses : inactiveClasses}`}
+            className={`flex flex-col items-center justify-center gap-1 w-full h-full select-none touch-manipulation active:bg-zinc-100 active:opacity-60 transition-opacity duration-200 outline-none ${isActive ? activeClasses : inactiveClasses}`}
         >
             {icon}
             <span className="text-[10px] font-bold uppercase tracking-wide">{label}</span>

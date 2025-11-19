@@ -239,7 +239,10 @@ const AddAttendeeForm: React.FC<AddAttendeeFormProps> = ({ onAddAttendee, onUpda
         // Check for duplicate person ID selection
         if (isPersonSelected && formData.personId) {
              const duplicate = registrations.find(r => r.person.id === formData.personId);
-             if (duplicate) {
+             // Ignore the duplicate if it is the same record we are currently editing
+             const isSelf = isEditMode && attendeeToEdit && duplicate?.id === attendeeToEdit.id;
+             
+             if (duplicate && !isSelf) {
                  newErrors.name = `"${formData.name}" já está na lista deste evento.`;
              }
         }

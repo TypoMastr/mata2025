@@ -98,9 +98,15 @@ const registrationToSupabase = (registration: Partial<Registration>): any => {
         record.payment_status = registration.payment.status;
         const paymentDetails: { [key: string]: any } = {};
         if (registration.packageType === PackageType.SITIO_BUS) {
-            const sitePaid = !!registration.payment.sitePaymentDetails?.isPaid;
-            const busPaid = !!registration.payment.busPaymentDetails?.isPaid;
-            if (registration.payment.status !== PaymentStatus.ISENTO) record.payment_status = (sitePaid && busPaid) ? PaymentStatus.PAGO : PaymentStatus.PENDENTE;
+            // FIX: Consider "Paid" if it is explicitly paid OR if it is exempt.
+            const siteOk = !!registration.payment.sitePaymentDetails?.isPaid || !!registration.payment.sitePaymentDetails?.isExempt;
+            const busOk = !!registration.payment.busPaymentDetails?.isPaid || !!registration.payment.busPaymentDetails?.isExempt;
+            
+            // If the overall status is not fully EXEMPT (all parts exempt), we determine PAGO vs PENDENTE based on if all parts are "Ok"
+            if (registration.payment.status !== PaymentStatus.ISENTO) {
+                record.payment_status = (siteOk && busOk) ? PaymentStatus.PAGO : PaymentStatus.PENDENTE;
+            }
+            
             paymentDetails.site = registration.payment.sitePaymentDetails || { isPaid: false, receiptUrl: null };
             paymentDetails.bus = registration.payment.busPaymentDetails || { isPaid: false, receiptUrl: null };
         } else {

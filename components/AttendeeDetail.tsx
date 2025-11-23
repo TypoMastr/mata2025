@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import type { Attendee, PartialPaymentDetails } from '../types';
 import { PaymentStatus, PackageType, DocumentType } from '../types';
@@ -54,24 +55,36 @@ const PartialPaymentDetail: React.FC<{
     onViewReceipt: (url: string) => void;
 }> = ({ title, amount, details, onViewReceipt }) => {
     const isPaid = details?.isPaid || false;
+    const isExempt = details?.isExempt || false;
+
     return (
-        <div className={`p-3 rounded-lg border ${isPaid ? 'bg-green-50 border-green-200' : 'bg-red-50 border-red-200'}`}>
+        <div className={`p-3 rounded-lg border ${isExempt ? 'bg-indigo-50 border-indigo-200' : isPaid ? 'bg-green-50 border-green-200' : 'bg-red-50 border-red-200'}`}>
             <div className="flex justify-between items-center">
                 <h3 className="font-bold text-zinc-800">{title}</h3>
-                <span className={`px-2 py-0.5 text-xs font-bold rounded-full ${isPaid ? 'bg-green-200 text-green-800' : 'bg-red-200 text-red-800'}`}>
-                    {isPaid ? 'PAGO' : 'PENDENTE'}
-                </span>
+                {isExempt ? (
+                    <span className="px-2 py-0.5 text-xs font-bold rounded-full bg-indigo-200 text-indigo-800">ISENTO</span>
+                ) : (
+                    <span className={`px-2 py-0.5 text-xs font-bold rounded-full ${isPaid ? 'bg-green-200 text-green-800' : 'bg-red-200 text-red-800'}`}>
+                        {isPaid ? 'PAGO' : 'PENDENTE'}
+                    </span>
+                )}
             </div>
             <div className="text-sm text-zinc-600 mt-2 space-y-2">
-                <div className="flex justify-between"><span className="font-medium">Valor:</span><span>R$ {amount.toFixed(2).replace('.', ',')}</span></div>
-                {isPaid && (
+                {isExempt ? (
+                    <div className="text-indigo-700 font-medium">Pagamento dispensado.</div>
+                ) : (
                     <>
-                        <div className="flex justify-between"><span className="font-medium">Data:</span><span>{formatDate(details?.date)}</span></div>
-                        <div className="flex justify-between"><span className="font-medium">Tipo:</span><span>{details?.type || 'N/A'}</span></div>
-                        {details?.receiptUrl && (
-                             <button onClick={() => onViewReceipt(details.receiptUrl!)} className="text-sm font-semibold text-green-600 hover:underline pt-1">
-                                Ver Comprovante
-                            </button>
+                        <div className="flex justify-between"><span className="font-medium">Valor:</span><span>R$ {amount.toFixed(2).replace('.', ',')}</span></div>
+                        {isPaid && (
+                            <>
+                                <div className="flex justify-between"><span className="font-medium">Data:</span><span>{formatDate(details?.date)}</span></div>
+                                <div className="flex justify-between"><span className="font-medium">Tipo:</span><span>{details?.type || 'N/A'}</span></div>
+                                {details?.receiptUrl && (
+                                     <button onClick={() => onViewReceipt(details.receiptUrl!)} className="text-sm font-semibold text-green-600 hover:underline pt-1">
+                                        Ver Comprovante
+                                    </button>
+                                )}
+                            </>
                         )}
                     </>
                 )}
@@ -130,6 +143,7 @@ const AttendeeDetail: React.FC<AttendeeDetailProps> = ({ attendee, onBack, onEdi
     const isPartiallyPaid = isMultiPayment &&
                             status === PaymentStatus.PENDENTE &&
                             (attendee.payment.sitePaymentDetails?.isPaid || attendee.payment.busPaymentDetails?.isPaid);
+    const isPartialExempt = isMultiPayment && (attendee.payment.sitePaymentDetails?.isExempt || attendee.payment.busPaymentDetails?.isExempt);
 
     const handleEditNotesClick = () => {
         setEditedNotes(attendee.notes || '');
@@ -280,13 +294,18 @@ const AttendeeDetail: React.FC<AttendeeDetailProps> = ({ attendee, onBack, onEdi
                         <h2 className="text-lg font-bold text-zinc-800 mb-3">Pagamento</h2>
                         <div className="space-y-4">
                             <DetailRow label="Status Geral">
-                                <div className="flex items-center gap-2">
+                                <div className="flex items-center flex-wrap gap-2">
                                      <span className={`px-3 py-1 text-sm font-bold rounded-full ${statusClasses}`}>
                                         {attendee.payment.status}
                                     </span>
                                     {isPartiallyPaid && (
                                          <span className="px-3 py-1 text-sm font-bold rounded-full bg-yellow-100 text-yellow-800">
                                             PARCIAL
+                                        </span>
+                                    )}
+                                    {isPartialExempt && (
+                                        <span className="px-3 py-1 text-sm font-bold rounded-full bg-indigo-100 text-indigo-800">
+                                            ISENTO PARCIAL
                                         </span>
                                     )}
                                 </div>

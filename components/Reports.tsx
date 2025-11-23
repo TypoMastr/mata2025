@@ -1,3 +1,4 @@
+
 import React, { useState, useMemo } from 'react';
 // FIX: Import Event type
 import type { Attendee, ReportConfig, ReportField, Event } from '../types';
@@ -1088,9 +1089,28 @@ const ReportsDashboard: React.FC<{ attendees: Attendee[]; onGenerateReportClick:
                 return sum;
             }, 0);
         
+        // Calculate possible revenue:
+        // Start with sum of all amounts (this includes exempt amounts if they are set to 0 or full price depending on logic).
+        // Better logic: 
+        // For each attendee:
+        // If full exempt -> 0 potential
+        // If Sitio+Bus:
+        //   Sitio Potential = Is Exempt ? 0 : Price
+        //   Bus Potential = Is Exempt ? 0 : Price
         const calculatedTotalPossibleRevenue = attendees
-                .filter(a => a.payment.status !== PaymentStatus.ISENTO)
-                .reduce((sum, a) => sum + a.payment.amount, 0);
+                .reduce((sum, a) => {
+                    if (a.payment.status === PaymentStatus.ISENTO) return sum;
+                    
+                    if (a.packageType === PackageType.SITIO_BUS) {
+                        let potential = 0;
+                        if (!a.payment.sitePaymentDetails?.isExempt) potential += (event?.site_price ?? 70);
+                        if (!a.payment.busPaymentDetails?.isExempt) potential += (event?.bus_price ?? 50);
+                        return sum + potential;
+                    } else {
+                        // Single package type
+                        return sum + (event?.site_price ?? 70); // Assuming SITIO_ONLY
+                    }
+                }, 0);
 
         return {
             totalAttendees: attendees.length,
@@ -1329,14 +1349,19 @@ const Reports: React.FC<ReportsProps> = ({ attendees, onLogout, onUpdateAttendee
                     paidSitio += sitePrice;
                 }
             } else if (a.packageType === PackageType.SITIO_BUS) {
-                totalSitio += sitePrice;
-                totalBus += busPrice;
-
-                if (a.payment.sitePaymentDetails?.isPaid) {
-                    paidSitio += sitePrice;
+                // Only count potential revenue if NOT exempt
+                if (!a.payment.sitePaymentDetails?.isExempt) {
+                    totalSitio += sitePrice;
+                    if (a.payment.sitePaymentDetails?.isPaid) {
+                        paidSitio += sitePrice;
+                    }
                 }
-                if (a.payment.busPaymentDetails?.isPaid) {
-                    paidBus += busPrice;
+                
+                if (!a.payment.busPaymentDetails?.isExempt) {
+                    totalBus += busPrice;
+                    if (a.payment.busPaymentDetails?.isPaid) {
+                        paidBus += busPrice;
+                    }
                 }
             }
         });

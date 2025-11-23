@@ -1,3 +1,4 @@
+
 export enum PackageType {
     SITIO_ONLY = 'Apenas Sítio',
     SITIO_BUS = 'Sítio + Ônibus',
@@ -25,6 +26,7 @@ export enum PaymentType {
 
 export interface PartialPaymentDetails {
     isPaid: boolean;
+    isExempt?: boolean;
     date?: string;
     type?: PaymentType;
     receiptUrl: string | null;
@@ -74,6 +76,7 @@ export type Attendee = Registration;
 
 export interface PartialPaymentFormDetails {
     isPaid: boolean;
+    isExempt?: boolean;
     date: string;
     dateNotInformed: boolean;
     type: PaymentType;
@@ -97,6 +100,8 @@ export interface RegistrationFormData {
     paymentDate: string;
     paymentDateNotInformed: boolean;
     paymentType: PaymentType;
+    paymentIsExempt?: boolean;
+    paymentIsPaid?: boolean;
 
     // For multi-payment
     sitePayment: PartialPaymentFormDetails;

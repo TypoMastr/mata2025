@@ -30,19 +30,45 @@ interface PartialPaymentFieldsProps {
 const PartialPaymentFields: React.FC<PartialPaymentFieldsProps> = ({ idPrefix, details, onUpdate }) => {
     return (
         <div className="space-y-3">
-            <label className="flex items-center space-x-2 cursor-pointer w-fit">
-                <input type="checkbox" checked={details.isPaid} onChange={(e) => onUpdate({ isPaid: e.target.checked })} className="h-4 w-4 rounded border-zinc-300 text-green-600 focus:ring-green-500"/>
-                <span className="text-sm text-zinc-700 font-medium">Pagamento realizado?</span>
-            </label>
-            {details.isPaid && (
-                <div className="space-y-3 pl-6 border-l-2 border-zinc-200 animate-fadeIn">
+             <div className="flex flex-wrap gap-4">
+                 <label className="flex items-center space-x-2 cursor-pointer w-fit">
+                    <input 
+                        type="checkbox" 
+                        checked={!!details.isExempt} 
+                        onChange={(e) => onUpdate({ isExempt: e.target.checked, isPaid: e.target.checked ? false : details.isPaid })} 
+                        className="h-4 w-4 rounded border-zinc-300 text-indigo-600 focus:ring-indigo-500"
+                    />
+                    <span className="text-sm text-zinc-700 font-medium">Isento?</span>
+                </label>
+                
+                {!details.isExempt && (
+                    <label className="flex items-center space-x-2 cursor-pointer w-fit">
+                        <input 
+                            type="checkbox" 
+                            checked={details.isPaid} 
+                            onChange={(e) => onUpdate({ isPaid: e.target.checked })} 
+                            className="h-4 w-4 rounded border-zinc-300 text-green-600 focus:ring-green-500"
+                        />
+                        <span className="text-sm text-zinc-700 font-medium">Pagamento realizado?</span>
+                    </label>
+                )}
+            </div>
+
+            {details.isExempt && (
+                 <div className="pl-4 border-l-2 border-indigo-300 animate-fadeIn">
+                    <p className="text-sm text-indigo-700 font-medium">Pagamento dispensado (Isenção).</p>
+                </div>
+            )}
+
+            {!details.isExempt && details.isPaid && (
+                <div className="space-y-3 pl-4 border-l-2 border-green-300 animate-fadeIn">
                     <FormField label="Data do Pagamento" id={`${idPrefix}-date`}>
                         <input
                             type="date"
                             id={`${idPrefix}-date`}
                             value={details.date}
                             onChange={(e) => onUpdate({ date: e.target.value })}
-                            className="block w-full px-3 py-2 bg-white border border-zinc-300 rounded-md shadow-sm sm:text-sm focus:outline-none focus:ring-green-500 focus:border-green-500 disabled:bg-zinc-100"
+                            className="block w-full max-w-full min-w-0 px-3 py-2 bg-white border border-zinc-300 rounded-md shadow-sm sm:text-sm focus:outline-none focus:ring-green-500 focus:border-green-500 disabled:bg-zinc-100"
                             required={!details.dateNotInformed}
                             disabled={details.dateNotInformed}
                             autoComplete="off"
@@ -85,6 +111,7 @@ interface AddAttendeeFormProps {
 
 const getInitialPartialPayment = (): PartialPaymentFormDetails => ({
     isPaid: false,
+    isExempt: false,
     date: new Date().toISOString().split('T')[0],
     dateNotInformed: false,
     type: PaymentType.PIX_CONTA,
@@ -104,6 +131,8 @@ const getInitialFormData = (attendee?: Attendee | null): AttendeeFormData => {
             paymentDate: new Date().toISOString().split('T')[0],
             paymentDateNotInformed: true,
             paymentType: PaymentType.PIX_CONTA,
+            paymentIsExempt: false,
+            paymentIsPaid: true,
             sitePayment: getInitialPartialPayment(),
             busPayment: getInitialPartialPayment(),
         };
@@ -120,6 +149,8 @@ const getInitialFormData = (attendee?: Attendee | null): AttendeeFormData => {
         paymentDate: new Date().toISOString().split('T')[0],
         paymentDateNotInformed: false,
         paymentType: PaymentType.PIX_CONTA,
+        paymentIsExempt: false,
+        paymentIsPaid: true,
         sitePayment: getInitialPartialPayment(),
         busPayment: getInitialPartialPayment(),
     };
@@ -182,10 +213,18 @@ const AddAttendeeForm: React.FC<AddAttendeeFormProps> = ({ onAddAttendee, onUpda
         if (!isEditMode) {
             const sitePrice = event?.site_price ?? 70;
             const busPrice = event?.bus_price ?? 50;
-            const amount = formData.packageType === PackageType.SITIO_BUS ? (sitePrice + busPrice).toFixed(2) : sitePrice.toFixed(2);
-            setFormData(fd => ({ ...fd, paymentAmount: amount }));
+            
+            let amount = 0;
+            if (formData.packageType === PackageType.SITIO_BUS) {
+                if (!formData.sitePayment.isExempt) amount += sitePrice;
+                if (!formData.busPayment.isExempt) amount += busPrice;
+            } else {
+                if (!formData.paymentIsExempt) amount += sitePrice;
+            }
+            
+            setFormData(fd => ({ ...fd, paymentAmount: amount.toFixed(2) }));
         }
-    }, [formData.packageType, isEditMode, event]);
+    }, [formData.packageType, formData.sitePayment.isExempt, formData.busPayment.isExempt, formData.paymentIsExempt, isEditMode, event]);
 
     const handleSelectPerson = (person: Person) => {
         // Immediate check for duplicates when selecting a person
@@ -475,7 +514,24 @@ const AddAttendeeForm: React.FC<AddAttendeeFormProps> = ({ onAddAttendee, onUpda
                                         </div>
                                     </div>
                                 ) : (
-                                    <PartialPaymentFields idPrefix="single" details={{ isPaid: true, date: formData.paymentDate, dateNotInformed: formData.paymentDateNotInformed, type: formData.paymentType }} onUpdate={({date, dateNotInformed, type}) => setFormData(fd => ({...fd, paymentDate: date !== undefined ? date : fd.paymentDate, paymentDateNotInformed: dateNotInformed !== undefined ? dateNotInformed : fd.paymentDateNotInformed, type: type !== undefined ? type : fd.paymentType }))} />
+                                    <PartialPaymentFields 
+                                        idPrefix="single" 
+                                        details={{ 
+                                            isPaid: formData.paymentIsPaid ?? true, 
+                                            isExempt: !!formData.paymentIsExempt,
+                                            date: formData.paymentDate, 
+                                            dateNotInformed: formData.paymentDateNotInformed, 
+                                            type: formData.paymentType 
+                                        }} 
+                                        onUpdate={(updates) => setFormData(fd => ({
+                                            ...fd, 
+                                            paymentDate: updates.date !== undefined ? updates.date : fd.paymentDate, 
+                                            paymentDateNotInformed: updates.dateNotInformed !== undefined ? updates.dateNotInformed : fd.paymentDateNotInformed, 
+                                            paymentType: updates.type !== undefined ? updates.type : fd.paymentType,
+                                            paymentIsExempt: updates.isExempt !== undefined ? updates.isExempt : fd.paymentIsExempt,
+                                            paymentIsPaid: updates.isPaid !== undefined ? updates.isPaid : fd.paymentIsPaid,
+                                        }))} 
+                                    />
                                 )}
                             </div>
                         )}

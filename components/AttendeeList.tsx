@@ -12,8 +12,8 @@ interface AttendeeListProps {
     onLogout: () => void;
     searchQuery: string;
     onSearchQueryChange: (query: string) => void;
-    statusFilter: 'all' | PaymentStatus;
-    onStatusFilterChange: (filter: 'all' | PaymentStatus) => void;
+    statusFilter: 'all' | PaymentStatus | 'partial_exempt';
+    onStatusFilterChange: (filter: 'all' | PaymentStatus | 'partial_exempt') => void;
     packageFilter: 'all' | PackageType;
     onPackageFilterChange: (filter: 'all' | PackageType) => void;
     scrollPosition: number;
@@ -24,13 +24,80 @@ interface AttendeeListProps {
 }
 
 const FilterPill: React.FC<{ label: string; isActive: boolean; onClick: () => void; }> = ({ label, isActive, onClick }) => {
-    const baseClasses = "px-3 py-1 text-sm font-semibold rounded-full transition-colors flex-shrink-0 select-none touch-manipulation active:bg-zinc-300";
+    const baseClasses = "px-3 py-1 text-sm font-semibold rounded-full transition-colors flex-shrink-0 select-none touch-manipulation cursor-pointer";
     const activeClasses = "bg-green-500 text-white shadow-sm active:bg-green-600";
     const inactiveClasses = "bg-zinc-200 text-zinc-700 hover:bg-zinc-300";
     return (
         <button onClick={onClick} className={`${baseClasses} ${isActive ? activeClasses : inactiveClasses}`}>
             {label}
         </button>
+    );
+};
+
+const FilterBottomSheet: React.FC<{
+    title: string;
+    options: { label: string; value: string }[];
+    selectedValue: string;
+    onSelect: (value: string) => void;
+    onClose: () => void;
+}> = ({ title, options, selectedValue, onSelect, onClose }) => {
+    const [isClosing, setIsClosing] = useState(false);
+
+    const handleClose = () => {
+        setIsClosing(true);
+        // Wait for animation to finish before unmounting
+        setTimeout(() => {
+            onClose();
+        }, 300);
+    };
+
+    const handleSelect = (value: string) => {
+        onSelect(value);
+        handleClose();
+    };
+
+    return (
+        <div className={`fixed inset-0 z-[100] flex items-end justify-center`} onClick={handleClose}>
+            {/* Backdrop with Fade In/Out */}
+            <div className={`absolute inset-0 bg-black/50 ${isClosing ? 'animate-fadeOut' : 'animate-fadeIn'}`}></div>
+            
+            {/* Sheet Content */}
+            {/* Changed mb-16 to mb-12 (48px) to allow 16px overlap with navbar (64px) to hide bounce gap */}
+            <div 
+                className={`w-full bg-white rounded-t-2xl p-4 pb-safe shadow-2xl max-w-md mx-auto relative z-10 mb-12 mb-safe md:mb-0 ${isClosing ? 'animate-slideDown' : 'animate-slideUp'}`} 
+                onClick={e => e.stopPropagation()}
+            >
+                <div className="flex justify-between items-center mb-4">
+                    <h3 className="font-bold text-lg text-zinc-800">{title}</h3>
+                    <button onClick={handleClose} className="p-1.5 bg-zinc-100 rounded-full text-zinc-500 hover:bg-zinc-200 transition-colors">
+                        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+                    </button>
+                </div>
+                <div className="space-y-2 pb-2">
+                    {options.map((opt) => {
+                        const isSelected = selectedValue === opt.value;
+                        return (
+                            <button
+                                key={opt.value}
+                                onClick={() => handleSelect(opt.value)}
+                                className={`w-full text-left px-4 py-3 rounded-xl border-2 text-base transition-all flex justify-between items-center touch-manipulation active:scale-[0.99] ${
+                                    isSelected
+                                        ? 'bg-green-50 border-green-600 text-green-900 font-bold shadow-sm'
+                                        : 'bg-white border-zinc-200 text-zinc-800 font-semibold hover:bg-zinc-50'
+                                }`}
+                            >
+                                {opt.label}
+                                {isSelected && (
+                                    <div className="bg-green-600 rounded-full p-1">
+                                        <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" /></svg>
+                                    </div>
+                                )}
+                            </button>
+                        );
+                    })}
+                </div>
+            </div>
+        </div>
     );
 };
 
@@ -61,6 +128,9 @@ const StatusBadge: React.FC<{ attendee: Attendee }> = ({ attendee }) => {
     const isPartiallyPaid = attendee.packageType === PackageType.SITIO_BUS &&
                             status === PaymentStatus.PENDENTE &&
                             (sitePaymentDetails?.isPaid || busPaymentDetails?.isPaid);
+    
+    const isPartialExempt = attendee.packageType === PackageType.SITIO_BUS &&
+                            (sitePaymentDetails?.isExempt || busPaymentDetails?.isExempt);
 
     return (
         <div className="flex items-center flex-wrap gap-2">
@@ -70,6 +140,11 @@ const StatusBadge: React.FC<{ attendee: Attendee }> = ({ attendee }) => {
             {isPartiallyPaid && (
                  <span className="px-3 py-1 text-xs font-bold rounded-full bg-yellow-100 text-yellow-800">
                     PARCIAL
+                </span>
+            )}
+            {isPartialExempt && (
+                 <span className="px-3 py-1 text-xs font-bold rounded-full bg-indigo-100 text-indigo-800">
+                    ISENTO PARCIAL
                 </span>
             )}
         </div>
@@ -93,6 +168,8 @@ const AttendeeList: React.FC<AttendeeListProps> = ({
     selectedEventId,
     onEventChange,
 }) => {
+    
+    const [activeModal, setActiveModal] = useState<'status' | 'package' | null>(null);
 
     useEffect(() => {
         if (scrollPosition > 0) {
@@ -114,9 +191,15 @@ const AttendeeList: React.FC<AttendeeListProps> = ({
             .filter(attendee =>
                 normalizeString(attendee.person.name).includes(normalizedSearchQuery)
             )
-            .filter(attendee =>
-                statusFilter === 'all' || attendee.payment.status === statusFilter
-            )
+            .filter(attendee => {
+                if (statusFilter === 'all') return true;
+                if (statusFilter === 'partial_exempt') {
+                    const isExempt = attendee.payment.sitePaymentDetails?.isExempt || attendee.payment.busPaymentDetails?.isExempt;
+                    // Don't show if entirely ISENTO status (already covered by ISENTO filter, but here we want mixed)
+                    return isExempt;
+                }
+                return attendee.payment.status === statusFilter;
+            })
             .filter(attendee =>
                 packageFilter === 'all' || attendee.packageType === packageFilter
             );
@@ -124,6 +207,19 @@ const AttendeeList: React.FC<AttendeeListProps> = ({
         return [...filtered].sort((a, b) => a.person.name.localeCompare(b.person.name));
     }, [attendees, searchQuery, statusFilter, packageFilter]);
 
+    const statusOptions = [
+        { label: 'Todos', value: 'all' },
+        { label: PaymentStatus.PAGO, value: PaymentStatus.PAGO },
+        { label: PaymentStatus.PENDENTE, value: PaymentStatus.PENDENTE },
+        { label: PaymentStatus.ISENTO, value: PaymentStatus.ISENTO },
+        { label: 'Isenção Parcial', value: 'partial_exempt' },
+    ];
+
+    const packageOptions = [
+        { label: 'Todos', value: 'all' },
+        { label: PackageType.SITIO_ONLY, value: PackageType.SITIO_ONLY },
+        { label: PackageType.SITIO_BUS, value: PackageType.SITIO_BUS },
+    ];
 
     return (
         <div className="animate-fadeIn">
@@ -177,15 +273,52 @@ const AttendeeList: React.FC<AttendeeListProps> = ({
                     </div>
                 </div>
                 
-                <div className="space-y-3 lg:flex lg:justify-between lg:items-center lg:space-y-0 lg:gap-6">
-                    <div className="flex flex-wrap gap-2 items-center">
+                {/* Mobile Filter Buttons */}
+                <div className="flex gap-3 md:hidden">
+                     <button
+                        onClick={() => setActiveModal('status')}
+                        className={`flex-1 py-2.5 px-4 rounded-xl border font-medium text-sm flex justify-between items-center transition-colors touch-manipulation active:bg-zinc-50 ${
+                            statusFilter !== 'all' 
+                            ? 'bg-green-50 border-green-500 text-green-800 shadow-sm' 
+                            : 'bg-white border-zinc-200 text-zinc-600 shadow-sm'
+                        }`}
+                    >
+                        <span className="truncate pr-2">
+                            {statusFilter === 'all' ? 'Filtrar Status' : (statusOptions.find(o => o.value === statusFilter)?.label || statusFilter)}
+                        </span>
+                        <svg xmlns="http://www.w3.org/2000/svg" className={`h-4 w-4 flex-shrink-0 ${statusFilter !== 'all' ? 'text-green-600' : 'text-zinc-400'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                        </svg>
+                    </button>
+
+                    <button
+                        onClick={() => setActiveModal('package')}
+                        className={`flex-1 py-2.5 px-4 rounded-xl border font-medium text-sm flex justify-between items-center transition-colors touch-manipulation active:bg-zinc-50 ${
+                            packageFilter !== 'all'
+                            ? 'bg-green-50 border-green-500 text-green-800 shadow-sm'
+                            : 'bg-white border-zinc-200 text-zinc-600 shadow-sm'
+                        }`}
+                    >
+                        <span className="truncate pr-2">
+                            {packageFilter === 'all' ? 'Filtrar Pacote' : packageFilter}
+                        </span>
+                        <svg xmlns="http://www.w3.org/2000/svg" className={`h-4 w-4 flex-shrink-0 ${packageFilter !== 'all' ? 'text-green-600' : 'text-zinc-400'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                        </svg>
+                    </button>
+                </div>
+
+                {/* Desktop Filters */}
+                <div className="hidden md:flex space-y-3 lg:flex lg:justify-between lg:items-center lg:space-y-0 lg:gap-6">
+                    <div className="flex flex-wrap gap-2 items-center min-w-max">
                         <span className="text-sm font-medium text-zinc-500 flex-shrink-0">Status:</span>
                         <FilterPill label="Todos" isActive={statusFilter === 'all'} onClick={() => onStatusFilterChange('all')} />
                         <FilterPill label={PaymentStatus.PAGO} isActive={statusFilter === PaymentStatus.PAGO} onClick={() => onStatusFilterChange(PaymentStatus.PAGO)} />
                         <FilterPill label={PaymentStatus.PENDENTE} isActive={statusFilter === PaymentStatus.PENDENTE} onClick={() => onStatusFilterChange(PaymentStatus.PENDENTE)} />
                         <FilterPill label={PaymentStatus.ISENTO} isActive={statusFilter === PaymentStatus.ISENTO} onClick={() => onStatusFilterChange(PaymentStatus.ISENTO)} />
+                        <FilterPill label="Isenção Parcial" isActive={statusFilter === 'partial_exempt'} onClick={() => onStatusFilterChange('partial_exempt')} />
                     </div>
-                     <div className="flex flex-wrap gap-2 items-center">
+                     <div className="flex flex-wrap gap-2 items-center min-w-max">
                         <span className="text-sm font-medium text-zinc-500 flex-shrink-0">Pacote:</span>
                         <FilterPill label="Todos" isActive={packageFilter === 'all'} onClick={() => onPackageFilterChange('all')} />
                         <FilterPill label={PackageType.SITIO_ONLY} isActive={packageFilter === PackageType.SITIO_ONLY} onClick={() => onPackageFilterChange(PackageType.SITIO_ONLY)} />
@@ -246,6 +379,25 @@ const AttendeeList: React.FC<AttendeeListProps> = ({
                     </div>
                 )}
             </div>
+
+            {activeModal === 'status' && (
+                <FilterBottomSheet 
+                    title="Filtrar por Status"
+                    options={statusOptions}
+                    selectedValue={statusFilter}
+                    onSelect={(val) => onStatusFilterChange(val as any)}
+                    onClose={() => setActiveModal(null)}
+                />
+            )}
+            {activeModal === 'package' && (
+                <FilterBottomSheet
+                    title="Filtrar por Pacote"
+                    options={packageOptions}
+                    selectedValue={packageFilter}
+                    onSelect={(val) => onPackageFilterChange(val as any)}
+                    onClose={() => setActiveModal(null)}
+                />
+            )}
         </div>
     );
 };

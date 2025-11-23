@@ -48,7 +48,7 @@ const AppContent: React.FC = () => {
     const [registrationPaymentToDelete, setRegistrationPaymentToDelete] = useState<Registration | null>(null);
 
     const [searchQuery, setSearchQuery] = useState('');
-    const [statusFilter, setStatusFilter] = useState<'all' | PaymentStatus>('all');
+    const [statusFilter, setStatusFilter] = useState<'all' | PaymentStatus | 'partial_exempt'>('all');
     const [packageFilter, setPackageFilter] = useState<'all' | PackageType>('all');
     const [scrollPosition, setScrollPosition] = useState(0);
 
@@ -203,7 +203,7 @@ const AppContent: React.FC = () => {
             case 'editForm':
                  return selectedRegistration && <AddAttendeeForm onUpdateAttendee={handleUpdateRegistration} onCancel={() => setView('detail')} attendeeToEdit={selectedRegistration} registrations={registrations} event={selectedEvent} />;
             case 'payment':
-                return selectedRegistration && <RegisterPaymentForm attendee={selectedRegistration} onRegisterPayment={handleRegisterPayment} onCancel={() => setView('detail')} onDeletePayment={handleDeletePaymentRequest} />;
+                return selectedRegistration && <RegisterPaymentForm attendee={selectedRegistration} onRegisterPayment={handleRegisterPayment} onCancel={() => setView('detail')} onDeletePayment={handleDeletePaymentRequest} event={selectedEvent} />;
              case 'reports':
                 return <Reports attendees={registrations} onLogout={handleLogout} onUpdateAttendee={handleUpdateRegistration} onSelectAttendee={handleSelectRegistration} event={selectedEvent} />;
              case 'info':

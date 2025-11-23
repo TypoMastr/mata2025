@@ -62,9 +62,9 @@ const FilterBottomSheet: React.FC<{
             <div className={`absolute inset-0 bg-black/50 ${isClosing ? 'animate-fadeOut' : 'animate-fadeIn'}`}></div>
             
             {/* Sheet Content */}
-            {/* Updated margin-bottom (mb-16) to 64px to match BottomNav height, ensuring buttons are clickable */}
+            {/* Margin bottom calculated to sit exactly above the BottomNav (4rem/64px) + Safe Area */}
             <div 
-                className={`w-full bg-white rounded-t-2xl p-4 shadow-2xl max-w-md mx-auto relative z-10 mb-16 mb-safe md:mb-0 ${isClosing ? 'animate-slideDown' : 'animate-slideUp'}`} 
+                className={`w-full bg-white rounded-t-2xl p-4 shadow-2xl max-w-md mx-auto relative z-10 mb-[calc(4rem_+_env(safe-area-inset-bottom))] md:mb-0 ${isClosing ? 'animate-slideDown' : 'animate-slideUp'}`} 
                 onClick={e => e.stopPropagation()}
             >
                 <div className="flex justify-between items-center mb-4">

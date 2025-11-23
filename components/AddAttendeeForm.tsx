@@ -61,7 +61,7 @@ const PartialPaymentFields: React.FC<PartialPaymentFieldsProps> = ({ idPrefix, d
             )}
 
             {!details.isExempt && details.isPaid && (
-                <div className="space-y-3 pl-4 border-l-2 border-green-300 animate-fadeIn">
+                <div className="space-y-3 pl-3 md:pl-4 border-l-2 border-green-300 animate-fadeIn">
                     <FormField label="Data do Pagamento" id={`${idPrefix}-date`}>
                         <input
                             type="date"
@@ -72,6 +72,7 @@ const PartialPaymentFields: React.FC<PartialPaymentFieldsProps> = ({ idPrefix, d
                             required={!details.dateNotInformed}
                             disabled={details.dateNotInformed}
                             autoComplete="off"
+                            style={{ maxWidth: '100%' }}
                         />
                          <label className="flex items-center space-x-2 mt-2 cursor-pointer w-fit">
                             <input type="checkbox" checked={details.dateNotInformed} onChange={(e) => onUpdate({ dateNotInformed: e.target.checked })} className="h-4 w-4 rounded border-zinc-300 text-green-600 focus:ring-green-500" />
@@ -81,7 +82,7 @@ const PartialPaymentFields: React.FC<PartialPaymentFieldsProps> = ({ idPrefix, d
                     <FormField label="Tipo de Pagamento" id={`${idPrefix}-type`}>
                         <select
                             id={`${idPrefix}-type`}
-                            value={details.type}
+                            value={details.type || ''}
                             onChange={(e) => onUpdate({ type: e.target.value as PaymentType })}
                             className="block w-full px-3 py-2 bg-white border border-zinc-300 rounded-md shadow-sm sm:text-sm focus:outline-none focus:ring-green-500 focus:border-green-500"
                             required

@@ -32,6 +32,7 @@ const AttendeeListItem: React.FC<AttendeeListItemProps> = ({ attendee, onSelect 
                             (sitePaymentDetails?.isPaid || busPaymentDetails?.isPaid);
 
     const isPartialExempt = attendee.packageType === PackageType.SITIO_BUS &&
+                            status !== PaymentStatus.ISENTO &&
                             (sitePaymentDetails?.isExempt || busPaymentDetails?.isExempt);
 
     const packageIcon = attendee.packageType === PackageType.SITIO_BUS 

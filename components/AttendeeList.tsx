@@ -129,7 +129,9 @@ const StatusBadge: React.FC<{ attendee: Attendee }> = ({ attendee }) => {
                             status === PaymentStatus.PENDENTE &&
                             (sitePaymentDetails?.isPaid || busPaymentDetails?.isPaid);
     
+    // Only show partial exempt if the user is NOT fully exempt
     const isPartialExempt = attendee.packageType === PackageType.SITIO_BUS &&
+                            status !== PaymentStatus.ISENTO &&
                             (sitePaymentDetails?.isExempt || busPaymentDetails?.isExempt);
 
     return (
@@ -194,9 +196,9 @@ const AttendeeList: React.FC<AttendeeListProps> = ({
             .filter(attendee => {
                 if (statusFilter === 'all') return true;
                 if (statusFilter === 'partial_exempt') {
+                    // Only match if partial exemption exists AND user is not fully exempt (status ISENTO)
                     const isExempt = attendee.payment.sitePaymentDetails?.isExempt || attendee.payment.busPaymentDetails?.isExempt;
-                    // Don't show if entirely ISENTO status (already covered by ISENTO filter, but here we want mixed)
-                    return isExempt;
+                    return attendee.payment.status !== PaymentStatus.ISENTO && isExempt;
                 }
                 return attendee.payment.status === statusFilter;
             })

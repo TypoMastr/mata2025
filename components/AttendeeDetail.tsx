@@ -143,7 +143,10 @@ const AttendeeDetail: React.FC<AttendeeDetailProps> = ({ attendee, onBack, onEdi
     const isPartiallyPaid = isMultiPayment &&
                             status === PaymentStatus.PENDENTE &&
                             (attendee.payment.sitePaymentDetails?.isPaid || attendee.payment.busPaymentDetails?.isPaid);
-    const isPartialExempt = isMultiPayment && (attendee.payment.sitePaymentDetails?.isExempt || attendee.payment.busPaymentDetails?.isExempt);
+    
+    const isPartialExempt = isMultiPayment && 
+                            status !== PaymentStatus.ISENTO && 
+                            (attendee.payment.sitePaymentDetails?.isExempt || attendee.payment.busPaymentDetails?.isExempt);
 
     const handleEditNotesClick = () => {
         setEditedNotes(attendee.notes || '');

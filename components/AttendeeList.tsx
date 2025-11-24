@@ -57,46 +57,60 @@ const FilterBottomSheet: React.FC<{
         handleClose();
     };
 
+    // Common content for both Sheet and Modal
+    const Content = () => (
+        <>
+            <div className="flex justify-between items-center mb-4">
+                <h3 className="font-bold text-lg text-zinc-800">{title}</h3>
+                <button onClick={handleClose} className="p-1.5 bg-zinc-100 rounded-full text-zinc-500 hover:bg-zinc-200 transition-colors">
+                    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+                </button>
+            </div>
+            <div className="space-y-2 pb-2">
+                {options.map((opt) => {
+                    const isSelected = selectedValue === opt.value;
+                    return (
+                        <button
+                            key={opt.value}
+                            onClick={() => handleSelect(opt.value)}
+                            className={`w-full text-left px-4 py-3 rounded-xl border-2 text-base transition-all flex justify-between items-center touch-manipulation active:scale-[0.99] ${
+                                isSelected
+                                    ? 'bg-green-50 border-green-600 text-green-900 font-bold shadow-sm'
+                                    : 'bg-white border-zinc-200 text-zinc-800 font-semibold hover:bg-zinc-50'
+                            }`}
+                        >
+                            {opt.label}
+                            {isSelected && (
+                                <div className="bg-green-600 rounded-full p-1">
+                                    <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" /></svg>
+                                </div>
+                            )}
+                        </button>
+                    );
+                })}
+            </div>
+        </>
+    );
+
     return (
-        <div className={`fixed inset-0 z-[100] flex items-end justify-center`} onClick={handleClose}>
+        <div className={`fixed inset-0 z-[100] flex items-end md:items-center justify-center`} onClick={handleClose}>
             {/* Backdrop with Fade In/Out */}
             <div className={`absolute inset-0 bg-black/50 ${isClosing ? 'animate-fadeOut' : 'animate-fadeIn'}`}></div>
             
-            {/* Sheet Content */}
-            {/* Margin bottom calculated to sit exactly above the BottomNav (4rem/64px) + Safe Area */}
+            {/* Mobile Bottom Sheet (< md) */}
             <div 
-                className={`w-full bg-white rounded-t-2xl p-4 shadow-2xl max-w-md mx-auto relative z-10 mb-[calc(4rem_+_env(safe-area-inset-bottom))] md:mb-0 ${isClosing ? 'animate-slideDown' : 'animate-slideUp'}`} 
+                className={`md:hidden w-full bg-white rounded-t-2xl p-4 shadow-2xl relative z-10 mb-[calc(4rem_+_env(safe-area-inset-bottom))] ${isClosing ? 'animate-slideDown' : 'animate-slideUp'}`} 
                 onClick={e => e.stopPropagation()}
             >
-                <div className="flex justify-between items-center mb-4">
-                    <h3 className="font-bold text-lg text-zinc-800">{title}</h3>
-                    <button onClick={handleClose} className="p-1.5 bg-zinc-100 rounded-full text-zinc-500 hover:bg-zinc-200 transition-colors">
-                        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
-                    </button>
-                </div>
-                <div className="space-y-2 pb-2">
-                    {options.map((opt) => {
-                        const isSelected = selectedValue === opt.value;
-                        return (
-                            <button
-                                key={opt.value}
-                                onClick={() => handleSelect(opt.value)}
-                                className={`w-full text-left px-4 py-3 rounded-xl border-2 text-base transition-all flex justify-between items-center touch-manipulation active:scale-[0.99] ${
-                                    isSelected
-                                        ? 'bg-green-50 border-green-600 text-green-900 font-bold shadow-sm'
-                                        : 'bg-white border-zinc-200 text-zinc-800 font-semibold hover:bg-zinc-50'
-                                }`}
-                            >
-                                {opt.label}
-                                {isSelected && (
-                                    <div className="bg-green-600 rounded-full p-1">
-                                        <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" /></svg>
-                                    </div>
-                                )}
-                            </button>
-                        );
-                    })}
-                </div>
+                <Content />
+            </div>
+
+            {/* Tablet/Desktop Modal (>= md) */}
+            <div 
+                className={`hidden md:block w-full max-w-sm bg-white rounded-2xl p-6 shadow-2xl relative z-10 m-4 ${isClosing ? 'animate-fadeOut' : 'animate-popIn'}`}
+                onClick={e => e.stopPropagation()}
+            >
+                <Content />
             </div>
         </div>
     );
@@ -368,8 +382,9 @@ const AttendeeList: React.FC<AttendeeListProps> = ({
                         </div>
                     </div>
                     
-                    {/* Mobile Filter Buttons */}
-                    <div className="flex gap-3 md:hidden">
+                    {/* Filter Buttons - Visible on mobile and tablets (up to xl) */}
+                    {/* Changed breakpoint from lg to xl so tablets use buttons */}
+                    <div className="flex gap-3 xl:hidden">
                         <button
                             onClick={() => setActiveModal('status')}
                             className={`flex-1 py-2.5 px-4 rounded-xl border font-medium text-sm flex justify-between items-center transition-colors touch-manipulation active:bg-zinc-50 ${
@@ -403,8 +418,9 @@ const AttendeeList: React.FC<AttendeeListProps> = ({
                         </button>
                     </div>
 
-                    {/* Desktop Filters */}
-                    <div className="hidden md:flex space-y-3 lg:flex lg:justify-between lg:items-center lg:space-y-0 lg:gap-6">
+                    {/* Desktop Filters - Hidden on mobile and tablets */}
+                    {/* Changed breakpoint from lg to xl */}
+                    <div className="hidden xl:flex xl:justify-between xl:items-center xl:space-y-0 xl:gap-6">
                         <div className="flex flex-wrap gap-2 items-center min-w-max">
                             <span className="text-sm font-medium text-zinc-500 flex-shrink-0">Status:</span>
                             <FilterPill label="Todos" isActive={statusFilter === 'all'} onClick={() => onStatusFilterChange('all')} />

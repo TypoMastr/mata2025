@@ -951,7 +951,7 @@ const BusPassengerList: React.FC<{
                 </button>
                 <h1 className="text-xl md:text-2xl font-bold text-zinc-800">Ônibus {busDetails.busNumber} ({busDetails.passengers.length}/{busDetails.capacity})</h1>
             </header>
-            <main className="p-4 space-y-6">
+            <main className="p-4 space-y-6 xl:space-y-0 xl:grid xl:grid-cols-2 xl:gap-4">
                 <div className="bg-white p-4 rounded-xl border border-zinc-200 shadow-sm opacity-0 animate-fadeInUp" style={{ animationFillMode: 'forwards', animationDelay: '100ms' }}>
                     <h2 className="font-bold text-lg text-zinc-800 mb-3">Designados Manualmente ({manuallyAssigned.length})</h2>
                     {manuallyAssigned.length > 0 ? (
@@ -1181,7 +1181,7 @@ const ReportsDashboard: React.FC<{ attendees: Attendee[]; onGenerateReportClick:
                     </svg>
                 </button>
             </header>
-            <div className="p-4 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            <div className="p-4 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
                 <StatCard title="Inscrições" icon={IconUsers} delay={100}>
                     <div className="flex justify-between items-baseline">
                         <span className="font-bold text-3xl text-zinc-800">{totalAttendees}</span>

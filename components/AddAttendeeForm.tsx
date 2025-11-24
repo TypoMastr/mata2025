@@ -431,15 +431,15 @@ const AddAttendeeForm: React.FC<AddAttendeeFormProps> = ({ onAddAttendee, onUpda
         : formData.paymentIsExempt;
 
     return (
-        <div className="animate-fadeIn w-full">
+        <div className="animate-fadeIn w-full h-full flex flex-col">
              <header className="sticky top-0 md:static bg-white md:bg-transparent z-10 p-3 md:pt-4 border-b border-zinc-200 flex items-center gap-4">
                 <button onClick={onCancel} className="text-zinc-500 hover:text-zinc-800 p-1 rounded-full hover:bg-zinc-100">
                     <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>
                 </button>
                 <h1 className="text-xl md:text-2xl font-bold text-zinc-800">{isEditMode ? 'Editar Inscrição' : 'Nova Inscrição'}</h1>
             </header>
-            <form onSubmit={handleSubmit} className="p-3">
-                <div className="grid grid-cols-1 md:grid-cols-12 xl:grid-cols-3 gap-4 items-start">
+            <form onSubmit={handleSubmit} className="p-3 flex flex-col flex-grow">
+                <div className="grid grid-cols-1 md:grid-cols-12 xl:grid-cols-3 gap-4 items-start flex-grow content-start">
                     
                     {/* Left Column Wrapper (Personal & Package) */}
                     <div className="md:col-span-7 xl:col-span-2 space-y-3 xl:space-y-0 xl:grid xl:grid-cols-2 xl:gap-4">
@@ -508,7 +508,7 @@ const AddAttendeeForm: React.FC<AddAttendeeFormProps> = ({ onAddAttendee, onUpda
                                         disabled={isPersonSelected} 
                                     />
                                 </FormField>
-                                <div className="md:grid md:grid-cols-2 md:gap-3 space-y-3 md:space-y-0">
+                                <div className="space-y-3">
                                     <FormField label={`Documento (CPF ou RG)${formData.packageType === PackageType.SITIO_BUS ? '' : ' - Opcional'}`} id="document" error={errors.document} onPaste={(text) => handlePaste('document', text)}>
                                         <input type="tel" id="document" name="document" value={formData.document} onChange={handleInputChange} className="block w-full px-3 py-2 bg-white border border-zinc-300 rounded-md shadow-sm sm:text-sm focus:outline-none focus:ring-green-500 focus:border-green-500 pr-8" required={formData.packageType === PackageType.SITIO_BUS} autoComplete="off" disabled={isPersonSelected} />
                                     </FormField>
@@ -523,7 +523,7 @@ const AddAttendeeForm: React.FC<AddAttendeeFormProps> = ({ onAddAttendee, onUpda
                                     <FormField label="Nome Completo" id="name" error={errors.name} onPaste={(text) => handlePaste('name', text)}>
                                         <input type="text" id="name" name="name" value={formData.name} onChange={handleInputChange} className="block w-full px-3 py-2 bg-white border border-zinc-300 rounded-md shadow-sm sm:text-sm uppercase pr-8" required autoComplete="off" />
                                     </FormField>
-                                    <div className="md:grid md:grid-cols-2 md:gap-3 space-y-3 md:space-y-0">
+                                    <div className="space-y-3">
                                         <FormField label={`Documento (CPF ou RG)${formData.packageType === PackageType.SITIO_BUS ? '' : ' - Opcional'}`} id="document" error={errors.document} onPaste={(text) => handlePaste('document', text)}>
                                             <input type="tel" id="document" name="document" value={formData.document} onChange={handleInputChange} className="block w-full px-3 py-2 bg-white border border-zinc-300 rounded-md shadow-sm sm:text-sm pr-8" required={formData.packageType === PackageType.SITIO_BUS} autoComplete="off" />
                                         </FormField>
@@ -687,7 +687,7 @@ const AddAttendeeForm: React.FC<AddAttendeeFormProps> = ({ onAddAttendee, onUpda
                 </div>
                 
                 {/* Footer Actions - Sticky at bottom of form on Desktop */}
-                <div className="mt-4 pt-3 border-t border-zinc-200 md:border-t md:sticky md:bottom-0 bg-zinc-50 md:z-10 md:-mx-4 md:px-4 md:py-3 md:shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)] flex justify-center items-center">
+                <div className="mt-auto pt-3 border-t border-zinc-200 sticky bottom-0 bg-zinc-50 z-10 -mx-3 px-4 py-3 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)] flex justify-center items-center">
                     <div className="flex flex-col md:flex-row gap-4 w-full md:w-auto">
                         <button type="button" onClick={onCancel} className="w-full md:w-32 bg-zinc-200 text-zinc-800 font-bold py-3 px-4 rounded-full hover:bg-zinc-300 transition-colors">Cancelar</button>
                         <button type="submit" disabled={isSubmitting || (!isPersonSelected && !formData.name)} className="w-full md:w-48 bg-green-500 text-white font-bold py-3 px-4 rounded-full flex items-center justify-center gap-2 hover:bg-green-600 shadow-sm disabled:bg-green-400 disabled:cursor-not-allowed">

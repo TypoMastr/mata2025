@@ -785,8 +785,15 @@ interface FinancialData {
     paidBus: number;
     totalBus: number;
     pendingBus: number;
+    // Counts
+    countPaidSitio: number;
+    countTotalSitio: number;
+    countPendingSitio: number;
+    countPaidBus: number;
+    countTotalBus: number;
+    countPendingBus: number;
 }
-const FinancialDetailCard: React.FC<{ title: string; paid: number; total: number; }> = ({ title, paid, total }) => (
+const FinancialDetailCard: React.FC<{ title: string; paid: number; total: number; countPaid: number; countTotal: number; }> = ({ title, paid, total, countPaid, countTotal }) => (
     <div className="bg-white p-4 rounded-xl border border-zinc-200 shadow-sm space-y-3">
         <h3 className="font-bold text-lg text-zinc-800">{title}</h3>
         <div>
@@ -794,6 +801,9 @@ const FinancialDetailCard: React.FC<{ title: string; paid: number; total: number
                 <span className="font-bold text-3xl text-zinc-800">R$ {paid.toFixed(2).replace('.', ',')}</span>
                 <span className="text-sm font-semibold text-zinc-500">de R$ {total.toFixed(2).replace('.', ',')}</span>
             </div>
+             <p className="text-xs text-zinc-400 mt-1 mb-2 font-medium">
+                {countPaid} de {countTotal} pagantes
+            </p>
             <ProgressBar value={paid} max={total} />
         </div>
     </div>
@@ -809,18 +819,32 @@ const FinancialDetailView: React.FC<{ financialData: FinancialData; onBack: () =
             </header>
             <main className="p-4 grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="opacity-0 animate-fadeInUp" style={{ animationFillMode: 'forwards', animationDelay: '100ms' }}>
-                    <FinancialDetailCard title="Arrecadado (Sítio)" paid={financialData.paidSitio} total={financialData.totalSitio} />
+                    <FinancialDetailCard 
+                        title="Arrecadado (Sítio)" 
+                        paid={financialData.paidSitio} 
+                        total={financialData.totalSitio}
+                        countPaid={financialData.countPaidSitio}
+                        countTotal={financialData.countTotalSitio}
+                    />
                 </div>
                  <div className="opacity-0 animate-fadeInUp" style={{ animationFillMode: 'forwards', animationDelay: '200ms' }}>
-                    <FinancialDetailCard title="Arrecadado (Ônibus)" paid={financialData.paidBus} total={financialData.totalBus} />
+                    <FinancialDetailCard 
+                        title="Arrecadado (Ônibus)" 
+                        paid={financialData.paidBus} 
+                        total={financialData.totalBus}
+                        countPaid={financialData.countPaidBus}
+                        countTotal={financialData.countTotalBus}
+                    />
                 </div>
                 <div className="bg-red-50 p-4 rounded-xl border border-red-200 shadow-sm space-y-3 opacity-0 animate-fadeInUp" style={{ animationFillMode: 'forwards', animationDelay: '300ms' }}>
                      <h3 className="font-bold text-lg text-red-800">Pendente (Sítio)</h3>
                      <span className="font-bold text-3xl text-red-800">R$ {financialData.pendingSitio.toFixed(2).replace('.', ',')}</span>
+                     <p className="text-xs text-red-600 font-medium mt-1">{financialData.countPendingSitio} pendentes</p>
                 </div>
                 <div className="bg-red-50 p-4 rounded-xl border border-red-200 shadow-sm space-y-3 opacity-0 animate-fadeInUp" style={{ animationFillMode: 'forwards', animationDelay: '400ms' }}>
                      <h3 className="font-bold text-lg text-red-800">Pendente (Ônibus)</h3>
                      <span className="font-bold text-3xl text-red-800">R$ {financialData.pendingBus.toFixed(2).replace('.', ',')}</span>
+                     <p className="text-xs text-red-600 font-medium mt-1">{financialData.countPendingBus} pendentes</p>
                 </div>
             </main>
         </div>
@@ -1039,6 +1063,7 @@ const ReportsDashboard: React.FC<{ attendees: Attendee[]; onGenerateReportClick:
             return acc;
         }, {} as Record<PaymentType, { count: number; total: number }>);
         
+        // Populate stats for payment methods (existing logic)
         const allPaidOrPartiallyPaid = attendees.filter(a => a.payment.status === PaymentStatus.PAGO || (a.payment.sitePaymentDetails?.isPaid || a.payment.busPaymentDetails?.isPaid));
 
         allPaidOrPartiallyPaid.forEach(attendee => {
@@ -1057,7 +1082,7 @@ const ReportsDashboard: React.FC<{ attendees: Attendee[]; onGenerateReportClick:
                 if (attendee.payment.status === PaymentStatus.PAGO && attendee.payment.type) {
                     const type = attendee.payment.type;
                     calculatedPaymentStats[type].count += 1;
-                    calculatedPaymentStats[type].total += attendee.payment.amount;
+                    calculatedPaymentStats[type].total += attendee.payment.amount; // Use actual amount here for single
                 }
             }
         });
@@ -1073,44 +1098,56 @@ const ReportsDashboard: React.FC<{ attendees: Attendee[]; onGenerateReportClick:
                 r[k as PaymentType] = v
                 return r;
             }, {} as Record<PaymentType, { count: number; total: number }>);
-            
-        const calculatedTotalRevenue = attendees
-            .filter(a => a.payment.status !== PaymentStatus.ISENTO)
-            .reduce((sum, a) => {
-                if (a.payment.status === PaymentStatus.PAGO) {
-                    return sum + a.payment.amount;
-                }
-                if (a.packageType === PackageType.SITIO_BUS) {
-                    let partialSum = 0;
-                    if (a.payment.sitePaymentDetails?.isPaid) partialSum += (event?.site_price ?? 70);
-                    if (a.payment.busPaymentDetails?.isPaid) partialSum += (event?.bus_price ?? 50);
-                    return sum + partialSum;
-                }
-                return sum;
-            }, 0);
+
+        // --- STRICT FINANCIAL CALCULATION ---
+        // We recalculate totally from scratch based on strict rules to match the detail view
+        // and avoid double counting.
         
-        // Calculate possible revenue:
-        // Start with sum of all amounts (this includes exempt amounts if they are set to 0 or full price depending on logic).
-        // Better logic: 
-        // For each attendee:
-        // If full exempt -> 0 potential
-        // If Sitio+Bus:
-        //   Sitio Potential = Is Exempt ? 0 : Price
-        //   Bus Potential = Is Exempt ? 0 : Price
-        const calculatedTotalPossibleRevenue = attendees
-                .reduce((sum, a) => {
-                    if (a.payment.status === PaymentStatus.ISENTO) return sum;
+        const sitePrice = event?.site_price ?? 70;
+        const busPrice = event?.bus_price ?? 50;
+
+        let calculatedTotalRevenue = 0;
+        let calculatedTotalPossibleRevenue = 0;
+
+        attendees.forEach(a => {
+            // 1. Ignore fully exempt people. They contribute 0 to potential and 0 to revenue.
+            if (a.payment.status === PaymentStatus.ISENTO) return;
+            
+            // Critical Fix: If status is PAGO, assume paid regardless of partial details state
+            // unless specific exemption overrides exist (which shouldn't happen if status is PAGO generally).
+            const isGeneralPaid = a.payment.status === PaymentStatus.PAGO;
+
+            if (a.packageType === PackageType.SITIO_ONLY) {
+                // Not exempt, so adds to potential
+                calculatedTotalPossibleRevenue += sitePrice;
+                // If Paid, adds to revenue
+                if (isGeneralPaid) {
+                    calculatedTotalRevenue += sitePrice;
+                }
+            } else if (a.packageType === PackageType.SITIO_BUS) {
+                // Check Site Part
+                if (!a.payment.sitePaymentDetails?.isExempt) {
+                    // If NOT exempt, it ADDS to potential revenue.
+                    calculatedTotalPossibleRevenue += sitePrice;
                     
-                    if (a.packageType === PackageType.SITIO_BUS) {
-                        let potential = 0;
-                        if (!a.payment.sitePaymentDetails?.isExempt) potential += (event?.site_price ?? 70);
-                        if (!a.payment.busPaymentDetails?.isExempt) potential += (event?.bus_price ?? 50);
-                        return sum + potential;
-                    } else {
-                        // Single package type
-                        return sum + (event?.site_price ?? 70); // Assuming SITIO_ONLY
+                    // If Paid (or general paid), it adds to Actual Revenue.
+                    if (a.payment.sitePaymentDetails?.isPaid || isGeneralPaid) {
+                        calculatedTotalRevenue += sitePrice;
                     }
-                }, 0);
+                }
+                
+                // Check Bus Part
+                if (!a.payment.busPaymentDetails?.isExempt) {
+                    // If NOT exempt, it ADDS to potential revenue.
+                    calculatedTotalPossibleRevenue += busPrice;
+
+                    // If Paid (or general paid), it adds to Actual Revenue.
+                    if (a.payment.busPaymentDetails?.isPaid || isGeneralPaid) {
+                        calculatedTotalRevenue += busPrice;
+                    }
+                }
+            }
+        });
 
         return {
             totalAttendees: attendees.length,
@@ -1330,37 +1367,66 @@ const Reports: React.FC<ReportsProps> = ({ attendees, onLogout, onUpdateAttendee
     }, [attendees]);
     
     const financialDetails = useMemo(() => {
+        // --- STRICT RECALCULATION LOGIC ---
+        // Initializes all counters to zero
         let paidSitio = 0;
         let totalSitio = 0;
+        
         let paidBus = 0;
         let totalBus = 0;
+        
+        // Counters for people
+        let countPaidSitio = 0;
+        let countTotalSitio = 0;
+        
+        let countPaidBus = 0;
+        let countTotalBus = 0;
 
         const sitePrice = event?.site_price ?? 70;
         const busPrice = event?.bus_price ?? 50;
 
         attendees.forEach(a => {
+            // 1. Skip strictly EXEMPT (ISENTO) users entirely
             if (a.payment.status === PaymentStatus.ISENTO) {
-                return; // Skip exempt attendees from financial calculations
+                return; 
             }
 
+            // Critical Fix: If status is PAGO, assume paid regardless of partial details state
+            const isGeneralPaid = a.payment.status === PaymentStatus.PAGO;
+
             if (a.packageType === PackageType.SITIO_ONLY) {
+                // Not exempt, so counts towards Total Possible
                 totalSitio += sitePrice;
-                if (a.payment.status === PaymentStatus.PAGO) {
+                countTotalSitio++;
+
+                if (isGeneralPaid) {
                     paidSitio += sitePrice;
+                    countPaidSitio++;
                 }
             } else if (a.packageType === PackageType.SITIO_BUS) {
-                // Only count potential revenue if NOT exempt
-                if (!a.payment.sitePaymentDetails?.isExempt) {
+                // --- SÍTIO PART ---
+                const siteExempt = !!a.payment.sitePaymentDetails?.isExempt;
+                if (!siteExempt) {
+                    // Not exempt from Site, add to Total
                     totalSitio += sitePrice;
-                    if (a.payment.sitePaymentDetails?.isPaid) {
+                    countTotalSitio++;
+                    
+                    if (a.payment.sitePaymentDetails?.isPaid || isGeneralPaid) {
                         paidSitio += sitePrice;
+                        countPaidSitio++;
                     }
                 }
                 
-                if (!a.payment.busPaymentDetails?.isExempt) {
+                // --- BUS PART ---
+                const busExempt = !!a.payment.busPaymentDetails?.isExempt;
+                if (!busExempt) {
+                    // Not exempt from Bus, add to Total
                     totalBus += busPrice;
-                    if (a.payment.busPaymentDetails?.isPaid) {
+                    countTotalBus++;
+                    
+                    if (a.payment.busPaymentDetails?.isPaid || isGeneralPaid) {
                         paidBus += busPrice;
+                        countPaidBus++;
                     }
                 }
             }
@@ -1373,6 +1439,12 @@ const Reports: React.FC<ReportsProps> = ({ attendees, onLogout, onUpdateAttendee
             paidBus,
             totalBus,
             pendingBus: totalBus - paidBus,
+            countPaidSitio,
+            countTotalSitio,
+            countPendingSitio: countTotalSitio - countPaidSitio,
+            countPaidBus,
+            countTotalBus,
+            countPendingBus: countTotalBus - countPaidBus
         };
     }, [attendees, event]);
 

@@ -178,10 +178,10 @@ const ManagementPage: React.FC<ManagementPageProps> = ({ events, onAddEvent, onU
                 </div>
             </header>
 
-            <main className="p-3 space-y-3 xl:space-y-0 xl:grid xl:grid-cols-3 xl:gap-4 flex-grow overflow-y-auto xl:overflow-visible">
+            <main className="p-3 space-y-3 xl:space-y-0 xl:grid xl:grid-cols-12 xl:gap-4 flex-grow overflow-y-auto xl:overflow-visible">
                 
-                {/* Column 1: Events */}
-                <div className="space-y-3 flex flex-col">
+                {/* Column 1: Events (4 columns) */}
+                <div className="space-y-3 flex flex-col xl:col-span-4">
                     <div className="bg-white p-3 rounded-xl border border-zinc-200 shadow-sm space-y-3 flex-shrink-0">
                         <div className="flex justify-between items-center">
                             <h2 className="text-lg font-bold text-zinc-700">Eventos Ativos</h2>
@@ -291,8 +291,8 @@ const ManagementPage: React.FC<ManagementPageProps> = ({ events, onAddEvent, onU
                     )}
                 </div>
 
-                {/* Column 2: History */}
-                <div className="bg-white p-3 rounded-xl border border-zinc-200 shadow-sm space-y-3 h-fit max-h-[calc(100vh-8rem)] overflow-y-auto">
+                {/* Column 2: History (8 columns - Wider) */}
+                <div className="bg-white p-3 rounded-xl border border-zinc-200 shadow-sm space-y-3 h-fit max-h-[calc(100vh-8rem)] overflow-y-auto xl:col-span-8">
                     <h2 className="text-lg font-bold text-zinc-700">Histórico Recente</h2>
                     {latestHistory.length > 0 ? (
                         <div className="space-y-2">
@@ -313,11 +313,12 @@ const ManagementPage: React.FC<ManagementPageProps> = ({ events, onAddEvent, onU
                     )}
                 </div>
                 
-                {/* Column 3: Settings */}
-                <div className="space-y-3">
+                {/* Column 3: Settings (Full width of next row) */}
+                <div className="space-y-3 xl:col-span-12">
                      <div className="bg-white p-3 rounded-xl border border-zinc-200 shadow-sm">
                         <h2 className="text-lg font-bold text-zinc-700 mb-2">Configurações</h2>
-                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+                        {/* Settings Grid: Side by side on medium+ screens */}
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                             <InfoCard icon={IconDatabase} title="Banco de Dados" delay={50}>
                                 <p className="text-xs text-zinc-600 mb-2">
                                     Gerencie a lista central de pessoas.

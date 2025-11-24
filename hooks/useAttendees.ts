@@ -9,8 +9,11 @@ export const useRegistrations = (eventId: string | null) => {
     const [registrations, setRegistrations] = useState<Registration[]>([]);
     const [isLoading, setIsLoading] = useState(true);
 
-    const fetchRegistrations = useCallback(async (id: string) => {
-        setIsLoading(true);
+    const fetchRegistrations = useCallback(async (id: string, options?: { silent?: boolean }) => {
+        // Only trigger loading state if NOT silent
+        if (!options?.silent) {
+            setIsLoading(true);
+        }
         try {
             // API now handles soft deletes, so no change needed here.
             const data = await api.fetchRegistrations(id);
@@ -18,7 +21,9 @@ export const useRegistrations = (eventId: string | null) => {
         } catch (err) {
             console.error("Failed to fetch registrations:", err);
         } finally {
-            setIsLoading(false);
+            if (!options?.silent) {
+                setIsLoading(false);
+            }
         }
     }, []);
 
@@ -28,6 +33,14 @@ export const useRegistrations = (eventId: string | null) => {
         } else {
             setRegistrations([]);
             setIsLoading(false);
+        }
+    }, [eventId, fetchRegistrations]);
+    
+    // Wrapper to allow components to trigger a refresh manually using the current eventId
+    // Accepts options for silent refresh (background update)
+    const refresh = useCallback(async (options?: { silent?: boolean }) => {
+        if (eventId) {
+            await fetchRegistrations(eventId, options);
         }
     }, [eventId, fetchRegistrations]);
     
@@ -166,6 +179,7 @@ export const useRegistrations = (eventId: string | null) => {
         addRegistration,
         updateRegistration,
         deleteRegistration,
+        refresh
     };
 };
 // Alias for backwards compatibility

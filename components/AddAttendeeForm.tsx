@@ -13,10 +13,50 @@ const SpinnerIcon: React.FC<{ white?: boolean }> = ({ white = true }) => (
     </svg>
 );
 
-const FormField: React.FC<{ label: string; id: string; error?: string; children: React.ReactNode }> = ({ label, id, error, children }) => (
+// Utility to handle paste with error handling
+const PasteButton: React.FC<{ onPaste: (text: string) => void }> = ({ onPaste }) => {
+    const { addToast } = useToast();
+
+    const handleClick = async (e: React.MouseEvent) => {
+        e.preventDefault(); 
+        
+        if (!navigator.clipboard || !navigator.clipboard.readText) {
+             addToast('Colar não suportado neste navegador.', 'error');
+             return;
+        }
+
+        try {
+            const text = await navigator.clipboard.readText();
+            if (text) onPaste(text);
+            else addToast('Área de transferência vazia.', 'info');
+        } catch (err) {
+            console.error('Failed to read clipboard', err);
+            addToast('Falha ao acessar área de transferência. Verifique as permissões.', 'error');
+        }
+    };
+
+    return (
+        <button
+            type="button"
+            onClick={handleClick}
+            className="absolute right-2 top-1/2 transform -translate-y-1/2 text-zinc-400 hover:text-green-600 p-1.5 rounded-md hover:bg-zinc-100 transition-colors z-10"
+            title="Colar"
+            tabIndex={-1}
+        >
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+            </svg>
+        </button>
+    );
+};
+
+const FormField: React.FC<{ label: string; id: string; error?: string; children: React.ReactNode; onPaste?: (text: string) => void }> = ({ label, id, error, children, onPaste }) => (
     <div>
         <label htmlFor={id} className="block text-sm font-medium text-zinc-700">{label}</label>
-        <div className="mt-1">{children}</div>
+        <div className="mt-1 relative">
+            {children}
+            {onPaste && <PasteButton onPaste={onPaste} />}
+        </div>
         {error && <p className="mt-1 text-xs text-red-600 animate-fadeIn">{error}</p>}
     </div>
 );
@@ -30,73 +70,41 @@ interface PartialPaymentFieldsProps {
 const PartialPaymentFields: React.FC<PartialPaymentFieldsProps> = ({ idPrefix, details, onUpdate }) => {
     return (
         <div className="space-y-3">
-             <div className="flex flex-wrap gap-4">
-                 <label className="flex items-center space-x-2 cursor-pointer w-fit">
-                    <input 
-                        type="checkbox" 
-                        checked={!!details.isExempt} 
-                        onChange={(e) => onUpdate({ isExempt: e.target.checked, isPaid: e.target.checked ? false : details.isPaid })} 
-                        className="h-4 w-4 rounded border-zinc-300 text-indigo-600 focus:ring-indigo-500"
+            <div className="space-y-3 pl-3 md:pl-4 border-l-2 border-green-300 animate-fadeIn">
+                <FormField label="Data do Pagamento" id={`${idPrefix}-date`}>
+                    <input
+                        type="date"
+                        id={`${idPrefix}-date`}
+                        value={details.date}
+                        onChange={(e) => onUpdate({ date: e.target.value })}
+                        className="block w-full max-w-full min-w-0 px-3 py-2 bg-white border border-zinc-300 rounded-md shadow-sm sm:text-sm focus:outline-none focus:ring-green-500 focus:border-green-500 disabled:bg-zinc-100"
+                        required={!details.dateNotInformed}
+                        disabled={details.dateNotInformed}
+                        autoComplete="off"
+                        style={{ maxWidth: '100%' }}
                     />
-                    <span className="text-sm text-zinc-700 font-medium">Isento?</span>
-                </label>
-                
-                {!details.isExempt && (
-                    <label className="flex items-center space-x-2 cursor-pointer w-fit">
-                        <input 
-                            type="checkbox" 
-                            checked={details.isPaid} 
-                            onChange={(e) => onUpdate({ isPaid: e.target.checked })} 
-                            className="h-4 w-4 rounded border-zinc-300 text-green-600 focus:ring-green-500"
-                        />
-                        <span className="text-sm text-zinc-700 font-medium">Pagamento realizado?</span>
+                     <label className="flex items-center space-x-2 mt-2 cursor-pointer w-fit">
+                        <input type="checkbox" checked={details.dateNotInformed} onChange={(e) => onUpdate({ dateNotInformed: e.target.checked })} className="h-4 w-4 rounded border-zinc-300 text-green-600 focus:ring-green-500" />
+                        <span className="text-sm text-zinc-700">Data não informada</span>
                     </label>
-                )}
+                </FormField>
+                <FormField label="Tipo de Pagamento" id={`${idPrefix}-type`}>
+                    <select
+                        id={`${idPrefix}-type`}
+                        value={details.type || ''}
+                        onChange={(e) => onUpdate({ type: e.target.value as PaymentType })}
+                        className="block w-full px-3 py-2 bg-white border border-zinc-300 rounded-md shadow-sm sm:text-sm focus:outline-none focus:ring-green-500 focus:border-green-500"
+                        required
+                        autoComplete="off"
+                    >
+                        <option value={PaymentType.PIX_CONTA}>PIX (Conta)</option>
+                        <option value={PaymentType.PIX_MAQUINA}>PIX (Máquina)</option>
+                        <option value={PaymentType.DEBITO}>Débito</option>
+                        <option value={PaymentType.CREDITO}>Crédito</option>
+                        <option value={PaymentType.DINHEIRO}>Dinheiro</option>
+                    </select>
+                </FormField>
             </div>
-
-            {details.isExempt && (
-                 <div className="pl-4 border-l-2 border-indigo-300 animate-fadeIn">
-                    <p className="text-sm text-indigo-700 font-medium">Pagamento dispensado (Isenção).</p>
-                </div>
-            )}
-
-            {!details.isExempt && details.isPaid && (
-                <div className="space-y-3 pl-3 md:pl-4 border-l-2 border-green-300 animate-fadeIn">
-                    <FormField label="Data do Pagamento" id={`${idPrefix}-date`}>
-                        <input
-                            type="date"
-                            id={`${idPrefix}-date`}
-                            value={details.date}
-                            onChange={(e) => onUpdate({ date: e.target.value })}
-                            className="block w-full max-w-full min-w-0 px-3 py-2 bg-white border border-zinc-300 rounded-md shadow-sm sm:text-sm focus:outline-none focus:ring-green-500 focus:border-green-500 disabled:bg-zinc-100"
-                            required={!details.dateNotInformed}
-                            disabled={details.dateNotInformed}
-                            autoComplete="off"
-                            style={{ maxWidth: '100%' }}
-                        />
-                         <label className="flex items-center space-x-2 mt-2 cursor-pointer w-fit">
-                            <input type="checkbox" checked={details.dateNotInformed} onChange={(e) => onUpdate({ dateNotInformed: e.target.checked })} className="h-4 w-4 rounded border-zinc-300 text-green-600 focus:ring-green-500" />
-                            <span className="text-sm text-zinc-700">Data não informada</span>
-                        </label>
-                    </FormField>
-                    <FormField label="Tipo de Pagamento" id={`${idPrefix}-type`}>
-                        <select
-                            id={`${idPrefix}-type`}
-                            value={details.type || ''}
-                            onChange={(e) => onUpdate({ type: e.target.value as PaymentType })}
-                            className="block w-full px-3 py-2 bg-white border border-zinc-300 rounded-md shadow-sm sm:text-sm focus:outline-none focus:ring-green-500 focus:border-green-500"
-                            required
-                            autoComplete="off"
-                        >
-                            <option value={PaymentType.PIX_CONTA}>PIX (Conta)</option>
-                            <option value={PaymentType.PIX_MAQUINA}>PIX (Máquina)</option>
-                            <option value={PaymentType.DEBITO}>Débito</option>
-                            <option value={PaymentType.CREDITO}>Crédito</option>
-                            <option value={PaymentType.DINHEIRO}>Dinheiro</option>
-                        </select>
-                    </FormField>
-                </div>
-            )}
         </div>
     );
 };
@@ -120,6 +128,7 @@ const getInitialPartialPayment = (): PartialPaymentFormDetails => ({
 
 const getInitialFormData = (attendee?: Attendee | null): AttendeeFormData => {
     if (attendee) {
+        const isBus = attendee.packageType === PackageType.SITIO_BUS;
         return {
             personId: attendee.person.id,
             name: attendee.person.name,
@@ -129,13 +138,25 @@ const getInitialFormData = (attendee?: Attendee | null): AttendeeFormData => {
             notes: attendee.notes || '',
             paymentAmount: attendee.payment.amount.toString(),
             registerPaymentNow: false,
-            paymentDate: new Date().toISOString().split('T')[0],
-            paymentDateNotInformed: true,
-            paymentType: PaymentType.PIX_CONTA,
-            paymentIsExempt: false,
-            paymentIsPaid: true,
-            sitePayment: getInitialPartialPayment(),
-            busPayment: getInitialPartialPayment(),
+            paymentDate: attendee.payment.date ? new Date(attendee.payment.date).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
+            paymentDateNotInformed: !attendee.payment.date,
+            paymentType: attendee.payment.type || PaymentType.PIX_CONTA,
+            paymentIsExempt: !isBus && attendee.payment.status === 'Isento',
+            paymentIsPaid: !isBus && attendee.payment.status === 'Pago',
+            sitePayment: isBus ? (attendee.payment.sitePaymentDetails ? {
+                isPaid: attendee.payment.sitePaymentDetails.isPaid,
+                isExempt: attendee.payment.sitePaymentDetails.isExempt,
+                date: attendee.payment.sitePaymentDetails.date ? new Date(attendee.payment.sitePaymentDetails.date).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
+                dateNotInformed: !attendee.payment.sitePaymentDetails.date,
+                type: attendee.payment.sitePaymentDetails.type || PaymentType.PIX_CONTA
+            } : getInitialPartialPayment()) : getInitialPartialPayment(),
+            busPayment: isBus ? (attendee.payment.busPaymentDetails ? {
+                isPaid: attendee.payment.busPaymentDetails.isPaid,
+                isExempt: attendee.payment.busPaymentDetails.isExempt,
+                date: attendee.payment.busPaymentDetails.date ? new Date(attendee.payment.busPaymentDetails.date).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
+                dateNotInformed: !attendee.payment.busPaymentDetails.date,
+                type: attendee.payment.busPaymentDetails.type || PaymentType.PIX_CONTA
+            } : getInitialPartialPayment()) : getInitialPartialPayment(),
         };
     }
     return {
@@ -319,15 +340,22 @@ const AddAttendeeForm: React.FC<AddAttendeeFormProps> = ({ onAddAttendee, onUpda
 
         let finalValue: string | boolean = isCheckbox ? checked : value;
 
-        if (name === 'name') {
-            finalValue = value.toUpperCase();
-        } else if (name === 'phone') {
+        // FIX: Do NOT uppercase name here to avoid cursor jumping. It is uppercased via CSS and onSubmit.
+        
+        if (name === 'phone') {
             finalValue = formatPhoneNumber(value);
         } else if (name === 'document') {
             finalValue = formatDocument(value);
         }
 
         setFormData(prev => ({ ...prev, [name]: finalValue }));
+    };
+    
+    const handlePaste = (field: keyof AttendeeFormData, text: string) => {
+        let finalValue = text;
+        if (field === 'phone') finalValue = formatPhoneNumber(text);
+        if (field === 'document') finalValue = formatDocument(text);
+        setFormData(prev => ({ ...prev, [field]: finalValue }));
     };
     
     const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -349,13 +377,15 @@ const AddAttendeeForm: React.FC<AddAttendeeFormProps> = ({ onAddAttendee, onUpda
 
         setIsSubmitting(true);
         try {
+            const finalName = formData.name.trim().toUpperCase(); // Uppercase applied on submit
+            
             if (isEditMode && onUpdateAttendee && attendeeToEdit) {
                 const { type } = getDocumentType(formData.document);
                 const updatedAttendee: Attendee = {
                     ...attendeeToEdit,
                     person: {
                         ...attendeeToEdit.person,
-                        name: formData.name.trim(),
+                        name: finalName,
                         document: formData.document,
                         documentType: type,
                         phone: formData.phone,
@@ -364,16 +394,17 @@ const AddAttendeeForm: React.FC<AddAttendeeFormProps> = ({ onAddAttendee, onUpda
                     notes: formData.notes.trim(),
                     payment: {
                         ...attendeeToEdit.payment,
-                        amount: formData.packageType === PackageType.SITIO_BUS ? ((event?.site_price ?? 70) + (event?.bus_price ?? 50)) : (event?.site_price ?? 70),
+                        amount: parseFloat(formData.paymentAmount),
                     },
                 };
+                
                 await onUpdateAttendee(updatedAttendee);
                 addToast('Inscrição atualizada com sucesso!', 'success');
                 onCancel();
             } else if (!isEditMode && onAddAttendee) {
                 await onAddAttendee({
                     ...formData,
-                    name: formData.name.trim(),
+                    name: finalName,
                     notes: formData.notes.trim(),
                 });
                 addToast('Inscrição adicionada com sucesso!', 'success');
@@ -394,6 +425,10 @@ const AddAttendeeForm: React.FC<AddAttendeeFormProps> = ({ onAddAttendee, onUpda
     const isBusPackage = formData.packageType === PackageType.SITIO_BUS;
     const sitePriceText = (event?.site_price ?? 70).toFixed(2).replace('.', ',');
     const totalBusPriceText = ((event?.site_price ?? 70) + (event?.bus_price ?? 50)).toFixed(2).replace('.', ',');
+
+    const isFullyExempt = isBusPackage 
+        ? (formData.sitePayment.isExempt && formData.busPayment.isExempt)
+        : formData.paymentIsExempt;
 
     return (
         <div className="animate-fadeIn">
@@ -455,27 +490,37 @@ const AddAttendeeForm: React.FC<AddAttendeeFormProps> = ({ onAddAttendee, onUpda
                          <p className="text-sm text-zinc-500 text-center border-b pb-4">
                             {isEditMode ? 'Edite os dados abaixo:' : 'Ou cadastre uma nova pessoa:'}
                          </p>
-                        <FormField label="Nome Completo" id="name" error={errors.name}>
-                            <input type="text" id="name" name="name" value={formData.name} onChange={handleInputChange} className="block w-full px-3 py-2 bg-white border border-zinc-300 rounded-md shadow-sm sm:text-sm focus:outline-none focus:ring-green-500 focus:border-green-500" required autoComplete="off" disabled={isPersonSelected} />
+                        <FormField label="Nome Completo" id="name" error={errors.name} onPaste={(text) => handlePaste('name', text)}>
+                            <input 
+                                type="text" 
+                                id="name" 
+                                name="name" 
+                                value={formData.name} 
+                                onChange={handleInputChange} 
+                                className="block w-full px-3 py-2 bg-white border border-zinc-300 rounded-md shadow-sm sm:text-sm focus:outline-none focus:ring-green-500 focus:border-green-500 uppercase pr-8" 
+                                required 
+                                autoComplete="off" 
+                                disabled={isPersonSelected} 
+                            />
                         </FormField>
-                         <FormField label={`Documento (CPF ou RG)${formData.packageType === PackageType.SITIO_BUS ? '' : ' - Opcional'}`} id="document" error={errors.document}>
-                            <input type="tel" id="document" name="document" value={formData.document} onChange={handleInputChange} className="block w-full px-3 py-2 bg-white border border-zinc-300 rounded-md shadow-sm sm:text-sm focus:outline-none focus:ring-green-500 focus:border-green-500" required={formData.packageType === PackageType.SITIO_BUS} autoComplete="off" disabled={isPersonSelected} />
+                         <FormField label={`Documento (CPF ou RG)${formData.packageType === PackageType.SITIO_BUS ? '' : ' - Opcional'}`} id="document" error={errors.document} onPaste={(text) => handlePaste('document', text)}>
+                            <input type="tel" id="document" name="document" value={formData.document} onChange={handleInputChange} className="block w-full px-3 py-2 bg-white border border-zinc-300 rounded-md shadow-sm sm:text-sm focus:outline-none focus:ring-green-500 focus:border-green-500 pr-8" required={formData.packageType === PackageType.SITIO_BUS} autoComplete="off" disabled={isPersonSelected} />
                         </FormField>
-                         <FormField label="Telefone (com DDD)" id="phone" error={errors.phone}>
-                            <input type="tel" id="phone" name="phone" value={formData.phone} onChange={handleInputChange} placeholder="(21) 99999-9999" className="block w-full px-3 py-2 bg-white border border-zinc-300 rounded-md shadow-sm sm:text-sm focus:outline-none focus:ring-green-500 focus:border-green-500" required autoComplete="off" disabled={isPersonSelected} />
+                         <FormField label="Telefone (com DDD)" id="phone" error={errors.phone} onPaste={(text) => handlePaste('phone', text)}>
+                            <input type="tel" id="phone" name="phone" value={formData.phone} onChange={handleInputChange} placeholder="(21) 99999-9999" className="block w-full px-3 py-2 bg-white border border-zinc-300 rounded-md shadow-sm sm:text-sm focus:outline-none focus:ring-green-500 focus:border-green-500 pr-8" required autoComplete="off" disabled={isPersonSelected} />
                         </FormField>
                     </div>
 
                     {isEditMode && (
                          <div className="space-y-4">
-                            <FormField label="Nome Completo" id="name" error={errors.name}>
-                                <input type="text" id="name" name="name" value={formData.name} onChange={handleInputChange} className="block w-full px-3 py-2 bg-white border border-zinc-300 rounded-md shadow-sm sm:text-sm" required autoComplete="off" />
+                            <FormField label="Nome Completo" id="name" error={errors.name} onPaste={(text) => handlePaste('name', text)}>
+                                <input type="text" id="name" name="name" value={formData.name} onChange={handleInputChange} className="block w-full px-3 py-2 bg-white border border-zinc-300 rounded-md shadow-sm sm:text-sm uppercase pr-8" required autoComplete="off" />
                             </FormField>
-                            <FormField label={`Documento (CPF ou RG)${formData.packageType === PackageType.SITIO_BUS ? '' : ' - Opcional'}`} id="document" error={errors.document}>
-                                <input type="tel" id="document" name="document" value={formData.document} onChange={handleInputChange} className="block w-full px-3 py-2 bg-white border border-zinc-300 rounded-md shadow-sm sm:text-sm" required={formData.packageType === PackageType.SITIO_BUS} autoComplete="off" />
+                            <FormField label={`Documento (CPF ou RG)${formData.packageType === PackageType.SITIO_BUS ? '' : ' - Opcional'}`} id="document" error={errors.document} onPaste={(text) => handlePaste('document', text)}>
+                                <input type="tel" id="document" name="document" value={formData.document} onChange={handleInputChange} className="block w-full px-3 py-2 bg-white border border-zinc-300 rounded-md shadow-sm sm:text-sm pr-8" required={formData.packageType === PackageType.SITIO_BUS} autoComplete="off" />
                             </FormField>
-                            <FormField label="Telefone (com DDD)" id="phone" error={errors.phone}>
-                                <input type="tel" id="phone" name="phone" value={formData.phone} onChange={handleInputChange} placeholder="(21) 99999-9999" className="block w-full px-3 py-2 bg-white border border-zinc-300 rounded-md shadow-sm sm:text-sm" required autoComplete="off" />
+                            <FormField label="Telefone (com DDD)" id="phone" error={errors.phone} onPaste={(text) => handlePaste('phone', text)}>
+                                <input type="tel" id="phone" name="phone" value={formData.phone} onChange={handleInputChange} placeholder="(21) 99999-9999" className="block w-full px-3 py-2 bg-white border border-zinc-300 rounded-md shadow-sm sm:text-sm pr-8" required autoComplete="off" />
                             </FormField>
                         </div>
                     )}
@@ -494,7 +539,67 @@ const AddAttendeeForm: React.FC<AddAttendeeFormProps> = ({ onAddAttendee, onUpda
                     </FormField>
                 </div>
 
+                {/* Seção de Isenção - Separada */}
                 {!isEditMode && (
+                    <div className="bg-white p-4 rounded-xl border border-zinc-200 shadow-sm space-y-3">
+                        <h2 className="text-lg font-bold text-zinc-800">Definição de Isenção</h2>
+                        <p className="text-xs text-zinc-500">Marque abaixo caso o inscrito seja isento de alguma taxa.</p>
+                        
+                        {isBusPackage ? (
+                            <div className="space-y-2">
+                                <label className="flex items-center space-x-2 cursor-pointer bg-zinc-50 p-2 rounded-lg border border-zinc-100 hover:bg-zinc-100">
+                                    <input 
+                                        type="checkbox" 
+                                        checked={formData.sitePayment.isExempt} 
+                                        onChange={(e) => {
+                                            const isExempt = e.target.checked;
+                                            setFormData(fd => ({
+                                                ...fd,
+                                                sitePayment: { ...fd.sitePayment, isExempt, isPaid: isExempt ? false : fd.sitePayment.isPaid }
+                                            }));
+                                        }} 
+                                        className="h-5 w-5 rounded border-zinc-300 text-indigo-600 focus:ring-indigo-500"
+                                    />
+                                    <span className="text-sm font-bold text-zinc-700">Isento da Taxa do Sítio</span>
+                                </label>
+                                <label className="flex items-center space-x-2 cursor-pointer bg-zinc-50 p-2 rounded-lg border border-zinc-100 hover:bg-zinc-100">
+                                    <input 
+                                        type="checkbox" 
+                                        checked={formData.busPayment.isExempt} 
+                                        onChange={(e) => {
+                                            const isExempt = e.target.checked;
+                                            setFormData(fd => ({
+                                                ...fd,
+                                                busPayment: { ...fd.busPayment, isExempt, isPaid: isExempt ? false : fd.busPayment.isPaid }
+                                            }));
+                                        }} 
+                                        className="h-5 w-5 rounded border-zinc-300 text-indigo-600 focus:ring-indigo-500"
+                                    />
+                                    <span className="text-sm font-bold text-zinc-700">Isento da Taxa do Ônibus</span>
+                                </label>
+                            </div>
+                        ) : (
+                            <label className="flex items-center space-x-2 cursor-pointer bg-zinc-50 p-2 rounded-lg border border-zinc-100 hover:bg-zinc-100">
+                                <input 
+                                    type="checkbox" 
+                                    name="paymentIsExempt" 
+                                    checked={formData.paymentIsExempt} 
+                                    onChange={(e) => setFormData(prev => ({ ...prev, paymentIsExempt: e.target.checked, paymentIsPaid: e.target.checked ? false : true }))} 
+                                    className="h-5 w-5 rounded border-zinc-300 text-indigo-600 focus:ring-indigo-500"
+                                />
+                                <span className="text-sm font-bold text-zinc-700">Isento de Pagamento</span>
+                            </label>
+                        )}
+                        
+                        {(isBusPackage && formData.sitePayment.isExempt && formData.busPayment.isExempt) || (!isBusPackage && formData.paymentIsExempt) ? (
+                            <div className="p-2 bg-indigo-50 text-indigo-800 text-sm font-semibold rounded-lg text-center">
+                                Inscrito totalmente isento. Nenhum pagamento necessário.
+                            </div>
+                        ) : null}
+                    </div>
+                )}
+
+                {!isEditMode && !isFullyExempt && (
                     <div className="bg-white p-4 rounded-xl border border-zinc-200 shadow-sm space-y-4">
                         <label className="flex items-center space-x-2 cursor-pointer w-fit">
                             <input type="checkbox" name="registerPaymentNow" checked={formData.registerPaymentNow} onChange={handleInputChange} className="h-4 w-4 rounded border-zinc-300 text-green-600 focus:ring-green-500"/>
@@ -505,34 +610,62 @@ const AddAttendeeForm: React.FC<AddAttendeeFormProps> = ({ onAddAttendee, onUpda
                             <div className="pt-4 border-t border-zinc-200 animate-fadeIn">
                                 {isBusPackage ? (
                                     <div className="space-y-4">
-                                        <div>
-                                            <h3 className="font-bold text-zinc-700 mb-2">Pagamento Sítio (R$ {sitePriceText})</h3>
-                                            <PartialPaymentFields idPrefix="site" details={formData.sitePayment} onUpdate={(updates) => setFormData(fd => ({ ...fd, sitePayment: { ...fd.sitePayment, ...updates } }))} />
-                                        </div>
-                                        <div>
-                                            <h3 className="font-bold text-zinc-700 mb-2">Pagamento Ônibus (R$ {(event?.bus_price ?? 50).toFixed(2).replace('.',',')})</h3>
-                                            <PartialPaymentFields idPrefix="bus" details={formData.busPayment} onUpdate={(updates) => setFormData(fd => ({ ...fd, busPayment: { ...fd.busPayment, ...updates } }))} />
-                                        </div>
+                                        {!formData.sitePayment.isExempt && (
+                                            <div>
+                                                <h3 className="font-bold text-zinc-700 mb-2">Pagamento Sítio (R$ {sitePriceText})</h3>
+                                                <label className="flex items-center space-x-2 mb-3 cursor-pointer w-fit">
+                                                    <input 
+                                                        type="checkbox" 
+                                                        checked={formData.sitePayment.isPaid} 
+                                                        onChange={(e) => setFormData(fd => ({ ...fd, sitePayment: { ...fd.sitePayment, isPaid: e.target.checked } }))} 
+                                                        className="h-4 w-4 rounded border-zinc-300 text-green-600 focus:ring-green-500"
+                                                    />
+                                                    <span className="text-sm text-zinc-700 font-medium">Pagamento realizado?</span>
+                                                </label>
+                                                {formData.sitePayment.isPaid && (
+                                                    <PartialPaymentFields idPrefix="site" details={formData.sitePayment} onUpdate={(updates) => setFormData(fd => ({ ...fd, sitePayment: { ...fd.sitePayment, ...updates } }))} />
+                                                )}
+                                            </div>
+                                        )}
+                                        
+                                        {!formData.busPayment.isExempt && (
+                                            <div>
+                                                <h3 className="font-bold text-zinc-700 mb-2">Pagamento Ônibus (R$ {(event?.bus_price ?? 50).toFixed(2).replace('.',',')})</h3>
+                                                <label className="flex items-center space-x-2 mb-3 cursor-pointer w-fit">
+                                                    <input 
+                                                        type="checkbox" 
+                                                        checked={formData.busPayment.isPaid} 
+                                                        onChange={(e) => setFormData(fd => ({ ...fd, busPayment: { ...fd.busPayment, isPaid: e.target.checked } }))} 
+                                                        className="h-4 w-4 rounded border-zinc-300 text-green-600 focus:ring-green-500"
+                                                    />
+                                                    <span className="text-sm text-zinc-700 font-medium">Pagamento realizado?</span>
+                                                </label>
+                                                {formData.busPayment.isPaid && (
+                                                    <PartialPaymentFields idPrefix="bus" details={formData.busPayment} onUpdate={(updates) => setFormData(fd => ({ ...fd, busPayment: { ...fd.busPayment, ...updates } }))} />
+                                                )}
+                                            </div>
+                                        )}
                                     </div>
                                 ) : (
-                                    <PartialPaymentFields 
-                                        idPrefix="single" 
-                                        details={{ 
-                                            isPaid: formData.paymentIsPaid ?? true, 
-                                            isExempt: !!formData.paymentIsExempt,
-                                            date: formData.paymentDate, 
-                                            dateNotInformed: formData.paymentDateNotInformed, 
-                                            type: formData.paymentType 
-                                        }} 
-                                        onUpdate={(updates) => setFormData(fd => ({
-                                            ...fd, 
-                                            paymentDate: updates.date !== undefined ? updates.date : fd.paymentDate, 
-                                            paymentDateNotInformed: updates.dateNotInformed !== undefined ? updates.dateNotInformed : fd.paymentDateNotInformed, 
-                                            paymentType: updates.type !== undefined ? updates.type : fd.paymentType,
-                                            paymentIsExempt: updates.isExempt !== undefined ? updates.isExempt : fd.paymentIsExempt,
-                                            paymentIsPaid: updates.isPaid !== undefined ? updates.isPaid : fd.paymentIsPaid,
-                                        }))} 
-                                    />
+                                    <div>
+                                        <h3 className="font-bold text-zinc-700 mb-2">Pagamento (R$ {sitePriceText})</h3>
+                                        <PartialPaymentFields 
+                                            idPrefix="single" 
+                                            details={{ 
+                                                isPaid: formData.paymentIsPaid ?? true, 
+                                                isExempt: false, 
+                                                date: formData.paymentDate, 
+                                                dateNotInformed: formData.paymentDateNotInformed, 
+                                                type: formData.paymentType 
+                                            }} 
+                                            onUpdate={(updates) => setFormData(fd => ({
+                                                ...fd, 
+                                                paymentDate: updates.date !== undefined ? updates.date : fd.paymentDate, 
+                                                paymentDateNotInformed: updates.dateNotInformed !== undefined ? updates.dateNotInformed : fd.paymentDateNotInformed, 
+                                                paymentType: updates.type !== undefined ? updates.type : fd.paymentType,
+                                            }))} 
+                                        />
+                                    </div>
                                 )}
                             </div>
                         )}

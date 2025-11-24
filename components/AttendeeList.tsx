@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import type { Attendee, Event } from '../types';
 import AttendeeListItem from './AttendeeListItem';
 import { PaymentStatus, PackageType } from '../types';
@@ -21,6 +21,7 @@ interface AttendeeListProps {
     events: Event[];
     selectedEventId: string | null;
     onEventChange: (id: string | null) => void;
+    onRefresh?: () => Promise<void>;
 }
 
 const FilterPill: React.FC<{ label: string; isActive: boolean; onClick: () => void; }> = ({ label, isActive, onClick }) => {
@@ -169,9 +170,18 @@ const AttendeeList: React.FC<AttendeeListProps> = ({
     events,
     selectedEventId,
     onEventChange,
+    onRefresh
 }) => {
     
     const [activeModal, setActiveModal] = useState<'status' | 'package' | null>(null);
+    const listRef = useRef<HTMLDivElement>(null);
+
+    // Pull to Refresh State
+    const [startY, setStartY] = useState(0);
+    const [pullDistance, setPullDistance] = useState(0);
+    const [isRefreshing, setIsRefreshing] = useState(false);
+    const MAX_PULL_DISTANCE = 80; // Distance required to trigger refresh
+    const REFRESH_THRESHOLD = 60; // Threshold to snap
 
     useEffect(() => {
         if (scrollPosition > 0) {
@@ -223,163 +233,247 @@ const AttendeeList: React.FC<AttendeeListProps> = ({
         { label: PackageType.SITIO_BUS, value: PackageType.SITIO_BUS },
     ];
 
+    // Touch Event Handlers for Pull to Refresh
+    const handleTouchStart = (e: React.TouchEvent) => {
+        const scrollTop = document.querySelector('main')?.scrollTop || 0;
+        if (scrollTop <= 0 && !isRefreshing) {
+            setStartY(e.touches[0].clientY);
+        } else {
+            setStartY(0);
+        }
+    };
+
+    const handleTouchMove = (e: React.TouchEvent) => {
+        if (startY === 0 || isRefreshing) return;
+        
+        const scrollTop = document.querySelector('main')?.scrollTop || 0;
+        const currentY = e.touches[0].clientY;
+        const diff = currentY - startY;
+
+        // Only engage if we are pulling down at the top of the list
+        if (scrollTop <= 0 && diff > 0) {
+            // Add resistance to the pull
+            const dampenedDiff = diff * 0.4;
+            setPullDistance(dampenedDiff);
+        } else {
+            setPullDistance(0);
+        }
+    };
+
+    const handleTouchEnd = async () => {
+        if (startY === 0 || isRefreshing) return;
+
+        if (pullDistance > REFRESH_THRESHOLD && onRefresh) {
+            setIsRefreshing(true);
+            setPullDistance(REFRESH_THRESHOLD); // Snap to loading position
+            
+            try {
+                await onRefresh();
+            } finally {
+                // Slight delay to show completion before snapping back
+                setTimeout(() => {
+                    setIsRefreshing(false);
+                    setPullDistance(0);
+                }, 500);
+            }
+        } else {
+            setPullDistance(0);
+        }
+        setStartY(0);
+    };
+
     return (
-        <div className="animate-fadeIn">
-            <header className="bg-white md:bg-transparent p-4 border-b border-zinc-200 md:border-b-0 md:pt-6 space-y-4">
-                 <div className="flex justify-between items-center">
-                    <h1 className="text-xl md:text-2xl font-bold text-zinc-800">Inscrições ({sortedAttendees.length})</h1>
-                    <div className="flex items-center gap-2">
+        <div 
+            className="animate-fadeIn relative" 
+            ref={listRef}
+            onTouchStart={handleTouchStart}
+            onTouchMove={handleTouchMove}
+            onTouchEnd={handleTouchEnd}
+        >
+            {/* Pull to Refresh Indicator */}
+            <div 
+                className="absolute w-full flex justify-center items-center pointer-events-none z-0 transition-all duration-200 ease-out"
+                style={{ 
+                    height: `${REFRESH_THRESHOLD}px`, 
+                    top: isRefreshing ? '10px' : `-${REFRESH_THRESHOLD}px`,
+                    opacity: pullDistance > 0 || isRefreshing ? 1 : 0,
+                    transform: isRefreshing ? 'none' : `translateY(${pullDistance}px)`
+                }}
+            >
+                <div className="bg-white p-2 rounded-full shadow-md border border-zinc-100">
+                    <svg 
+                        className={`h-6 w-6 text-green-500 ${isRefreshing ? 'animate-spin' : ''}`} 
+                        style={{ transform: !isRefreshing ? `rotate(${pullDistance * 3}deg)` : 'none' }}
+                        xmlns="http://www.w3.org/2000/svg" 
+                        fill="none" 
+                        viewBox="0 0 24 24" 
+                        stroke="currentColor"
+                    >
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                    </svg>
+                </div>
+            </div>
+
+            <div 
+                className="relative z-1 bg-white md:bg-transparent transition-transform duration-200 ease-out"
+                style={{ transform: `translateY(${isRefreshing ? REFRESH_THRESHOLD : pullDistance}px)` }}
+            >
+                <header className="p-4 border-b border-zinc-200 md:border-b-0 md:pt-6 space-y-4">
+                    <div className="flex justify-between items-center">
+                        <h1 className="text-xl md:text-2xl font-bold text-zinc-800">Inscrições ({sortedAttendees.length})</h1>
+                        <div className="flex items-center gap-2">
+                            <button
+                                onClick={onAddAttendee}
+                                className="bg-green-500 text-white font-bold py-2 px-4 rounded-full flex items-center gap-2 transition-colors shadow-sm flex-shrink-0 select-none touch-manipulation active:bg-green-700 md:hover:bg-green-600"
+                            >
+                                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clipRule="evenodd" /></svg>
+                                <span className="hidden md:inline">Nova Inscrição</span>
+                                <span className="md:hidden">Nova</span>
+                            </button>
+                            <button onClick={onLogout} className="p-2 text-zinc-500 rounded-full hover:bg-zinc-200 hover:text-zinc-800 transition-colors" aria-label="Sair">
+                            <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+                                </svg>
+                            </button>
+                        </div>
+                    </div>
+
+                    {events.length > 1 && (
+                        <div className="pt-2">
+                            <label htmlFor="event-selector" className="block text-sm font-medium text-zinc-700">Filtrar por Evento</label>
+                            <select
+                                id="event-selector"
+                                value={selectedEventId || ''}
+                                onChange={(e) => onEventChange(e.target.value)}
+                                className="mt-1 block w-full pl-3 pr-10 py-2 text-base border-zinc-300 focus:outline-none focus:ring-green-500 focus:border-green-500 sm:text-sm rounded-md shadow-sm"
+                            >
+                                {events.map(event => (
+                                    <option key={event.id} value={event.id}>{event.name}</option>
+                                ))}
+                            </select>
+                        </div>
+                    )}
+                    
+                    <div className="relative">
+                        <input
+                            type="search"
+                            placeholder="Buscar por nome..."
+                            value={searchQuery}
+                            onChange={(e) => onSearchQueryChange(e.target.value)}
+                            className="w-full pl-10 pr-4 py-2 bg-zinc-100 border border-transparent rounded-full focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                            autoComplete="off"
+                        />
+                        <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-zinc-400" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z" clipRule="evenodd" /></svg>
+                        </div>
+                    </div>
+                    
+                    {/* Mobile Filter Buttons */}
+                    <div className="flex gap-3 md:hidden">
                         <button
-                            onClick={onAddAttendee}
-                            className="bg-green-500 text-white font-bold py-2 px-4 rounded-full flex items-center gap-2 transition-colors shadow-sm flex-shrink-0 select-none touch-manipulation active:bg-green-700 md:hover:bg-green-600"
+                            onClick={() => setActiveModal('status')}
+                            className={`flex-1 py-2.5 px-4 rounded-xl border font-medium text-sm flex justify-between items-center transition-colors touch-manipulation active:bg-zinc-50 ${
+                                statusFilter !== 'all' 
+                                ? 'bg-green-50 border-green-500 text-green-800 shadow-sm' 
+                                : 'bg-white border-zinc-200 text-zinc-600 shadow-sm'
+                            }`}
                         >
-                            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clipRule="evenodd" /></svg>
-                            <span className="hidden md:inline">Nova Inscrição</span>
-                            <span className="md:hidden">Nova</span>
+                            <span className="truncate pr-2">
+                                {statusFilter === 'all' ? 'Filtrar Status' : (statusOptions.find(o => o.value === statusFilter)?.label || statusFilter)}
+                            </span>
+                            <svg xmlns="http://www.w3.org/2000/svg" className={`h-4 w-4 flex-shrink-0 ${statusFilter !== 'all' ? 'text-green-600' : 'text-zinc-400'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                            </svg>
                         </button>
-                         <button onClick={onLogout} className="p-2 text-zinc-500 rounded-full hover:bg-zinc-200 hover:text-zinc-800 transition-colors" aria-label="Sair">
-                           <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                              <path strokeLinecap="round" strokeLinejoin="round" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+
+                        <button
+                            onClick={() => setActiveModal('package')}
+                            className={`flex-1 py-2.5 px-4 rounded-xl border font-medium text-sm flex justify-between items-center transition-colors touch-manipulation active:bg-zinc-50 ${
+                                packageFilter !== 'all'
+                                ? 'bg-green-50 border-green-500 text-green-800 shadow-sm'
+                                : 'bg-white border-zinc-200 text-zinc-600 shadow-sm'
+                            }`}
+                        >
+                            <span className="truncate pr-2">
+                                {packageFilter === 'all' ? 'Filtrar Pacote' : packageFilter}
+                            </span>
+                            <svg xmlns="http://www.w3.org/2000/svg" className={`h-4 w-4 flex-shrink-0 ${packageFilter !== 'all' ? 'text-green-600' : 'text-zinc-400'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
                             </svg>
                         </button>
                     </div>
-                </div>
 
-                {events.length > 1 && (
-                    <div className="pt-2">
-                        <label htmlFor="event-selector" className="block text-sm font-medium text-zinc-700">Filtrar por Evento</label>
-                        <select
-                            id="event-selector"
-                            value={selectedEventId || ''}
-                            onChange={(e) => onEventChange(e.target.value)}
-                            className="mt-1 block w-full pl-3 pr-10 py-2 text-base border-zinc-300 focus:outline-none focus:ring-green-500 focus:border-green-500 sm:text-sm rounded-md shadow-sm"
-                        >
-                            {events.map(event => (
-                                <option key={event.id} value={event.id}>{event.name}</option>
-                            ))}
-                        </select>
-                    </div>
-                )}
-                
-                <div className="relative">
-                    <input
-                        type="search"
-                        placeholder="Buscar por nome..."
-                        value={searchQuery}
-                        onChange={(e) => onSearchQueryChange(e.target.value)}
-                        className="w-full pl-10 pr-4 py-2 bg-zinc-100 border border-transparent rounded-full focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent"
-                        autoComplete="off"
-                    />
-                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                         <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-zinc-400" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z" clipRule="evenodd" /></svg>
-                    </div>
-                </div>
-                
-                {/* Mobile Filter Buttons */}
-                <div className="flex gap-3 md:hidden">
-                     <button
-                        onClick={() => setActiveModal('status')}
-                        className={`flex-1 py-2.5 px-4 rounded-xl border font-medium text-sm flex justify-between items-center transition-colors touch-manipulation active:bg-zinc-50 ${
-                            statusFilter !== 'all' 
-                            ? 'bg-green-50 border-green-500 text-green-800 shadow-sm' 
-                            : 'bg-white border-zinc-200 text-zinc-600 shadow-sm'
-                        }`}
-                    >
-                        <span className="truncate pr-2">
-                            {statusFilter === 'all' ? 'Filtrar Status' : (statusOptions.find(o => o.value === statusFilter)?.label || statusFilter)}
-                        </span>
-                        <svg xmlns="http://www.w3.org/2000/svg" className={`h-4 w-4 flex-shrink-0 ${statusFilter !== 'all' ? 'text-green-600' : 'text-zinc-400'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                        </svg>
-                    </button>
-
-                    <button
-                        onClick={() => setActiveModal('package')}
-                        className={`flex-1 py-2.5 px-4 rounded-xl border font-medium text-sm flex justify-between items-center transition-colors touch-manipulation active:bg-zinc-50 ${
-                            packageFilter !== 'all'
-                            ? 'bg-green-50 border-green-500 text-green-800 shadow-sm'
-                            : 'bg-white border-zinc-200 text-zinc-600 shadow-sm'
-                        }`}
-                    >
-                        <span className="truncate pr-2">
-                            {packageFilter === 'all' ? 'Filtrar Pacote' : packageFilter}
-                        </span>
-                        <svg xmlns="http://www.w3.org/2000/svg" className={`h-4 w-4 flex-shrink-0 ${packageFilter !== 'all' ? 'text-green-600' : 'text-zinc-400'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                        </svg>
-                    </button>
-                </div>
-
-                {/* Desktop Filters */}
-                <div className="hidden md:flex space-y-3 lg:flex lg:justify-between lg:items-center lg:space-y-0 lg:gap-6">
-                    <div className="flex flex-wrap gap-2 items-center min-w-max">
-                        <span className="text-sm font-medium text-zinc-500 flex-shrink-0">Status:</span>
-                        <FilterPill label="Todos" isActive={statusFilter === 'all'} onClick={() => onStatusFilterChange('all')} />
-                        <FilterPill label={PaymentStatus.PAGO} isActive={statusFilter === PaymentStatus.PAGO} onClick={() => onStatusFilterChange(PaymentStatus.PAGO)} />
-                        <FilterPill label={PaymentStatus.PENDENTE} isActive={statusFilter === PaymentStatus.PENDENTE} onClick={() => onStatusFilterChange(PaymentStatus.PENDENTE)} />
-                        <FilterPill label={PaymentStatus.ISENTO} isActive={statusFilter === PaymentStatus.ISENTO} onClick={() => onStatusFilterChange(PaymentStatus.ISENTO)} />
-                        <FilterPill label="Isenção Parcial" isActive={statusFilter === 'partial_exempt'} onClick={() => onStatusFilterChange('partial_exempt')} />
-                    </div>
-                     <div className="flex flex-wrap gap-2 items-center min-w-max">
-                        <span className="text-sm font-medium text-zinc-500 flex-shrink-0">Pacote:</span>
-                        <FilterPill label="Todos" isActive={packageFilter === 'all'} onClick={() => onPackageFilterChange('all')} />
-                        <FilterPill label={PackageType.SITIO_ONLY} isActive={packageFilter === PackageType.SITIO_ONLY} onClick={() => onPackageFilterChange(PackageType.SITIO_ONLY)} />
-                        <FilterPill label={PackageType.SITIO_BUS} isActive={packageFilter === PackageType.SITIO_BUS} onClick={() => onPackageFilterChange(PackageType.SITIO_BUS)} />
-                    </div>
-                </div>
-
-            </header>
-            <div className="p-4">
-                {sortedAttendees.length > 0 ? (
-                    <>
-                        {/* Mobile View */}
-                        <div className="space-y-3 md:hidden">
-                            {sortedAttendees.map((attendee, index) => (
-                                <AttendeeListItem
-                                    key={attendee.id}
-                                    attendee={attendee}
-                                    onSelect={onSelectAttendee}
-                                    index={index}
-                                />
-                            ))}
+                    {/* Desktop Filters */}
+                    <div className="hidden md:flex space-y-3 lg:flex lg:justify-between lg:items-center lg:space-y-0 lg:gap-6">
+                        <div className="flex flex-wrap gap-2 items-center min-w-max">
+                            <span className="text-sm font-medium text-zinc-500 flex-shrink-0">Status:</span>
+                            <FilterPill label="Todos" isActive={statusFilter === 'all'} onClick={() => onStatusFilterChange('all')} />
+                            <FilterPill label={PaymentStatus.PAGO} isActive={statusFilter === PaymentStatus.PAGO} onClick={() => onStatusFilterChange(PaymentStatus.PAGO)} />
+                            <FilterPill label={PaymentStatus.PENDENTE} isActive={statusFilter === PaymentStatus.PENDENTE} onClick={() => onStatusFilterChange(PaymentStatus.PENDENTE)} />
+                            <FilterPill label={PaymentStatus.ISENTO} isActive={statusFilter === PaymentStatus.ISENTO} onClick={() => onStatusFilterChange(PaymentStatus.ISENTO)} />
+                            <FilterPill label="Isenção Parcial" isActive={statusFilter === 'partial_exempt'} onClick={() => onStatusFilterChange('partial_exempt')} />
                         </div>
-                        {/* Desktop View */}
-                        <div className="hidden md:block bg-white border border-zinc-200 rounded-xl shadow-sm overflow-x-auto">
-                            <table className="min-w-full divide-y divide-zinc-200">
-                                <thead className="bg-zinc-50">
-                                    <tr>
-                                        <th scope="col" className="px-6 py-3 text-left text-xs font-bold text-zinc-500 uppercase tracking-wider">Nome</th>
-                                        <th scope="col" className="px-6 py-3 text-left text-xs font-bold text-zinc-500 uppercase tracking-wider">Pacote</th>
-                                        <th scope="col" className="px-6 py-3 text-left text-xs font-bold text-zinc-500 uppercase tracking-wider">Status</th>
-                                        <th scope="col" className="px-6 py-3 text-left text-xs font-bold text-zinc-500 uppercase tracking-wider">Telefone</th>
-                                        <th scope="col" className="relative px-6 py-3"><span className="sr-only">Ver</span></th>
-                                    </tr>
-                                </thead>
-                                <tbody className="bg-white divide-y divide-zinc-200">
-                                    {sortedAttendees.map((attendee) => (
-                                        <tr key={attendee.id} onClick={() => onSelectAttendee(attendee.id)} className="hover:bg-zinc-50 cursor-pointer transition-colors">
-                                            <td className="px-6 py-4"><div className="text-sm font-medium text-zinc-900">{attendee.person.name}</div></td>
-                                            <td className="px-6 py-4"><div className="flex items-center text-sm text-zinc-500"><PackageIcon packageType={attendee.packageType} />{attendee.packageType}</div></td>
-                                            <td className="px-6 py-4"><StatusBadge attendee={attendee} /></td>
-                                            <td className="px-6 py-4 text-sm text-zinc-500">{attendee.person.phone}</td>
-                                            <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                                                <span className="text-green-600 hover:text-green-900 flex items-center justify-end">
-                                                   Ver
-                                                    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 ml-1 text-zinc-400" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clipRule="evenodd" /></svg>
-                                                </span>
-                                            </td>
+                        <div className="flex flex-wrap gap-2 items-center min-w-max">
+                            <span className="text-sm font-medium text-zinc-500 flex-shrink-0">Pacote:</span>
+                            <FilterPill label="Todos" isActive={packageFilter === 'all'} onClick={() => onPackageFilterChange('all')} />
+                            <FilterPill label={PackageType.SITIO_ONLY} isActive={packageFilter === PackageType.SITIO_ONLY} onClick={() => onPackageFilterChange(PackageType.SITIO_ONLY)} />
+                            <FilterPill label={PackageType.SITIO_BUS} isActive={packageFilter === PackageType.SITIO_BUS} onClick={() => onPackageFilterChange(PackageType.SITIO_BUS)} />
+                        </div>
+                    </div>
+
+                </header>
+                <div className="p-4">
+                    {sortedAttendees.length > 0 ? (
+                        <>
+                            {/* Mobile View */}
+                            <div className="space-y-3 md:hidden">
+                                {sortedAttendees.map((attendee, index) => (
+                                    <AttendeeListItem
+                                        key={attendee.id}
+                                        attendee={attendee}
+                                        onSelect={onSelectAttendee}
+                                        index={index}
+                                    />
+                                ))}
+                            </div>
+                            {/* Desktop View */}
+                            <div className="hidden md:block bg-white border border-zinc-200 rounded-xl shadow-sm overflow-x-auto">
+                                <table className="min-w-full divide-y divide-zinc-200">
+                                    <thead className="bg-zinc-50">
+                                        <tr>
+                                            <th scope="col" className="px-6 py-3 text-left text-xs font-bold text-zinc-500 uppercase tracking-wider">Nome</th>
+                                            <th scope="col" className="px-6 py-3 text-left text-xs font-bold text-zinc-500 uppercase tracking-wider">Pacote</th>
+                                            <th scope="col" className="px-6 py-3 text-left text-xs font-bold text-zinc-500 uppercase tracking-wider">Status</th>
+                                            <th scope="col" className="px-6 py-3 text-left text-xs font-bold text-zinc-500 uppercase tracking-wider">Telefone</th>
+                                            <th scope="col" className="relative px-6 py-3"><span className="sr-only">Ver</span></th>
                                         </tr>
-                                    ))}
-                                </tbody>
-                            </table>
+                                    </thead>
+                                    <tbody className="bg-white divide-y divide-zinc-200">
+                                        {sortedAttendees.map((attendee) => (
+                                            <tr key={attendee.id} onClick={() => onSelectAttendee(attendee.id)} className="hover:bg-zinc-50 cursor-pointer transition-colors">
+                                                <td className="px-6 py-4"><div className="text-sm font-medium text-zinc-900">{attendee.person.name}</div></td>
+                                                <td className="px-6 py-4"><div className="flex items-center text-sm text-zinc-500"><PackageIcon packageType={attendee.packageType} />{attendee.packageType}</div></td>
+                                                <td className="px-6 py-4"><StatusBadge attendee={attendee} /></td>
+                                                <td className="px-6 py-4 text-sm text-zinc-500">{attendee.person.phone}</td>
+                                                <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                                                    <span className="text-green-600 hover:text-green-900 flex items-center justify-end">
+                                                    Ver
+                                                        <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 ml-1 text-zinc-400" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clipRule="evenodd" /></svg>
+                                                    </span>
+                                                </td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </>
+                    ) : (
+                        <div className="text-center py-20 text-zinc-500 animate-fadeIn">
+                            <p className="font-semibold">Nenhuma inscrição encontrada.</p>
+                            <p className="mt-2 text-sm">Tente ajustar os filtros ou o termo de busca.</p>
                         </div>
-                    </>
-                ) : (
-                    <div className="text-center py-20 text-zinc-500 animate-fadeIn">
-                         <p className="font-semibold">Nenhuma inscrição encontrada.</p>
-                         <p className="mt-2 text-sm">Tente ajustar os filtros ou o termo de busca.</p>
-                    </div>
-                )}
+                    )}
+                </div>
             </div>
 
             {activeModal === 'status' && (

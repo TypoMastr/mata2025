@@ -1,8 +1,23 @@
+
 import { DocumentType } from '../types';
 
 export const formatPhoneNumber = (value: string): string => {
     if (!value) return value;
-    const phoneNumber = value.replace(/[^\d]/g, '');
+    
+    let cleanValue = value.trim();
+    
+    // Remove prefixo do país (+55 ou 55) se existir, comum ao copiar do WhatsApp
+    // Remove '+55 ' ou '+55'
+    if (cleanValue.startsWith('+55')) {
+        cleanValue = cleanValue.substring(3).trim();
+    } 
+    // Remove '55' se o restante do número parecer um celular válido (com DDD)
+    // Verifica se começa com 55 e tem mais de 11 digitos no total (indicando 55 + 11 do numero)
+    else if (cleanValue.startsWith('55') && cleanValue.replace(/\D/g, '').length >= 12) {
+        cleanValue = cleanValue.substring(2).trim();
+    }
+    
+    const phoneNumber = cleanValue.replace(/[^\d]/g, '');
     const phoneNumberLength = phoneNumber.length;
 
     if (phoneNumberLength < 3) return `(${phoneNumber}`;

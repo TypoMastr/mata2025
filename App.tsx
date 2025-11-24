@@ -36,7 +36,8 @@ const AppContent: React.FC = () => {
         isLoading: isLoadingRegistrations, 
         addRegistration, 
         updateRegistration, 
-        deleteRegistration 
+        deleteRegistration,
+        refresh: refreshRegistrations 
     } = useRegistrations(selectedEventId);
     
     const { addToast } = useToast();
@@ -64,6 +65,13 @@ const AppContent: React.FC = () => {
     useEffect(() => {
         historyHook.fetchLatestHistory();
     }, []);
+
+    // Background refresh when switching to list view
+    useEffect(() => {
+        if (view === 'list') {
+            refreshRegistrations({ silent: true });
+        }
+    }, [view, refreshRegistrations]);
 
     const busAttendeesCount = useMemo(() => registrations.filter(a => a.packageType === PackageType.SITIO_BUS).length, [registrations]);
     const totalBuses = useMemo(() => {
@@ -222,6 +230,7 @@ const AppContent: React.FC = () => {
                         searchQuery={searchQuery} onSearchQueryChange={setSearchQuery} statusFilter={statusFilter} onStatusFilterChange={setStatusFilter}
                         packageFilter={packageFilter} onPackageFilterChange={setPackageFilter} scrollPosition={scrollPosition} onScrollPositionReset={() => setScrollPosition(0)}
                         events={activeEvents} selectedEventId={selectedEventId} onEventChange={setSelectedEventId}
+                        onRefresh={refreshRegistrations}
                     />
                 );
         }

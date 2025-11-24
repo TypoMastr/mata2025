@@ -246,16 +246,14 @@ const AppContent: React.FC = () => {
 
     return (
         // Layout structure updated for iOS PWA scrolling:
-        // 1. Outer container handles the flexbox layout and ensures 100% height.
-        // 2. The content area uses `flex-grow` and `overflow-hidden` to contain the scroll area.
-        // 3. The <main> element provides the scrollable area (`overflow-y-auto`), independent of the body.
-        // 4. BottomNav sits outside the scrolling area but inside the flex container.
-        <div className="bg-zinc-50 font-sans h-full flex flex-col md:flex-row md:h-auto md:max-w-7xl md:mx-auto md:my-8 md:rounded-2xl md:shadow-2xl md:overflow-hidden">
+        // Added md:w-full to ensure the container takes full available width on desktop, preventing shrink-wrap behavior.
+        <div className="bg-zinc-50 font-sans h-full flex flex-col md:flex-row md:h-[calc(100vh-4rem)] md:max-w-7xl md:w-full md:mx-auto md:my-8 md:rounded-2xl md:shadow-2xl md:overflow-hidden">
              <SideNav currentView={view} setView={setView} />
             
-            <div className="flex-grow flex flex-col h-full overflow-hidden relative md:min-h-[800px]">
+            <div className="flex-grow flex flex-col h-full overflow-hidden relative">
                 {/* Main content scrolls independently */}
-                <main key={view + selectedEventId} className="flex-grow overflow-y-auto overscroll-contain pb-32 md:pb-0">
+                {/* overflow-y-scroll enforces a vertical scrollbar always, preventing horizontal layout shifts when content height toggles */}
+                <main key={view + selectedEventId} className="flex-grow overflow-y-scroll overscroll-contain pb-32 md:pb-0">
                     {renderContent()}
                 </main>
                 

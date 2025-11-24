@@ -255,7 +255,8 @@ const AppContent: React.FC = () => {
                 {/* Main content scrolls independently */}
                 {/* overflow-y-scroll enforces a vertical scrollbar always, preventing horizontal layout shifts when content height toggles */}
                 {/* Increased bottom padding (md:pb-20) ensures the last item is not cut off on tablets */}
-                <main key={view + selectedEventId} className="flex-grow overflow-y-scroll overscroll-contain pb-32 md:pb-20">
+                {/* Dynamic bottom padding: pb-20 for lists (to prevent cutoff), pb-0 for forms (to prevent whitespace below sticky footer) */}
+                <main key={view + selectedEventId} className={`flex-grow overflow-y-scroll overscroll-contain pb-32 ${view === 'list' ? 'md:pb-20' : 'md:pb-0'}`}>
                     {renderContent()}
                 </main>
                 

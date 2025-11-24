@@ -69,23 +69,23 @@ interface PartialPaymentFieldsProps {
 
 const PartialPaymentFields: React.FC<PartialPaymentFieldsProps> = ({ idPrefix, details, onUpdate }) => {
     return (
-        <div className="space-y-3">
-            <div className="space-y-3 md:space-y-0 md:grid md:grid-cols-2 md:gap-4 pl-3 md:pl-4 border-l-2 border-green-300 animate-fadeIn">
+        <div className="space-y-2">
+            <div className="space-y-3 md:space-y-0 md:grid md:grid-cols-2 md:gap-3 pl-3 md:pl-4 border-l-2 border-green-300 animate-fadeIn">
                 <FormField label="Data do Pagamento" id={`${idPrefix}-date`}>
                     <input
                         type="date"
                         id={`${idPrefix}-date`}
                         value={details.date}
                         onChange={(e) => onUpdate({ date: e.target.value })}
-                        className="block w-full max-w-full min-w-0 px-3 py-2 bg-white border border-zinc-300 rounded-md shadow-sm sm:text-sm focus:outline-none focus:ring-green-500 focus:border-green-500 disabled:bg-zinc-100"
+                        className="block w-full max-w-full min-w-0 px-2 py-1.5 bg-white border border-zinc-300 rounded-md shadow-sm sm:text-sm focus:outline-none focus:ring-green-500 focus:border-green-500 disabled:bg-zinc-100"
                         required={!details.dateNotInformed}
                         disabled={details.dateNotInformed}
                         autoComplete="off"
                         style={{ maxWidth: '100%' }}
                     />
-                     <label className="flex items-center space-x-2 mt-2 cursor-pointer w-fit">
+                     <label className="flex items-center space-x-2 mt-1.5 cursor-pointer w-fit">
                         <input type="checkbox" checked={details.dateNotInformed} onChange={(e) => onUpdate({ dateNotInformed: e.target.checked })} className="h-4 w-4 rounded border-zinc-300 text-green-600 focus:ring-green-500" />
-                        <span className="text-sm text-zinc-700">Data não informada</span>
+                        <span className="text-xs text-zinc-700">Data não informada</span>
                     </label>
                 </FormField>
                 <FormField label="Tipo de Pagamento" id={`${idPrefix}-type`}>
@@ -93,7 +93,7 @@ const PartialPaymentFields: React.FC<PartialPaymentFieldsProps> = ({ idPrefix, d
                         id={`${idPrefix}-type`}
                         value={details.type || ''}
                         onChange={(e) => onUpdate({ type: e.target.value as PaymentType })}
-                        className="block w-full px-3 py-2 bg-white border border-zinc-300 rounded-md shadow-sm sm:text-sm focus:outline-none focus:ring-green-500 focus:border-green-500"
+                        className="block w-full px-2 py-1.5 bg-white border border-zinc-300 rounded-md shadow-sm sm:text-sm focus:outline-none focus:ring-green-500 focus:border-green-500"
                         required
                         autoComplete="off"
                     >
@@ -432,18 +432,19 @@ const AddAttendeeForm: React.FC<AddAttendeeFormProps> = ({ onAddAttendee, onUpda
 
     return (
         <div className="animate-fadeIn w-full">
-             <header className="sticky top-0 md:static bg-white md:bg-transparent z-10 p-4 md:pt-6 border-b border-zinc-200 flex items-center gap-4">
+             <header className="sticky top-0 md:static bg-white md:bg-transparent z-10 p-3 md:pt-4 border-b border-zinc-200 flex items-center gap-4">
                 <button onClick={onCancel} className="text-zinc-500 hover:text-zinc-800 p-1 rounded-full hover:bg-zinc-100">
                     <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>
                 </button>
                 <h1 className="text-xl md:text-2xl font-bold text-zinc-800">{isEditMode ? 'Editar Inscrição' : 'Nova Inscrição'}</h1>
             </header>
-            <form onSubmit={handleSubmit} className="p-4">
-                <div className="md:grid md:grid-cols-12 md:gap-6 items-start">
-                    {/* Left Column: Personal Data & Package/Notes */}
-                    <div className="md:col-span-7 space-y-4">
+            <form onSubmit={handleSubmit} className="p-3">
+                <div className="grid grid-cols-1 md:grid-cols-12 xl:grid-cols-3 gap-4 items-start">
+                    
+                    {/* Left Column Wrapper (Personal & Package) */}
+                    <div className="md:col-span-7 xl:col-span-2 space-y-3 xl:space-y-0 xl:grid xl:grid-cols-2 xl:gap-4">
                         {/* Personal Data Card */}
-                        <div className="bg-white p-4 rounded-xl border border-zinc-200 shadow-sm space-y-4">
+                        <div className="bg-white p-3 rounded-xl border border-zinc-200 shadow-sm space-y-3 h-full">
                             <h2 className="text-lg font-bold text-zinc-800">Dados Pessoais</h2>
                             
                             {!isEditMode && (
@@ -490,8 +491,8 @@ const AddAttendeeForm: React.FC<AddAttendeeFormProps> = ({ onAddAttendee, onUpda
                                 </div>
                             )}
 
-                            <div className={isPersonSelected ? 'hidden' : 'space-y-4'}>
-                                <p className="text-sm text-zinc-500 text-center border-b pb-4">
+                            <div className={isPersonSelected ? 'hidden' : 'space-y-3'}>
+                                <p className="text-sm text-zinc-500 text-center border-b pb-3">
                                     {isEditMode ? 'Edite os dados abaixo:' : 'Ou cadastre uma nova pessoa:'}
                                 </p>
                                 <FormField label="Nome Completo" id="name" error={errors.name} onPaste={(text) => handlePaste('name', text)}>
@@ -507,7 +508,7 @@ const AddAttendeeForm: React.FC<AddAttendeeFormProps> = ({ onAddAttendee, onUpda
                                         disabled={isPersonSelected} 
                                     />
                                 </FormField>
-                                <div className="md:grid md:grid-cols-2 md:gap-4 space-y-4 md:space-y-0">
+                                <div className="md:grid md:grid-cols-2 md:gap-3 space-y-3 md:space-y-0">
                                     <FormField label={`Documento (CPF ou RG)${formData.packageType === PackageType.SITIO_BUS ? '' : ' - Opcional'}`} id="document" error={errors.document} onPaste={(text) => handlePaste('document', text)}>
                                         <input type="tel" id="document" name="document" value={formData.document} onChange={handleInputChange} className="block w-full px-3 py-2 bg-white border border-zinc-300 rounded-md shadow-sm sm:text-sm focus:outline-none focus:ring-green-500 focus:border-green-500 pr-8" required={formData.packageType === PackageType.SITIO_BUS} autoComplete="off" disabled={isPersonSelected} />
                                     </FormField>
@@ -518,11 +519,11 @@ const AddAttendeeForm: React.FC<AddAttendeeFormProps> = ({ onAddAttendee, onUpda
                             </div>
 
                             {isEditMode && (
-                                <div className="space-y-4">
+                                <div className="space-y-3">
                                     <FormField label="Nome Completo" id="name" error={errors.name} onPaste={(text) => handlePaste('name', text)}>
                                         <input type="text" id="name" name="name" value={formData.name} onChange={handleInputChange} className="block w-full px-3 py-2 bg-white border border-zinc-300 rounded-md shadow-sm sm:text-sm uppercase pr-8" required autoComplete="off" />
                                     </FormField>
-                                    <div className="md:grid md:grid-cols-2 md:gap-4 space-y-4 md:space-y-0">
+                                    <div className="md:grid md:grid-cols-2 md:gap-3 space-y-3 md:space-y-0">
                                         <FormField label={`Documento (CPF ou RG)${formData.packageType === PackageType.SITIO_BUS ? '' : ' - Opcional'}`} id="document" error={errors.document} onPaste={(text) => handlePaste('document', text)}>
                                             <input type="tel" id="document" name="document" value={formData.document} onChange={handleInputChange} className="block w-full px-3 py-2 bg-white border border-zinc-300 rounded-md shadow-sm sm:text-sm pr-8" required={formData.packageType === PackageType.SITIO_BUS} autoComplete="off" />
                                         </FormField>
@@ -534,8 +535,8 @@ const AddAttendeeForm: React.FC<AddAttendeeFormProps> = ({ onAddAttendee, onUpda
                             )}
                         </div>
 
-                        {/* Package and Notes - Moved to Left Column */}
-                        <div className="bg-white p-4 rounded-xl border border-zinc-200 shadow-sm space-y-4">
+                        {/* Package and Notes Card */}
+                        <div className="bg-white p-3 rounded-xl border border-zinc-200 shadow-sm space-y-3 h-full">
                             <h2 className="text-lg font-bold text-zinc-800">Pacote e Observações</h2>
                             <FormField label="Pacote" id="packageType" error={errors.packageType}>
                                 <select id="packageType" name="packageType" value={formData.packageType} onChange={handleInputChange} className="block w-full px-3 py-2 bg-white border border-zinc-300 rounded-md shadow-sm sm:text-sm focus:outline-none focus:ring-green-500 focus:border-green-500">
@@ -543,16 +544,16 @@ const AddAttendeeForm: React.FC<AddAttendeeFormProps> = ({ onAddAttendee, onUpda
                                     <option value={PackageType.SITIO_BUS}>Sítio + Ônibus - R$ {totalBusPriceText}</option>
                                 </select>
                             </FormField>
-                            <FormField label="Observações" id="notes" error={errors.notes}>
+                            <FormField label="Observações" id="notes" error={errors.notes} className="flex-grow">
                                 <textarea id="notes" name="notes" value={formData.notes} onChange={handleInputChange} rows={3} className="block w-full px-3 py-2 bg-white border border-zinc-300 rounded-md shadow-sm sm:text-sm focus:outline-none focus:ring-green-500 focus:border-green-500" placeholder="Alergias, restrições alimentares, etc."></textarea>
                             </FormField>
                         </div>
                     </div>
 
-                    {/* Right Column: Exemption & Payment */}
-                    <div className="md:col-span-5 space-y-4 mt-4 md:mt-0">
+                    {/* Right Column Wrapper: Exemption & Payment */}
+                    <div className="md:col-span-5 xl:col-span-1 space-y-3 mt-3 md:mt-0">
                         {!isEditMode && (
-                            <div className="bg-white p-4 rounded-xl border border-zinc-200 shadow-sm space-y-3">
+                            <div className="bg-white p-3 rounded-xl border border-zinc-200 shadow-sm space-y-3">
                                 <h2 className="text-lg font-bold text-zinc-800">Definição de Isenção</h2>
                                 <p className="text-xs text-zinc-500">Marque abaixo caso o inscrito seja isento de alguma taxa.</p>
                                 
@@ -611,20 +612,20 @@ const AddAttendeeForm: React.FC<AddAttendeeFormProps> = ({ onAddAttendee, onUpda
                         )}
 
                         {!isEditMode && !isFullyExempt && (
-                            <div className="bg-white p-4 rounded-xl border border-zinc-200 shadow-sm space-y-4">
+                            <div className="bg-white p-3 rounded-xl border border-zinc-200 shadow-sm space-y-3">
                                 <label className="flex items-center space-x-2 cursor-pointer w-fit">
                                     <input type="checkbox" name="registerPaymentNow" checked={formData.registerPaymentNow} onChange={handleInputChange} className="h-4 w-4 rounded border-zinc-300 text-green-600 focus:ring-green-500"/>
                                     <span className="text-lg text-zinc-800 font-bold">Registrar Pagamento Agora?</span>
                                 </label>
 
                                 {formData.registerPaymentNow && (
-                                    <div className="pt-4 border-t border-zinc-200 animate-fadeIn">
+                                    <div className="pt-3 border-t border-zinc-200 animate-fadeIn">
                                         {isBusPackage ? (
-                                            <div className="space-y-4">
+                                            <div className="space-y-3">
                                                 {!formData.sitePayment.isExempt && (
                                                     <div>
-                                                        <h3 className="font-bold text-zinc-700 mb-2">Pagamento Sítio (R$ {sitePriceText})</h3>
-                                                        <label className="flex items-center space-x-2 mb-3 cursor-pointer w-fit">
+                                                        <h3 className="font-bold text-zinc-700 mb-1.5">Pagamento Sítio (R$ {sitePriceText})</h3>
+                                                        <label className="flex items-center space-x-2 mb-2 cursor-pointer w-fit">
                                                             <input 
                                                                 type="checkbox" 
                                                                 checked={formData.sitePayment.isPaid} 
@@ -641,8 +642,8 @@ const AddAttendeeForm: React.FC<AddAttendeeFormProps> = ({ onAddAttendee, onUpda
                                                 
                                                 {!formData.busPayment.isExempt && (
                                                     <div>
-                                                        <h3 className="font-bold text-zinc-700 mb-2">Pagamento Ônibus (R$ {(event?.bus_price ?? 50).toFixed(2).replace('.',',')})</h3>
-                                                        <label className="flex items-center space-x-2 mb-3 cursor-pointer w-fit">
+                                                        <h3 className="font-bold text-zinc-700 mb-1.5">Pagamento Ônibus (R$ {(event?.bus_price ?? 50).toFixed(2).replace('.',',')})</h3>
+                                                        <label className="flex items-center space-x-2 mb-2 cursor-pointer w-fit">
                                                             <input 
                                                                 type="checkbox" 
                                                                 checked={formData.busPayment.isPaid} 
@@ -659,7 +660,7 @@ const AddAttendeeForm: React.FC<AddAttendeeFormProps> = ({ onAddAttendee, onUpda
                                             </div>
                                         ) : (
                                             <div>
-                                                <h3 className="font-bold text-zinc-700 mb-2">Pagamento (R$ {sitePriceText})</h3>
+                                                <h3 className="font-bold text-zinc-700 mb-1.5">Pagamento (R$ {sitePriceText})</h3>
                                                 <PartialPaymentFields 
                                                     idPrefix="single" 
                                                     details={{ 
@@ -686,8 +687,7 @@ const AddAttendeeForm: React.FC<AddAttendeeFormProps> = ({ onAddAttendee, onUpda
                 </div>
                 
                 {/* Footer Actions - Sticky at bottom of form on Desktop */}
-                {/* Fixed to use bg-zinc-50 to match page background, reducing color discrepancy */}
-                <div className="mt-6 pt-4 border-t border-zinc-200 md:border-t md:sticky md:bottom-0 bg-zinc-50 md:z-10 md:-mx-4 md:px-4 md:py-4 md:shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)] flex justify-center items-center">
+                <div className="mt-4 pt-3 border-t border-zinc-200 md:border-t md:sticky md:bottom-0 bg-zinc-50 md:z-10 md:-mx-4 md:px-4 md:py-3 md:shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)] flex justify-center items-center">
                     <div className="flex flex-col md:flex-row gap-4 w-full md:w-auto">
                         <button type="button" onClick={onCancel} className="w-full md:w-32 bg-zinc-200 text-zinc-800 font-bold py-3 px-4 rounded-full hover:bg-zinc-300 transition-colors">Cancelar</button>
                         <button type="submit" disabled={isSubmitting || (!isPersonSelected && !formData.name)} className="w-full md:w-48 bg-green-500 text-white font-bold py-3 px-4 rounded-full flex items-center justify-center gap-2 hover:bg-green-600 shadow-sm disabled:bg-green-400 disabled:cursor-not-allowed">

@@ -686,8 +686,8 @@ const AddAttendeeForm: React.FC<AddAttendeeFormProps> = ({ onAddAttendee, onUpda
                     </div>
                 </div>
                 
-                {/* Footer Actions - Sticky at bottom of form on Desktop */}
-                <div className="mt-auto pt-3 border-t border-zinc-200 sticky bottom-0 bg-zinc-50 z-10 -mx-3 px-4 py-3 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)] flex justify-center items-center">
+                {/* Footer Actions - Sticky at bottom of form on Desktop, Static on Mobile */}
+                <div className="mt-auto pt-3 border-t border-zinc-200 md:sticky md:bottom-0 bg-zinc-50 z-10 -mx-3 px-4 py-3 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)] flex justify-center items-center">
                     <div className="flex flex-col md:flex-row gap-4 w-full md:w-auto">
                         <button type="button" onClick={onCancel} className="w-full md:w-32 bg-zinc-200 text-zinc-800 font-bold py-3 px-4 rounded-full hover:bg-zinc-300 transition-colors">Cancelar</button>
                         <button type="submit" disabled={isSubmitting || (!isPersonSelected && !formData.name)} className="w-full md:w-48 bg-green-500 text-white font-bold py-3 px-4 rounded-full flex items-center justify-center gap-2 hover:bg-green-600 shadow-sm disabled:bg-green-400 disabled:cursor-not-allowed">

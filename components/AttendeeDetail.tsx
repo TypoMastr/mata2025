@@ -505,11 +505,17 @@ const AttendeeDetail: React.FC<AttendeeDetailProps> = ({ attendee, onBack, onEdi
                         )}
                     </div>
 
-                    {/* Attendance Status Card - Moved Here */}
-                    <div className="bg-white p-4 rounded-xl border border-zinc-200 shadow-sm space-y-4 opacity-0 animate-fadeInUp md:col-span-2" style={getAnimationStyle(325)}>
-                        <div className="flex justify-between items-center">
-                            <h2 className="text-lg font-bold text-zinc-800">Status de Presença</h2>
-                            <label className="relative inline-flex items-center cursor-pointer">
+                    {/* Attendance Status Card - Mobile Optimized */}
+                    <div className="bg-white p-4 rounded-xl border border-zinc-200 shadow-sm space-y-3 opacity-0 animate-fadeInUp md:col-span-2" style={getAnimationStyle(325)}>
+                        <h2 className="text-lg font-bold text-zinc-800">Controle de Presença</h2>
+                        
+                        <div className="flex items-center justify-between p-3 rounded-lg border border-zinc-100 bg-zinc-50">
+                            <div className="flex flex-col mr-4">
+                                <span className="font-semibold text-zinc-700 text-sm">Confirmar Ausência</span>
+                                <span className="text-xs text-zinc-500">Marcar que não irá comparecer</span>
+                            </div>
+                            
+                            <label className="relative inline-flex items-center cursor-pointer flex-shrink-0">
                                 <input 
                                     type="checkbox" 
                                     className="sr-only peer" 
@@ -517,19 +523,19 @@ const AttendeeDetail: React.FC<AttendeeDetailProps> = ({ attendee, onBack, onEdi
                                     onChange={initiateToggleAttendance} 
                                     disabled={isUpdatingAttendance} 
                                 />
-                                <div className="w-11 h-6 bg-zinc-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-red-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-zinc-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-red-600"></div>
-                                <span className="ml-3 text-sm font-medium text-zinc-700">Não Comparecerá</span>
+                                <div className="w-11 h-6 bg-zinc-300 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-red-200 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-zinc-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-red-500"></div>
                             </label>
                         </div>
+
                         {attendee.wontAttend && (
-                            <div className="bg-red-50 border border-red-200 text-red-700 p-3 rounded-lg text-sm">
-                                <p className="font-bold flex items-center gap-2">
-                                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" /></svg>
-                                    Inscrição marcada como "Não irá".
-                                </p>
-                                <p className="mt-1">
-                                    Esta pessoa <strong>não ocupará vaga no ônibus</strong> e não será contabilizada nos relatórios de logística/presença. O histórico financeiro será mantido.
-                                </p>
+                            <div className="bg-red-50 border border-red-100 text-red-800 p-3 rounded-lg text-sm flex gap-3 items-start animate-fadeIn">
+                                 <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 flex-shrink-0 mt-0.5 text-red-600" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" /></svg>
+                                 <div>
+                                    <p className="font-bold text-red-700">Ausência Confirmada</p>
+                                    <p className="mt-1 text-xs leading-relaxed opacity-90">
+                                        Esta pessoa <strong>liberou a vaga no ônibus</strong> e não será contada na lista de presença. O histórico financeiro foi mantido.
+                                    </p>
+                                </div>
                             </div>
                         )}
                     </div>

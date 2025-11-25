@@ -12,8 +12,8 @@ interface AttendeeListProps {
     onLogout: () => void;
     searchQuery: string;
     onSearchQueryChange: (query: string) => void;
-    statusFilter: 'all' | PaymentStatus | 'partial_exempt';
-    onStatusFilterChange: (filter: 'all' | PaymentStatus | 'partial_exempt') => void;
+    statusFilter: 'all' | PaymentStatus | 'partial_exempt' | 'wont_attend';
+    onStatusFilterChange: (filter: 'all' | PaymentStatus | 'partial_exempt' | 'wont_attend') => void;
     packageFilter: 'all' | PackageType;
     onPackageFilterChange: (filter: 'all' | PackageType) => void;
     scrollPosition: number;
@@ -151,6 +151,11 @@ const StatusBadge: React.FC<{ attendee: Attendee }> = ({ attendee }) => {
 
     return (
         <div className="flex items-center flex-wrap gap-2">
+            {attendee.wontAttend && (
+                <span className="px-3 py-1 text-xs font-bold rounded-full bg-zinc-600 text-white">
+                    NÃO VAI
+                </span>
+            )}
             <span className={`px-3 py-1 text-xs font-bold rounded-full ${statusClasses}`}>
                 {status.toUpperCase()}
             </span>
@@ -219,6 +224,7 @@ const AttendeeList: React.FC<AttendeeListProps> = ({
             )
             .filter(attendee => {
                 if (statusFilter === 'all') return true;
+                if (statusFilter === 'wont_attend') return attendee.wontAttend;
                 if (statusFilter === 'partial_exempt') {
                     // Only match if partial exemption exists AND user is not fully exempt (status ISENTO)
                     const isExempt = attendee.payment.sitePaymentDetails?.isExempt || attendee.payment.busPaymentDetails?.isExempt;
@@ -239,6 +245,7 @@ const AttendeeList: React.FC<AttendeeListProps> = ({
         { label: PaymentStatus.PENDENTE, value: PaymentStatus.PENDENTE },
         { label: PaymentStatus.ISENTO, value: PaymentStatus.ISENTO },
         { label: 'Isenção Parcial', value: 'partial_exempt' },
+        { label: 'Não vai', value: 'wont_attend' },
     ];
 
     const packageOptions = [
@@ -428,6 +435,7 @@ const AttendeeList: React.FC<AttendeeListProps> = ({
                             <FilterPill label={PaymentStatus.PENDENTE} isActive={statusFilter === PaymentStatus.PENDENTE} onClick={() => onStatusFilterChange(PaymentStatus.PENDENTE)} />
                             <FilterPill label={PaymentStatus.ISENTO} isActive={statusFilter === PaymentStatus.ISENTO} onClick={() => onStatusFilterChange(PaymentStatus.ISENTO)} />
                             <FilterPill label="Isenção Parcial" isActive={statusFilter === 'partial_exempt'} onClick={() => onStatusFilterChange('partial_exempt')} />
+                            <FilterPill label="Não vai" isActive={statusFilter === 'wont_attend'} onClick={() => onStatusFilterChange('wont_attend')} />
                         </div>
                         <div className="flex flex-wrap gap-2 items-center min-w-max">
                             <span className="text-sm font-medium text-zinc-500 flex-shrink-0">Pacote:</span>
@@ -466,8 +474,16 @@ const AttendeeList: React.FC<AttendeeListProps> = ({
                                     </thead>
                                     <tbody className="bg-white divide-y divide-zinc-200">
                                         {sortedAttendees.map((attendee) => (
-                                            <tr key={attendee.id} onClick={() => onSelectAttendee(attendee.id)} className="hover:bg-zinc-50 cursor-pointer transition-colors">
-                                                <td className="px-6 py-4"><div className="text-sm font-medium text-zinc-900">{attendee.person.name}</div></td>
+                                            <tr 
+                                                key={attendee.id} 
+                                                onClick={() => onSelectAttendee(attendee.id)} 
+                                                className={`hover:bg-zinc-50 cursor-pointer transition-colors ${attendee.wontAttend ? 'bg-zinc-50 opacity-75' : ''}`}
+                                            >
+                                                <td className="px-6 py-4">
+                                                    <div className={`text-sm font-medium ${attendee.wontAttend ? 'text-zinc-500 line-through decoration-2 decoration-zinc-400' : 'text-zinc-900'}`}>
+                                                        {attendee.person.name}
+                                                    </div>
+                                                </td>
                                                 <td className="px-6 py-4"><div className="flex items-center text-sm text-zinc-500"><PackageIcon packageType={attendee.packageType} />{attendee.packageType}</div></td>
                                                 <td className="px-6 py-4"><StatusBadge attendee={attendee} /></td>
                                                 <td className="px-6 py-4 text-sm text-zinc-500">{attendee.person.phone}</td>

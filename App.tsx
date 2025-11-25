@@ -49,7 +49,7 @@ const AppContent: React.FC = () => {
     const [registrationPaymentToDelete, setRegistrationPaymentToDelete] = useState<Registration | null>(null);
 
     const [searchQuery, setSearchQuery] = useState('');
-    const [statusFilter, setStatusFilter] = useState<'all' | PaymentStatus | 'partial_exempt'>('all');
+    const [statusFilter, setStatusFilter] = useState<'all' | PaymentStatus | 'partial_exempt' | 'wont_attend'>('all');
     const [packageFilter, setPackageFilter] = useState<'all' | PackageType>('all');
     const [scrollPosition, setScrollPosition] = useState(0);
 

@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { useToast } from '../contexts/ToastContext';
 
@@ -33,11 +34,19 @@ CREATE TABLE public.action_history (
 ALTER TABLE public.${tableName}
 ADD COLUMN is_deleted BOOLEAN DEFAULT FALSE;`;
     };
+    
+    const addWontAttendSql = (): string => {
+        return `-- Adiciona a coluna 'wont_attend' à tabela 'event_registrations' para marcar quem pagou mas não irá
+ALTER TABLE public.event_registrations
+ADD COLUMN wont_attend BOOLEAN DEFAULT FALSE;`;
+    };
 
     missingItems.forEach(item => {
         if (item.startsWith('table:')) {
             const tableName = item.split(':')[1];
             commands.push(createTableSql(tableName));
+        } else if (item === 'column:wont_attend:event_registrations') {
+            commands.push(addWontAttendSql());
         } else {
             // Assume it's a table name missing a column
             commands.push(addColumnSql(item));
@@ -61,14 +70,15 @@ const DatabaseMigration: React.FC<DatabaseMigrationProps> = ({ missingIn }) => {
     };
     
     const missingTables = missingIn.filter(i => i.startsWith('table:')).map(i => i.split(':')[1]);
-    const missingColumnsInTables = missingIn.filter(i => !i.startsWith('table:'));
+    const missingColumnsInTables = missingIn.filter(i => !i.startsWith('table:') && !i.startsWith('column:'));
+    const specificColumnMissing = missingIn.some(i => i.startsWith('column:wont_attend'));
 
     return (
         <div className="bg-zinc-100 flex flex-col items-center justify-center min-h-screen p-4 font-sans text-zinc-800">
             <div className="w-full max-w-2xl mx-auto bg-white p-8 rounded-2xl shadow-xl border border-zinc-200">
                 <div className="flex items-center gap-4 mb-4">
                     <div className="flex-shrink-0 flex items-center justify-center h-12 w-12 rounded-full bg-red-100">
-                        <svg className="h-6 w-6 text-red-600" xmlns="http://www.w.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <svg className="h-6 w-6 text-red-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
                         </svg>
                     </div>
@@ -82,6 +92,7 @@ const DatabaseMigration: React.FC<DatabaseMigrationProps> = ({ missingIn }) => {
                 <ul className="list-disc list-inside mb-4 text-zinc-600 space-y-1">
                     {missingTables.length > 0 && <li>Tabela(s) faltando: <strong>{missingTables.join(', ')}</strong></li>}
                     {missingColumnsInTables.length > 0 && <li>Coluna <code>is_deleted</code> faltando em: <strong>{missingColumnsInTables.join(', ')}</strong></li>}
+                    {specificColumnMissing && <li>Coluna <code>wont_attend</code> faltando em: <strong>event_registrations</strong></li>}
                 </ul>
 
                 <p className="mb-4 text-zinc-600">

@@ -67,6 +67,7 @@ export interface Registration {
     notes?: string;
     busNumber?: number | null;
     is_deleted?: boolean;
+    wontAttend?: boolean; // New field: Paid but not attending
 }
 
 // Alias for backwards compatibility in components.

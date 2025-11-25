@@ -1050,22 +1050,27 @@ const ProgressBar: React.FC<{ value: number; max: number; colorClass?: string }>
 
 const ReportsDashboard: React.FC<{ attendees: Attendee[]; onGenerateReportClick: () => void; onLogout: () => void; onFixDocsClick: () => void; onCheckDuplicatesClick: () => void; zeroDocCount: number; duplicateGroupCount: number; busStats: BusStat[]; onViewBus: (busNumber: number) => void; onViewFinancials: () => void; onViewSitioOnlyList: () => void; event: Event | null; }> = ({ attendees, onGenerateReportClick, onLogout, onFixDocsClick, onCheckDuplicatesClick, zeroDocCount, duplicateGroupCount, busStats, onViewBus, onViewFinancials, onViewSitioOnlyList, event }) => {
     const { totalAttendees, paidCount, pendingCount, isentoCount, totalRevenue, pendingRevenue, totalPossibleRevenue, sitioOnlyCount, paymentStats } = useMemo(() => {
-        const paidAttendees = attendees.filter(a => a.payment.status === PaymentStatus.PAGO);
-        const pendingAttendees = attendees.filter(a => a.payment.status === PaymentStatus.PENDENTE);
-        const isentoAttendees = attendees.filter(a => a.payment.status === PaymentStatus.ISENTO);
+        // We want to count active attendees for logistics, but ALL payments for financials.
+        
+        // Logistics Counts (Exclude wontAttend)
+        const activeAttendees = attendees.filter(a => !a.wontAttend);
+        
+        const paidAttendees = activeAttendees.filter(a => a.payment.status === PaymentStatus.PAGO);
+        const pendingAttendees = activeAttendees.filter(a => a.payment.status === PaymentStatus.PENDENTE);
+        const isentoAttendees = activeAttendees.filter(a => a.payment.status === PaymentStatus.ISENTO);
 
         const paidCountValue = paidAttendees.length;
         const pendingCountValue = pendingAttendees.length;
         const isentoCountValue = isentoAttendees.length;
+        
+        // Financial Calculations (INCLUDE wontAttend because they paid)
+        const allPaidOrPartiallyPaid = attendees.filter(a => a.payment.status === PaymentStatus.PAGO || (a.payment.sitePaymentDetails?.isPaid || a.payment.busPaymentDetails?.isPaid));
 
         const calculatedPaymentStats = (Object.values(PaymentType) as PaymentType[]).reduce((acc, type) => {
             acc[type] = { count: 0, total: 0 };
             return acc;
         }, {} as Record<PaymentType, { count: number; total: number }>);
         
-        // Populate stats for payment methods (existing logic)
-        const allPaidOrPartiallyPaid = attendees.filter(a => a.payment.status === PaymentStatus.PAGO || (a.payment.sitePaymentDetails?.isPaid || a.payment.busPaymentDetails?.isPaid));
-
         allPaidOrPartiallyPaid.forEach(attendee => {
             if (attendee.packageType === PackageType.SITIO_BUS) {
                 if (attendee.payment.sitePaymentDetails?.isPaid && attendee.payment.sitePaymentDetails.type) {
@@ -1100,9 +1105,7 @@ const ReportsDashboard: React.FC<{ attendees: Attendee[]; onGenerateReportClick:
             }, {} as Record<PaymentType, { count: number; total: number }>);
 
         // --- STRICT FINANCIAL CALCULATION ---
-        // We recalculate totally from scratch based on strict rules to match the detail view
-        // and avoid double counting.
-        
+        // Iterate ALL attendees to get correct money values, regardless of attendance
         const sitePrice = event?.site_price ?? 70;
         const busPrice = event?.bus_price ?? 50;
 
@@ -1150,14 +1153,14 @@ const ReportsDashboard: React.FC<{ attendees: Attendee[]; onGenerateReportClick:
         });
 
         return {
-            totalAttendees: attendees.length,
+            totalAttendees: activeAttendees.length,
             paidCount: paidCountValue,
             pendingCount: pendingCountValue,
             isentoCount: isentoCountValue,
             totalRevenue: calculatedTotalRevenue,
             totalPossibleRevenue: calculatedTotalPossibleRevenue,
             pendingRevenue: calculatedTotalPossibleRevenue - calculatedTotalRevenue,
-            sitioOnlyCount: attendees.filter(a => a.packageType === PackageType.SITIO_ONLY).length,
+            sitioOnlyCount: activeAttendees.filter(a => a.packageType === PackageType.SITIO_ONLY).length,
             paymentStats: sortedPaymentStats
         };
     }, [attendees, event]);
@@ -1182,10 +1185,10 @@ const ReportsDashboard: React.FC<{ attendees: Attendee[]; onGenerateReportClick:
                 </button>
             </header>
             <div className="p-4 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-                <StatCard title="Inscrições" icon={IconUsers} delay={100}>
+                <StatCard title="Inscrições Ativas" icon={IconUsers} delay={100}>
                     <div className="flex justify-between items-baseline">
                         <span className="font-bold text-3xl text-zinc-800">{totalAttendees}</span>
-                        <span className="text-sm font-semibold text-zinc-500">Total</span>
+                        <span className="text-sm font-semibold text-zinc-500">Confirmados</span>
                     </div>
                     <ProgressBar value={paidCount} max={totalAttendees - isentoCount} />
                     <div className="flex justify-between text-sm flex-wrap gap-x-2">
@@ -1194,7 +1197,7 @@ const ReportsDashboard: React.FC<{ attendees: Attendee[]; onGenerateReportClick:
                         {isentoCount > 0 && <span className="font-semibold text-blue-600">{isentoCount} {isentoCount === 1 ? 'Isento' : 'Isentos'}</span>}
                     </div>
                 </StatCard>
-                <StatCard title="Financeiro" icon={IconDollar} delay={150} onClick={onViewFinancials}>
+                <StatCard title="Financeiro Global" icon={IconDollar} delay={150} onClick={onViewFinancials}>
                     <div className="flex justify-between items-baseline">
                         <span className="font-bold text-3xl text-zinc-800">R$ {totalRevenue.toFixed(2).replace('.',',')}</span>
                         <span className="text-sm font-semibold text-zinc-500">Arrecadado</span>
@@ -1321,6 +1324,7 @@ const Reports: React.FC<ReportsProps> = ({ attendees, onLogout, onUpdateAttendee
     const zeroDocAttendees = useMemo(() => {
         return attendees.filter(a =>
             a.packageType === PackageType.SITIO_BUS &&
+            !a.wontAttend && // Exclude those not attending
             // FIX: Access document from the nested person object.
             /^0+$/.test(a.person.document.replace(/[^\d]/g, ''))
         );
@@ -1328,10 +1332,13 @@ const Reports: React.FC<ReportsProps> = ({ attendees, onLogout, onUpdateAttendee
     
     const sitioOnlyAttendees = useMemo(() => 
         // FIX: Access name from the nested person object for sorting.
-        attendees.filter(a => a.packageType === PackageType.SITIO_ONLY).sort((a,b) => a.person.name.localeCompare(b.person.name)), 
+        attendees
+            .filter(a => a.packageType === PackageType.SITIO_ONLY && !a.wontAttend)
+            .sort((a,b) => a.person.name.localeCompare(b.person.name)), 
     [attendees]);
 
     const potentialDuplicates = useMemo(() => {
+        // Filter out wontAttend? No, duplicates are duplicates regardless.
         if (attendees.length < 2) return [];
 
         const normalize = (str: string) => str.toLowerCase().trim().replace(/\s+/g, ' ');
@@ -1390,6 +1397,9 @@ const Reports: React.FC<ReportsProps> = ({ attendees, onLogout, onUpdateAttendee
             if (a.payment.status === PaymentStatus.ISENTO) {
                 return; 
             }
+            
+            // NOTE: For financial details, we INCLUDE people marked as wontAttend
+            // because if they paid, the money is there.
 
             // Critical Fix: If status is PAGO, assume paid regardless of partial details state
             const isGeneralPaid = a.payment.status === PaymentStatus.PAGO;
@@ -1448,7 +1458,7 @@ const Reports: React.FC<ReportsProps> = ({ attendees, onLogout, onUpdateAttendee
         };
     }, [attendees, event]);
 
-    const busAttendees = useMemo(() => attendees.filter(a => a.packageType === PackageType.SITIO_BUS), [attendees]);
+    const busAttendees = useMemo(() => attendees.filter(a => a.packageType === PackageType.SITIO_BUS && !a.wontAttend), [attendees]);
     const totalBuses = useMemo(() => {
         const BUS_CAPACITY = 50;
         return Math.ceil(busAttendees.length / BUS_CAPACITY) || (busAttendees.length > 0 ? 1 : 0);
@@ -1464,7 +1474,9 @@ const Reports: React.FC<ReportsProps> = ({ attendees, onLogout, onUpdateAttendee
     }, [busAttendees]);
     
     const busPassengerLists = useMemo((): BusDetails[] => {
-        const busAttendees = attendees.filter(a => a.packageType === PackageType.SITIO_BUS);
+        // Filter out wontAttend people
+        const busAttendees = attendees.filter(a => a.packageType === PackageType.SITIO_BUS && !a.wontAttend);
+        
         const BUS_CAPACITY = 50;
         const totalBusesCalculated = Math.ceil(busAttendees.length / BUS_CAPACITY) || (busAttendees.length > 0 ? 1 : 0);
         

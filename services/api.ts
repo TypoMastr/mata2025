@@ -79,9 +79,16 @@ const fromSupabase = (record: any): Registration => {
     if (isMultiPayment && !payment.sitePaymentDetails) payment.sitePaymentDetails = { isPaid: false, receiptUrl: null };
     if (isMultiPayment && !payment.busPaymentDetails) payment.busPaymentDetails = { isPaid: false, receiptUrl: null };
     return {
-        id: record.id, person, eventId: record.event_id, packageType: record.package_type,
-        registrationDate: record.registration_date, payment: payment, notes: record.notes || undefined,
-        busNumber: record.bus_number || null, is_deleted: record.is_deleted,
+        id: record.id, 
+        person, 
+        eventId: record.event_id, 
+        packageType: record.package_type,
+        registrationDate: record.registration_date, 
+        payment: payment, 
+        notes: record.notes || undefined,
+        busNumber: record.bus_number || null, 
+        is_deleted: record.is_deleted,
+        wontAttend: record.wont_attend || false,
     };
 };
 
@@ -93,6 +100,8 @@ const registrationToSupabase = (registration: Partial<Registration>): any => {
     if (registration.notes !== undefined) record.notes = registration.notes;
     if (registration.busNumber !== undefined) record.bus_number = registration.busNumber;
     if (registration.is_deleted !== undefined) record.is_deleted = registration.is_deleted;
+    if (registration.wontAttend !== undefined) record.wont_attend = registration.wontAttend;
+    
     if (registration.payment) {
         record.payment_amount = registration.payment.amount;
         record.payment_status = registration.payment.status;
@@ -180,6 +189,13 @@ const generateActionDescription = async (action_type: string, previous_data: any
                 }
                 if ((before.notes || '').trim() !== (after.notes || '').trim()) changes.push(`Observações da inscrição de ${personName} foram atualizadas.`);
                 
+                // Attendance Change
+                if (before.wontAttend !== after.wontAttend) {
+                    changes.push(after.wontAttend 
+                        ? `Inscrição de ${personName} marcada como "Não Comparecerá" (o pagamento será mantido).` 
+                        : `Inscrição de ${personName} marcada como "Comparecerá".`);
+                }
+
                 // Payment changes
                 if (before.payment.status !== after.payment.status && after.payment.status === PaymentStatus.ISENTO) return `Inscrição de ${personName} marcada como ISENTA.`;
                 if (before.payment.status === PaymentStatus.ISENTO && after.payment.status !== PaymentStatus.ISENTO) return `Isenção da inscrição de ${personName} removida.`;
@@ -252,6 +268,16 @@ export const verifySchema = async (): Promise<{ success: boolean, missingIn: str
             missingIn.push(table);
         }
     }
+    
+    // Special check for wont_attend in event_registrations
+    const { error: wontAttendError } = await supabase
+        .from('event_registrations')
+        .select('wont_attend')
+        .limit(1);
+        
+    if (wontAttendError && wontAttendError.message.includes('does not exist')) {
+        missingIn.push('column:wont_attend:event_registrations');
+    }
 
     // Check for missing tables
     for (const table of tableChecks) {
@@ -308,6 +334,7 @@ export const createRegistration = async (regData: {personId: string, eventId: st
         payment_details: paymentDetails,
         notes: regData.notes,
         is_deleted: false,
+        wont_attend: false, // Default
         registration_date: new Date().toISOString(),
     };
 

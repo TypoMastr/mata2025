@@ -24,7 +24,6 @@ const SpinnerIcon: React.FC = () => (
     </svg>
 );
 
-
 const DetailRow: React.FC<{ label: string; value?: string; children?: React.ReactNode }> = ({ label, value, children }) => (
     <div>
         <p className="text-sm text-zinc-500">{label}</p>
@@ -93,6 +92,61 @@ const PartialPaymentDetail: React.FC<{
     )
 };
 
+interface ConfirmAttendanceToggleModalProps {
+    isOpen: boolean;
+    onClose: () => void;
+    onConfirm: () => void;
+    currentWontAttend: boolean;
+    personName: string;
+    isSaving: boolean;
+}
+
+const ConfirmAttendanceToggleModal: React.FC<ConfirmAttendanceToggleModalProps> = ({ isOpen, onClose, onConfirm, currentWontAttend, personName, isSaving }) => {
+    if (!isOpen) return null;
+
+    const willAttend = !currentWontAttend; // If currently wontAttend is true, we are changing to false (Will Attend)
+    
+    // If currently wontAttend is TRUE, it means they are marked as NOT GOING.
+    // Clicking the toggle means we are marking them as GOING (wontAttend = false).
+    
+    // If currently wontAttend is FALSE (default), it means they ARE GOING.
+    // Clicking the toggle means we are marking them as NOT GOING (wontAttend = true).
+
+    // Current State: wontAttend = false (Vai). User clicks -> New State: wontAttend = true (Não Vai).
+    const changingToWontAttend = !currentWontAttend;
+
+    return (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 animate-fadeIn">
+            <div className="bg-white rounded-xl shadow-lg p-6 max-w-sm w-full animate-popIn">
+                <h3 className="text-lg leading-6 font-bold text-zinc-900">Confirmar Alteração</h3>
+                <div className="mt-3 text-sm text-zinc-600">
+                    {changingToWontAttend ? (
+                        <>
+                            <p>Deseja marcar que <strong>{personName}</strong> <span className="text-red-600 font-bold">NÃO COMPARECERÁ</span> ao evento?</p>
+                            <ul className="list-disc list-inside mt-2 space-y-1 bg-red-50 p-2 rounded border border-red-100">
+                                <li>A vaga no ônibus será liberada.</li>
+                                <li>Não será contabilizado na lista de presença.</li>
+                                <li>O pagamento e histórico financeiro serão <strong>mantidos</strong>.</li>
+                            </ul>
+                        </>
+                    ) : (
+                        <p>Deseja confirmar novamente a presença de <strong>{personName}</strong>? A pessoa voltará a ocupar uma vaga no ônibus (se aplicável).</p>
+                    )}
+                </div>
+                <div className="mt-5 sm:mt-4 flex flex-col-reverse sm:flex-row sm:justify-end gap-3">
+                    <button type="button" onClick={onClose} disabled={isSaving} className="w-full justify-center rounded-full border border-zinc-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-zinc-700 hover:bg-zinc-50 sm:w-auto sm:text-sm">
+                        Cancelar
+                    </button>
+                    <button type="button" onClick={onConfirm} disabled={isSaving} className="w-full justify-center rounded-full border border-transparent shadow-sm px-4 py-2 bg-green-600 text-base font-medium text-white hover:bg-green-700 sm:w-auto sm:text-sm disabled:bg-green-400 flex items-center justify-center gap-2">
+                        {isSaving ? <SpinnerIcon /> : null}
+                        {isSaving ? 'Salvando...' : 'Confirmar'}
+                    </button>
+                </div>
+            </div>
+        </div>
+    );
+};
+
 const AttendeeDetail: React.FC<AttendeeDetailProps> = ({ attendee, onBack, onEdit, onDelete, onManagePayment, onUpdateAttendee, totalBuses, busAssignments }) => {
     const { addToast } = useToast();
     const [receiptToView, setReceiptToView] = useState<string | null>(null);
@@ -102,6 +156,10 @@ const AttendeeDetail: React.FC<AttendeeDetailProps> = ({ attendee, onBack, onEdi
     const [isEditingBus, setIsEditingBus] = useState(false);
     const [selectedBus, setSelectedBus] = useState<string>(attendee.busNumber?.toString() || 'null');
     const [isSavingBus, setIsSavingBus] = useState(false);
+    
+    // Confirmation Modal State
+    const [showAttendanceConfirmation, setShowAttendanceConfirmation] = useState(false);
+    const [isUpdatingAttendance, setIsUpdatingAttendance] = useState(false);
 
     const handleCopyToClipboard = async (text: string, label: string) => {
         if (!navigator.clipboard) {
@@ -204,6 +262,30 @@ const AttendeeDetail: React.FC<AttendeeDetailProps> = ({ attendee, onBack, onEdi
             setIsSavingBus(false);
         }
     };
+    
+    const initiateToggleAttendance = (e: React.ChangeEvent<HTMLInputElement>) => {
+        // Prevent immediate change, show modal instead
+        e.preventDefault();
+        setShowAttendanceConfirmation(true);
+    };
+
+    const confirmToggleAttendance = async () => {
+        if (isUpdatingAttendance) return;
+        setIsUpdatingAttendance(true);
+        try {
+            const newValue = !attendee.wontAttend;
+            await onUpdateAttendee({
+                ...attendee,
+                wontAttend: newValue,
+            });
+            addToast(newValue ? 'Marcado como "Não irá comparecer".' : 'Presença confirmada novamente.', 'success');
+            setShowAttendanceConfirmation(false);
+        } catch (error) {
+            addToast('Erro ao atualizar status de presença.', 'error');
+        } finally {
+            setIsUpdatingAttendance(false);
+        }
+    };
 
     // FIX: Access documentType from the nested person object.
     const showInvalidDocAsNotInformed = attendee.packageType === PackageType.SITIO_ONLY && attendee.person.documentType === DocumentType.OUTRO;
@@ -220,6 +302,7 @@ const AttendeeDetail: React.FC<AttendeeDetailProps> = ({ attendee, onBack, onEdi
             
             <div className="p-4">
                 <div className="md:grid md:grid-cols-2 md:gap-6 space-y-6 md:space-y-0">
+                    
                     <div className="bg-white p-4 rounded-xl border border-zinc-200 shadow-sm space-y-4 opacity-0 animate-fadeInUp" style={getAnimationStyle(100)}>
                         <DetailRow label="Nome">
                             <div className="flex items-center justify-between">
@@ -329,7 +412,7 @@ const AttendeeDetail: React.FC<AttendeeDetailProps> = ({ attendee, onBack, onEdi
                         </div>
                     </div>
                     
-                    {isMultiPayment && (
+                    {isMultiPayment && !attendee.wontAttend && (
                         <div className="bg-white p-4 rounded-xl border border-zinc-200 shadow-sm space-y-3 opacity-0 animate-fadeInUp md:col-span-2" style={getAnimationStyle(225)}>
                             <div className="flex justify-between items-center">
                                 <h2 className="text-lg font-bold text-zinc-800">Transporte</h2>
@@ -422,6 +505,35 @@ const AttendeeDetail: React.FC<AttendeeDetailProps> = ({ attendee, onBack, onEdi
                         )}
                     </div>
 
+                    {/* Attendance Status Card - Moved Here */}
+                    <div className="bg-white p-4 rounded-xl border border-zinc-200 shadow-sm space-y-4 opacity-0 animate-fadeInUp md:col-span-2" style={getAnimationStyle(325)}>
+                        <div className="flex justify-between items-center">
+                            <h2 className="text-lg font-bold text-zinc-800">Status de Presença</h2>
+                            <label className="relative inline-flex items-center cursor-pointer">
+                                <input 
+                                    type="checkbox" 
+                                    className="sr-only peer" 
+                                    checked={!!attendee.wontAttend} 
+                                    onChange={initiateToggleAttendance} 
+                                    disabled={isUpdatingAttendance} 
+                                />
+                                <div className="w-11 h-6 bg-zinc-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-red-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-zinc-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-red-600"></div>
+                                <span className="ml-3 text-sm font-medium text-zinc-700">Não Comparecerá</span>
+                            </label>
+                        </div>
+                        {attendee.wontAttend && (
+                            <div className="bg-red-50 border border-red-200 text-red-700 p-3 rounded-lg text-sm">
+                                <p className="font-bold flex items-center gap-2">
+                                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" /></svg>
+                                    Inscrição marcada como "Não irá".
+                                </p>
+                                <p className="mt-1">
+                                    Esta pessoa <strong>não ocupará vaga no ônibus</strong> e não será contabilizada nos relatórios de logística/presença. O histórico financeiro será mantido.
+                                </p>
+                            </div>
+                        )}
+                    </div>
+
                     <div className="space-y-3 opacity-0 animate-fadeInUp md:col-span-2" style={getAnimationStyle(350)}>
                         <button onClick={onManagePayment} className="w-full bg-blue-500 text-white font-bold py-3 px-4 rounded-full hover:bg-blue-600 transition-colors shadow-sm">
                             Gerenciar Pagamentos
@@ -442,6 +554,15 @@ const AttendeeDetail: React.FC<AttendeeDetailProps> = ({ attendee, onBack, onEdi
             {receiptToView && (
                 <ReceiptViewer receiptUrl={receiptToView} onClose={() => setReceiptToView(null)} />
             )}
+
+            <ConfirmAttendanceToggleModal 
+                isOpen={showAttendanceConfirmation}
+                onClose={() => setShowAttendanceConfirmation(false)}
+                onConfirm={confirmToggleAttendance}
+                currentWontAttend={!!attendee.wontAttend}
+                personName={attendee.person.name}
+                isSaving={isUpdatingAttendance}
+            />
         </div>
     );
 };

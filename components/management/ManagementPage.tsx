@@ -164,7 +164,7 @@ const ManagementPage: React.FC<ManagementPageProps> = ({ events, onAddEvent, onU
     const IconDatabase = <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M20.25 6.375c0 2.278-3.694 4.125-8.25 4.125S3.75 8.653 3.75 6.375m16.5 0c0-2.278-3.694-4.125-8.25-4.125S3.75 4.097 3.75 6.375m16.5 0v11.25c0 2.278-3.694 4.125-8.25 4.125s-8.25-1.847-8.25-4.125V6.375m16.5 0v3.75m-16.5-3.75v3.75m16.5 0v3.75C20.25 16.153 16.556 18 12 18s-8.25-1.847-8.25-4.125v-3.75m16.5 0c0 2.278-3.694 4.125-8.25 4.125s-8.25-1.847-8.25-4.125" /></svg>;
 
     return (
-        <div className="animate-fadeIn h-full flex flex-col">
+        <div className="animate-fadeIn">
             <header className="sticky top-0 md:static bg-white md:bg-transparent z-10 p-3 border-b border-zinc-200 md:border-b-0 md:pt-4">
                 <div className="flex justify-between items-center">
                     <h1 className="text-xl md:text-2xl font-bold text-zinc-800">Gestão</h1>
@@ -178,7 +178,7 @@ const ManagementPage: React.FC<ManagementPageProps> = ({ events, onAddEvent, onU
                 </div>
             </header>
 
-            <main className="p-3 space-y-3 xl:space-y-0 xl:grid xl:grid-cols-12 xl:gap-4 flex-grow overflow-y-auto xl:overflow-visible">
+            <main className="p-3 space-y-3 xl:space-y-0 xl:grid xl:grid-cols-12 xl:gap-4">
                 
                 {/* Column 1: Events (4 columns) */}
                 <div className="space-y-3 flex flex-col xl:col-span-4">

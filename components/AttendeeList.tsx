@@ -1,5 +1,6 @@
 
 import React, { useState, useEffect, useMemo, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import type { Attendee, Event } from '../types';
 import AttendeeListItem from './AttendeeListItem';
 import { PaymentStatus, PackageType } from '../types';
@@ -73,7 +74,7 @@ const FilterBottomSheet: React.FC<{
                         <button
                             key={opt.value}
                             onClick={() => handleSelect(opt.value)}
-                            className={`w-full text-left px-4 py-3 rounded-xl border-2 text-base transition-all flex justify-between items-center touch-manipulation active:scale-[0.99] ${
+                            className={`w-full text-left px-4 py-3 rounded-xl border-2 text-base transition-all flex justify-between items-center touch-manipulation ${
                                 isSelected
                                     ? 'bg-green-50 border-green-600 text-green-900 font-bold shadow-sm'
                                     : 'bg-white border-zinc-200 text-zinc-800 font-semibold hover:bg-zinc-50'
@@ -92,14 +93,24 @@ const FilterBottomSheet: React.FC<{
         </>
     );
 
-    return (
-        <div className={`fixed inset-0 z-[100] flex items-end md:items-center justify-center`} onClick={handleClose}>
+    return createPortal(
+        <div 
+            className={`fixed inset-0 z-[100] flex items-end md:items-center justify-center`} 
+            onClick={handleClose}
+            // CRITICAL FIX: Stop touch events from bubbling up to the AttendeeList component.
+            // AttendeeList has pull-to-refresh logic on touch events. If these events bubble up
+            // from the Portal (which is a React child), they trigger state updates in AttendeeList,
+            // causing re-renders that can interrupt the click event sequence on mobile.
+            onTouchStart={(e) => e.stopPropagation()}
+            onTouchMove={(e) => e.stopPropagation()}
+            onTouchEnd={(e) => e.stopPropagation()}
+        >
             {/* Backdrop with Fade In/Out */}
             <div className={`absolute inset-0 bg-black/50 ${isClosing ? 'animate-fadeOut' : 'animate-fadeIn'}`}></div>
             
             {/* Mobile Bottom Sheet (< md) */}
             <div 
-                className={`md:hidden w-full bg-white rounded-t-2xl p-4 shadow-2xl relative z-10 mb-[calc(4rem_+_env(safe-area-inset-bottom))] ${isClosing ? 'animate-slideDown' : 'animate-slideUp'}`} 
+                className={`md:hidden w-full bg-white rounded-t-2xl p-4 shadow-2xl relative z-10 pb-[calc(1rem_+_env(safe-area-inset-bottom))] ${isClosing ? 'animate-slideDown' : 'animate-slideUp'}`} 
                 onClick={e => e.stopPropagation()}
             >
                 <Content />
@@ -112,7 +123,8 @@ const FilterBottomSheet: React.FC<{
             >
                 <Content />
             </div>
-        </div>
+        </div>,
+        document.body
     );
 };
 

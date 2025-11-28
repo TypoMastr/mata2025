@@ -50,64 +50,12 @@ const PasteButton: React.FC<{ onPaste: (text: string) => void }> = ({ onPaste })
     );
 };
 
-// Componente para buscar contato da agenda (Contact Picker API)
-const ContactPickerButton: React.FC<{ onSelect: (phone: string) => void }> = ({ onSelect }) => {
-    const { addToast } = useToast();
-    const [isSupported, setIsSupported] = useState(false);
-
-    useEffect(() => {
-        // Verifica suporte à API
-        const supported = 'contacts' in navigator && 'ContactsManager' in window;
-        setIsSupported(supported);
-    }, []);
-
-    const handlePickContact = async (e: React.MouseEvent) => {
-        e.preventDefault();
-        try {
-            const props = ['tel'];
-            const opts = { multiple: false };
-            
-            // @ts-ignore - Typescript might not know about navigator.contacts yet
-            const contacts = await navigator.contacts.select(props, opts);
-            
-            if (contacts && contacts[0]) {
-                const contact = contacts[0];
-                if (contact.tel && contact.tel.length > 0) {
-                    onSelect(contact.tel[0]);
-                } else {
-                    addToast('O contato selecionado não possui telefone.', 'info');
-                }
-            }
-        } catch (err) {
-            // User cancelled or error occurred
-            console.debug('Contact picker cancelled or failed', err);
-        }
-    };
-
-    if (!isSupported) return null;
-
-    return (
-        <button
-            type="button"
-            onClick={handlePickContact}
-            className="absolute right-2 top-1/2 transform -translate-y-1/2 text-zinc-400 hover:text-green-600 p-1.5 rounded-md hover:bg-zinc-100 transition-colors z-10"
-            title="Buscar nos Contatos"
-            tabIndex={-1}
-        >
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                <path d="M8 9a3 3 0 100-6 3 3 0 000 6zM8 11a6 6 0 016 6H2a6 6 0 016-6zM16 7a1 1 0 10-2 0 1 1 0 002 0z" />
-            </svg>
-        </button>
-    );
-};
-
-const FormField: React.FC<{ label: string; id: string; error?: string; children: React.ReactNode; onPaste?: (text: string) => void; onPickContact?: (phone: string) => void; className?: string }> = ({ label, id, error, children, onPaste, onPickContact, className = '' }) => (
+const FormField: React.FC<{ label: string; id: string; error?: string; children: React.ReactNode; onPaste?: (text: string) => void; className?: string }> = ({ label, id, error, children, onPaste, className = '' }) => (
     <div className={className}>
         <label htmlFor={id} className="block text-sm font-medium text-zinc-700">{label}</label>
         <div className="mt-1 relative">
             {children}
-            {onPaste && !onPickContact && <PasteButton onPaste={onPaste} />}
-            {onPickContact && <ContactPickerButton onSelect={onPickContact} />}
+            {onPaste && <PasteButton onPaste={onPaste} />}
         </div>
         {error && <p className="mt-1 text-xs text-red-600 animate-fadeIn">{error}</p>}
     </div>
@@ -410,12 +358,6 @@ const AddAttendeeForm: React.FC<AddAttendeeFormProps> = ({ onAddAttendee, onUpda
         setFormData(prev => ({ ...prev, [field]: finalValue }));
     };
     
-    const handlePickContact = (phone: string) => {
-        const finalValue = formatPhoneNumber(phone);
-        setFormData(prev => ({ ...prev, phone: finalValue }));
-        setErrors(prev => ({ ...prev, phone: '' }));
-    };
-    
     const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const value = e.target.value;
         setPersonSearchQuery(value);
@@ -570,13 +512,7 @@ const AddAttendeeForm: React.FC<AddAttendeeFormProps> = ({ onAddAttendee, onUpda
                                     <FormField label={`Documento (CPF ou RG)${formData.packageType === PackageType.SITIO_BUS ? '' : ' - Opcional'}`} id="document" error={errors.document} onPaste={(text) => handlePaste('document', text)}>
                                         <input type="tel" id="document" name="document" value={formData.document} onChange={handleInputChange} className="block w-full px-3 py-2 bg-white border border-zinc-300 rounded-md shadow-sm sm:text-sm focus:outline-none focus:ring-green-500 focus:border-green-500 pr-8" required={formData.packageType === PackageType.SITIO_BUS} autoComplete="off" disabled={isPersonSelected} />
                                     </FormField>
-                                    <FormField 
-                                        label="Telefone (com DDD)" 
-                                        id="phone" 
-                                        error={errors.phone} 
-                                        onPaste={(text) => handlePaste('phone', text)}
-                                        onPickContact={handlePickContact}
-                                    >
+                                    <FormField label="Telefone (com DDD)" id="phone" error={errors.phone} onPaste={(text) => handlePaste('phone', text)}>
                                         <input type="tel" id="phone" name="phone" value={formData.phone} onChange={handleInputChange} placeholder="(21) 99999-9999" className="block w-full px-3 py-2 bg-white border border-zinc-300 rounded-md shadow-sm sm:text-sm focus:outline-none focus:ring-green-500 focus:border-green-500 pr-8" required autoComplete="off" disabled={isPersonSelected} />
                                     </FormField>
                                 </div>
@@ -591,13 +527,7 @@ const AddAttendeeForm: React.FC<AddAttendeeFormProps> = ({ onAddAttendee, onUpda
                                         <FormField label={`Documento (CPF ou RG)${formData.packageType === PackageType.SITIO_BUS ? '' : ' - Opcional'}`} id="document" error={errors.document} onPaste={(text) => handlePaste('document', text)}>
                                             <input type="tel" id="document" name="document" value={formData.document} onChange={handleInputChange} className="block w-full px-3 py-2 bg-white border border-zinc-300 rounded-md shadow-sm sm:text-sm pr-8" required={formData.packageType === PackageType.SITIO_BUS} autoComplete="off" />
                                         </FormField>
-                                        <FormField 
-                                            label="Telefone (com DDD)" 
-                                            id="phone" 
-                                            error={errors.phone} 
-                                            onPaste={(text) => handlePaste('phone', text)}
-                                            onPickContact={handlePickContact}
-                                        >
+                                        <FormField label="Telefone (com DDD)" id="phone" error={errors.phone} onPaste={(text) => handlePaste('phone', text)}>
                                             <input type="tel" id="phone" name="phone" value={formData.phone} onChange={handleInputChange} placeholder="(21) 99999-9999" className="block w-full px-3 py-2 bg-white border border-zinc-300 rounded-md shadow-sm sm:text-sm pr-8" required autoComplete="off" />
                                         </FormField>
                                     </div>

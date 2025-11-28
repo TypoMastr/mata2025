@@ -72,61 +72,55 @@ export const useRegistrations = (eventId: string | null) => {
             receiptUrl: null,
         };
 
-         if (formData.registerPaymentNow) {
-            if (isBusPackage) {
-                const sitePaid = formData.sitePayment.isPaid;
-                const siteExempt = formData.sitePayment.isExempt;
-                const busPaid = formData.busPayment.isPaid;
-                const busExempt = formData.busPayment.isExempt;
-                
-                const siteOk = sitePaid || siteExempt;
-                const busOk = busPaid || busExempt;
-                
-                if (siteOk && busOk) {
-                    if (siteExempt && busExempt) {
-                        paymentDetails.status = PaymentStatus.ISENTO;
-                    } else {
-                        paymentDetails.status = PaymentStatus.PAGO; 
-                    }
-                } else {
-                    paymentDetails.status = PaymentStatus.PENDENTE;
-                }
-
-                paymentDetails.sitePaymentDetails = {
-                    isPaid: sitePaid,
-                    isExempt: siteExempt,
-                    date: sitePaid && !formData.sitePayment.dateNotInformed ? new Date(formData.sitePayment.date + 'T00:00:00Z').toISOString() : undefined,
-                    type: sitePaid ? formData.sitePayment.type : undefined,
-                    receiptUrl: null,
-                };
-
-                paymentDetails.busPaymentDetails = {
-                    isPaid: busPaid,
-                    isExempt: busExempt,
-                    date: busPaid && !formData.busPayment.dateNotInformed ? new Date(formData.busPayment.date + 'T00:00:00Z').toISOString() : undefined,
-                    type: busPaid ? formData.busPayment.type : undefined,
-                    receiptUrl: null,
-                };
-            } else { // Single payment package
-                const isExempt = formData.paymentIsExempt;
-                const isPaid = formData.paymentIsPaid ?? true; // Default to true if undefined for backward compatibility/simplicity
-                
-                if (isExempt) {
-                    paymentDetails.status = PaymentStatus.ISENTO;
-                } else if (isPaid) {
-                    paymentDetails.status = PaymentStatus.PAGO;
-                    paymentDetails.date = formData.paymentDateNotInformed ? undefined : new Date(formData.paymentDate + 'T00:00:00Z').toISOString();
-                    paymentDetails.type = formData.paymentType;
-                } else {
-                    paymentDetails.status = PaymentStatus.PENDENTE;
-                }
+        if (isBusPackage) {
+            // Capture Exemptions directly from form data (always valid)
+            const siteExempt = formData.sitePayment.isExempt;
+            const busExempt = formData.busPayment.isExempt;
+            
+            // Capture Paid status ONLY if registerPaymentNow is true
+            const sitePaid = formData.registerPaymentNow ? formData.sitePayment.isPaid : false;
+            const busPaid = formData.registerPaymentNow ? formData.busPayment.isPaid : false;
+            
+            const siteOk = sitePaid || siteExempt;
+            const busOk = busPaid || busExempt;
+            
+            // Determine Global Status
+            if (siteExempt && busExempt) {
+                paymentDetails.status = PaymentStatus.ISENTO;
+            } else if (siteOk && busOk) {
+                paymentDetails.status = PaymentStatus.PAGO; 
+            } else {
+                paymentDetails.status = PaymentStatus.PENDENTE;
             }
-        } else {
-             paymentDetails.status = PaymentStatus.PENDENTE;
-             if (isBusPackage) {
-                paymentDetails.sitePaymentDetails = { isPaid: false, receiptUrl: null };
-                paymentDetails.busPaymentDetails = { isPaid: false, receiptUrl: null };
-             }
+
+            paymentDetails.sitePaymentDetails = {
+                isPaid: sitePaid,
+                isExempt: siteExempt,
+                date: sitePaid && !formData.sitePayment.dateNotInformed ? new Date(formData.sitePayment.date + 'T00:00:00Z').toISOString() : undefined,
+                type: sitePaid ? formData.sitePayment.type : undefined,
+                receiptUrl: null,
+            };
+
+            paymentDetails.busPaymentDetails = {
+                isPaid: busPaid,
+                isExempt: busExempt,
+                date: busPaid && !formData.busPayment.dateNotInformed ? new Date(formData.busPayment.date + 'T00:00:00Z').toISOString() : undefined,
+                type: busPaid ? formData.busPayment.type : undefined,
+                receiptUrl: null,
+            };
+        } else { // Single payment package
+            const isExempt = formData.paymentIsExempt;
+            const isPaid = formData.registerPaymentNow ? (formData.paymentIsPaid ?? true) : false;
+            
+            if (isExempt) {
+                paymentDetails.status = PaymentStatus.ISENTO;
+            } else if (isPaid) {
+                paymentDetails.status = PaymentStatus.PAGO;
+                paymentDetails.date = formData.paymentDateNotInformed ? undefined : new Date(formData.paymentDate + 'T00:00:00Z').toISOString();
+                paymentDetails.type = formData.paymentType;
+            } else {
+                paymentDetails.status = PaymentStatus.PENDENTE;
+            }
         }
 
         // Step 3: Create the Registration

@@ -114,13 +114,18 @@ const registrationToSupabase = (registration: Partial<Registration>): any => {
             const siteExempt = !!registration.payment.sitePaymentDetails?.isExempt;
             const busExempt = !!registration.payment.busPaymentDetails?.isExempt;
             
-            // If both are exempt, force status to ISENTO.
-            // If not fully exempt, determine PAGO vs PENDENTE based on if all parts are "Ok"
+            // Critical Fix for Regression:
+            // Previously, this logic forced status to PENDENTE if (siteOk && busOk) was false.
+            // This caused legacy records (which are marked PAGO but lack granular sub-details) to revert to PENDENTE upon any update (like bus change).
+            // Logic updated: Only force upgrade to PAGO if details are correct. 
+            // Do NOT force downgrade to PENDENTE if incoming status is already PAGO.
+            
             if (siteExempt && busExempt) {
                 record.payment_status = PaymentStatus.ISENTO;
-            } else if (registration.payment.status !== PaymentStatus.ISENTO) {
-                record.payment_status = (siteOk && busOk) ? PaymentStatus.PAGO : PaymentStatus.PENDENTE;
-            }
+            } else if (siteOk && busOk) {
+                record.payment_status = PaymentStatus.PAGO;
+            } 
+            // Else: Leave record.payment_status as registration.payment.status (set above).
             
             paymentDetails.site = registration.payment.sitePaymentDetails || { isPaid: false, receiptUrl: null };
             paymentDetails.bus = registration.payment.busPaymentDetails || { isPaid: false, receiptUrl: null };

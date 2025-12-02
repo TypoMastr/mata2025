@@ -114,6 +114,9 @@ const PaymentRecoveryModal: React.FC<PaymentRecoveryModalProps> = ({ onClose, on
             const promises = candidates
                 .filter(c => selectedIds.has(c.currentRegistration.id))
                 .map(async (c) => {
+                    // IMPORTANT: We use the *current* registration data from the database
+                    // and ONLY override the payment status. This preserves any other changes
+                    // (like manual bus assignment) that were made when the bug occurred.
                     const restored: Registration = {
                         ...c.currentRegistration,
                         payment: {
@@ -136,8 +139,9 @@ const PaymentRecoveryModal: React.FC<PaymentRecoveryModalProps> = ({ onClose, on
 
     return (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 animate-fadeIn">
-            <div className="bg-white rounded-xl shadow-lg w-full max-w-2xl max-h-[90vh] flex flex-col animate-popIn">
-                <header className="p-4 border-b border-zinc-200 flex justify-between items-center bg-red-50 rounded-t-xl">
+            {/* Reduced max-height to 85dvh for better mobile compatibility and ensured flex layout works with scrolling */}
+            <div className="bg-white rounded-xl shadow-lg w-full max-w-2xl max-h-[85dvh] flex flex-col animate-popIn overflow-hidden">
+                <header className="p-4 border-b border-zinc-200 flex justify-between items-center bg-red-50 flex-shrink-0">
                     <div className="flex items-center gap-3">
                         <div className="bg-red-100 p-2 rounded-full">
                             <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -154,7 +158,7 @@ const PaymentRecoveryModal: React.FC<PaymentRecoveryModalProps> = ({ onClose, on
                     </button>
                 </header>
                 
-                <main className="p-4 overflow-y-auto flex-grow">
+                <main className="p-4 overflow-y-auto flex-grow min-h-0">
                     {isLoading ? (
                         <div className="flex flex-col items-center justify-center py-12 text-zinc-500">
                             <SpinnerIcon />
@@ -172,7 +176,7 @@ const PaymentRecoveryModal: React.FC<PaymentRecoveryModalProps> = ({ onClose, on
                         <div>
                             <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 text-sm text-yellow-800 mb-4 flex items-start gap-2">
                                 <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 flex-shrink-0 mt-0.5" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" /></svg>
-                                <span>Encontramos <strong>{candidates.length} registros</strong> que mudaram de <strong>PAGO</strong> para <strong>PENDENTE</strong> recentemente. Selecione abaixo para restaurar.</span>
+                                <span>Encontramos <strong>{candidates.length} registros</strong> que mudaram de <strong>PAGO</strong> para <strong>PENDENTE</strong> recentemente. Selecione abaixo para restaurar o status PAGO (sem alterar o ônibus atual).</span>
                             </div>
                             
                             <div className="flex justify-between items-center mb-2 px-1">
@@ -202,6 +206,11 @@ const PaymentRecoveryModal: React.FC<PaymentRecoveryModalProps> = ({ onClose, on
                                                     <span>Alterado em: {changeTime}</span>
                                                 </p>
                                                 <p className="text-xs text-zinc-400 mt-0.5 truncate">{history.description.split('\n')[0]}</p>
+                                                {currentRegistration.busNumber && (
+                                                    <p className="text-xs text-blue-600 mt-0.5 font-medium">
+                                                        Ônibus Atual: {currentRegistration.busNumber}
+                                                    </p>
+                                                )}
                                             </div>
                                             <div className="flex flex-col items-end gap-1 ml-2">
                                                 <span className="text-xs font-bold text-green-700 bg-green-100 px-2 py-0.5 rounded-full">Pago</span>
@@ -216,7 +225,7 @@ const PaymentRecoveryModal: React.FC<PaymentRecoveryModalProps> = ({ onClose, on
                     )}
                 </main>
 
-                <footer className="p-4 border-t border-zinc-200 flex justify-end gap-3 bg-zinc-50 rounded-b-xl">
+                <footer className="p-4 border-t border-zinc-200 flex justify-end gap-3 bg-zinc-50 flex-shrink-0">
                     <button onClick={onClose} disabled={isRestoring} className="px-4 py-2 bg-white border border-zinc-300 rounded-full font-bold text-zinc-700 hover:bg-zinc-50 transition-colors disabled:opacity-50">
                         Cancelar
                     </button>

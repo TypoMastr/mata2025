@@ -107,25 +107,28 @@ const registrationToSupabase = (registration: Partial<Registration>): any => {
         record.payment_status = registration.payment.status;
         const paymentDetails: { [key: string]: any } = {};
         if (registration.packageType === PackageType.SITIO_BUS) {
-            // FIX: Consider "Paid" if it is explicitly paid OR if it is exempt.
+            // Check implicit status based on partial details
             const siteOk = !!registration.payment.sitePaymentDetails?.isPaid || !!registration.payment.sitePaymentDetails?.isExempt;
             const busOk = !!registration.payment.busPaymentDetails?.isPaid || !!registration.payment.busPaymentDetails?.isExempt;
             
             const siteExempt = !!registration.payment.sitePaymentDetails?.isExempt;
             const busExempt = !!registration.payment.busPaymentDetails?.isExempt;
             
-            // Critical Fix for Regression:
-            // Previously, this logic forced status to PENDENTE if (siteOk && busOk) was false.
-            // This caused legacy records (which are marked PAGO but lack granular sub-details) to revert to PENDENTE upon any update (like bus change).
-            // Logic updated: Only force upgrade to PAGO if details are correct. 
-            // Do NOT force downgrade to PENDENTE if incoming status is already PAGO.
+            // Logic Fix: 
+            // 1. If everything is marked Exempt/Paid in details -> Force PAGO/ISENTO.
+            // 2. If details are NOT fully paid, BUT the incoming status is ALREADY PAGO (legacy data) -> Keep PAGO.
+            // 3. Otherwise -> PENDENTE.
             
             if (siteExempt && busExempt) {
                 record.payment_status = PaymentStatus.ISENTO;
             } else if (siteOk && busOk) {
                 record.payment_status = PaymentStatus.PAGO;
-            } 
-            // Else: Leave record.payment_status as registration.payment.status (set above).
+            } else if (registration.payment.status === PaymentStatus.PAGO) {
+                // Preserves 'PAGO' status for legacy records that might lack granular site/bus payment flags
+                record.payment_status = PaymentStatus.PAGO;
+            } else {
+                record.payment_status = PaymentStatus.PENDENTE;
+            }
             
             paymentDetails.site = registration.payment.sitePaymentDetails || { isPaid: false, receiptUrl: null };
             paymentDetails.bus = registration.payment.busPaymentDetails || { isPaid: false, receiptUrl: null };

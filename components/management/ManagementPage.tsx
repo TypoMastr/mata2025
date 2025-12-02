@@ -3,7 +3,9 @@ import React, { useState, useEffect, useMemo } from 'react';
 import type { Event, View, ActionHistory } from '../../types';
 import EventForm from './EventForm';
 import ConfirmDeleteEvent from '../ConfirmDeleteEvent';
+import PaymentRecoveryModal from './PaymentRecoveryModal';
 import * as authService from '../../services/authService';
+import { useToast } from '../../contexts/ToastContext';
 
 interface ManagementPageProps {
     events: Event[];
@@ -107,7 +109,9 @@ const formatDate = (dateString?: string) => {
 };
 
 const ManagementPage: React.FC<ManagementPageProps> = ({ events, onAddEvent, onUpdateEvent, onDeleteEvent, onLogout, selectedEventId, onEventChange, setView, latestHistory }) => {
+    const { addToast } = useToast();
     const [isFormOpen, setIsFormOpen] = useState(false);
+    const [isRecoveryOpen, setIsRecoveryOpen] = useState(false);
     const [eventToEdit, setEventToEdit] = useState<Event | null>(null);
     const [eventToDelete, setEventToDelete] = useState<Event | null>(null);
     const [openMenuId, setOpenMenuId] = useState<string | null>(null);
@@ -162,6 +166,7 @@ const ManagementPage: React.FC<ManagementPageProps> = ({ events, onAddEvent, onU
     }, [openMenuId]);
 
     const IconDatabase = <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M20.25 6.375c0 2.278-3.694 4.125-8.25 4.125S3.75 8.653 3.75 6.375m16.5 0c0-2.278-3.694-4.125-8.25-4.125S3.75 4.097 3.75 6.375m16.5 0v11.25c0 2.278-3.694 4.125-8.25 4.125s-8.25-1.847-8.25-4.125V6.375m16.5 0v3.75m-16.5-3.75v3.75m16.5 0v3.75C20.25 16.153 16.556 18 12 18s-8.25-1.847-8.25-4.125v-3.75m16.5 0c0 2.278-3.694 4.125-8.25 4.125s-8.25-1.847-8.25-4.125" /></svg>;
+    const IconTool = <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M11.42 15.17L17.25 21A2.652 2.652 0 0021 17.25l-5.877-5.877M11.42 15.17l2.496-3.03c.317-.384.74-.626 1.208-.766M11.42 15.17l-4.655 5.653a2.548 2.548 0 11-3.586-3.586l6.837-5.63m5.108-.233c.55-.164 1.163-.188 1.743-.014a4.5 4.5 0 00-6.338-6.338c.186.58.163 1.193-.014 1.743.661.544 1.373 1.083 2.124 1.606.752.522 1.29 1.234 2.485 3.003z" /></svg>;
 
     return (
         <div className="animate-fadeIn">
@@ -318,7 +323,7 @@ const ManagementPage: React.FC<ManagementPageProps> = ({ events, onAddEvent, onU
                      <div className="bg-white p-3 rounded-xl border border-zinc-200 shadow-sm">
                         <h2 className="text-lg font-bold text-zinc-700 mb-2">Configurações</h2>
                         {/* Settings Grid: Side by side on medium+ screens */}
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
                             <InfoCard icon={IconDatabase} title="Banco de Dados" delay={50}>
                                 <p className="text-xs text-zinc-600 mb-2">
                                     Gerencie a lista central de pessoas.
@@ -328,6 +333,17 @@ const ManagementPage: React.FC<ManagementPageProps> = ({ events, onAddEvent, onU
                                     className="w-full bg-blue-500 text-white font-bold py-1.5 px-4 rounded-full hover:bg-blue-600 transition-colors shadow-sm text-xs"
                                 >
                                     Gerenciar Pessoas
+                                </button>
+                            </InfoCard>
+                            <InfoCard icon={IconTool} title="Recuperação" delay={75}>
+                                <p className="text-xs text-zinc-600 mb-2">
+                                    Corrija pagamentos alterados indevidamente para "Pendente".
+                                </p>
+                                <button
+                                    onClick={() => setIsRecoveryOpen(true)}
+                                    className="w-full bg-orange-500 text-white font-bold py-1.5 px-4 rounded-full hover:bg-orange-600 transition-colors shadow-sm text-xs"
+                                >
+                                    Recuperar Status
                                 </button>
                             </InfoCard>
                             <BiometricsCard />
@@ -349,6 +365,17 @@ const ManagementPage: React.FC<ManagementPageProps> = ({ events, onAddEvent, onU
                     event={eventToEdit}
                     onSave={eventToEdit ? onUpdateEvent : onAddEvent}
                     onClose={handleCloseForm}
+                />
+            )}
+
+            {isRecoveryOpen && (
+                <PaymentRecoveryModal
+                    onClose={() => setIsRecoveryOpen(false)}
+                    onSuccess={() => {
+                        addToast('Registros recuperados com sucesso!', 'success');
+                        // Refresh logic happens via the component using context or prop if needed, 
+                        // but since history and list refresh when accessing them, basic success message is enough for now.
+                    }}
                 />
             )}
         </div>

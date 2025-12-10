@@ -22,7 +22,7 @@
         overscroll-behavior: none;
         color-scheme: light;
         -webkit-font-smoothing: antialiased;
-        background-color: #FAFAFA; /* Zinc-50 match */
+        background-color: #FAFAFA; /* Fallback for zinc-50 */
       }
       
       #root {
@@ -138,10 +138,11 @@
   "imports": {
     "react/": "https://aistudiocdn.com/react@^19.2.0/",
     "react": "https://aistudiocdn.com/react@^19.2.0",
+    "react-dom/client": "https://aistudiocdn.com/react-dom@^19.2.0/client",
     "react-dom/": "https://aistudiocdn.com/react-dom@^19.2.0/",
+    "react-dom": "https://aistudiocdn.com/react-dom@^19.2.0",
     "@google/genai": "https://aistudiocdn.com/@google/genai@^1.29.0",
-    "@supabase/supabase-js": "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm",
-    "react-dom": "https://aistudiocdn.com/react-dom@^19.2.0"
+    "@supabase/supabase-js": "https://esm.sh/@supabase/supabase-js@2"
   }
 }
 </script>

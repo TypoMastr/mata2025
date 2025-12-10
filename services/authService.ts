@@ -1,4 +1,3 @@
-
 const CREDENTIAL_ID_KEY = 'webauthnCredentialId';
 
 // Helper functions to convert between ArrayBuffer and Base64URL
@@ -33,7 +32,7 @@ export const isBiometricSupportAvailable = (): boolean => {
 // Register a new biometric credential
 export const registerBiometricCredential = async (): Promise<void> => {
     if (!isBiometricSupportAvailable()) {
-        throw new Error('Biometric authentication is not supported on this browser.');
+        throw new Error('Biometria não é suportada neste navegador.');
     }
 
     const challenge = new Uint8Array(32);
@@ -46,14 +45,16 @@ export const registerBiometricCredential = async (): Promise<void> => {
         challenge,
         rp: {
             name: 'Gira da Mata',
-            id: window.location.hostname,
         },
         user: {
             id: userId,
             name: 'usuario@giradamata',
             displayName: 'Usuário Gira da Mata',
         },
-        pubKeyCredParams: [{ type: 'public-key', alg: -7 }], // ES256
+        pubKeyCredParams: [
+            { type: 'public-key', alg: -7 },   // ES256
+            { type: 'public-key', alg: -257 }, // RS256
+        ],
         authenticatorSelection: {
             authenticatorAttachment: 'platform',
             userVerification: 'required',
@@ -63,15 +64,34 @@ export const registerBiometricCredential = async (): Promise<void> => {
         attestation: 'none',
     };
 
-    const credential = await navigator.credentials.create({
-        publicKey: publicKeyCredentialCreationOptions,
-    }) as PublicKeyCredential;
+    try {
+        const credential = await navigator.credentials.create({
+            publicKey: publicKeyCredentialCreationOptions,
+        }) as PublicKeyCredential;
 
-    if (credential && credential.rawId) {
-        const credentialIdBase64Url = bufferToBase64Url(credential.rawId);
-        localStorage.setItem(CREDENTIAL_ID_KEY, credentialIdBase64Url);
-    } else {
-        throw new Error('Credential creation failed.');
+        if (credential && credential.rawId) {
+            const credentialIdBase64Url = bufferToBase64Url(credential.rawId);
+            localStorage.setItem(CREDENTIAL_ID_KEY, credentialIdBase64Url);
+        } else {
+            throw new Error('A criação da credencial falhou.');
+        }
+    } catch (err: any) {
+        console.error("Biometric registration failed:", err.name, err.message);
+        
+        const errorMessage = (err.message || '').toLowerCase();
+
+        if (err.name === 'NotAllowedError') {
+            throw new Error('Operação cancelada pelo usuário.');
+        }
+        
+        // Broader check for iframe/permission errors, which is the most likely cause
+        // for the "publickey-credentials-create" feature not being enabled.
+        if (err.name === 'SecurityError' || errorMessage.includes('publickey-credentials-create') || errorMessage.includes('permissions policy')) {
+            throw new Error('Biometria indisponível no ambiente de preview (iframe). Funciona em produção.');
+        }
+
+        // Generic fallback for other potential issues
+        throw new Error(err.message || 'Falha desconhecida ao registrar biometria.');
     }
 };
 

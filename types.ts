@@ -24,6 +24,22 @@ export enum PaymentType {
     DINHEIRO = 'Dinheiro',
 }
 
+export enum FinancialRecordType {
+    INCOME = 'receita',
+    EXPENSE = 'despesa',
+}
+
+export interface FinancialRecord {
+    id: string;
+    eventId: string;
+    type: FinancialRecordType;
+    description: string;
+    amount: number;
+    date: string;
+    created_at?: string;
+    is_deleted?: boolean;
+}
+
 export interface PartialPaymentDetails {
     isPaid: boolean;
     isExempt?: boolean;
@@ -114,7 +130,7 @@ export type AttendeeFormData = RegistrationFormData; // Alias for form compatibi
 export type ReportField = 'person.name' | 'person.document' | 'person.phone' | 'packageType' | 'payment.status' | 'payment.amount';
 
 export interface ReportConfig {
-    type: 'custom' | 'busList';
+    type: 'custom' | 'busList' | 'financialSummary';
     fields: ReportField[];
     filters: {
         status: 'all' | PaymentStatus;
@@ -147,6 +163,7 @@ export interface ActionHistory {
     previous_data: any | null;
     new_data: any | null;
     description: string;
+    actor?: string; // Quem realizou a ação
     ip_address?: string;
     location_info?: any;
     is_undone: boolean;

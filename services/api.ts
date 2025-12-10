@@ -1,7 +1,6 @@
-
 import { createClient } from '@supabase/supabase-js';
-import type { Registration, Payment, Person, Event, ActionHistory } from '../types';
-import { PackageType, PaymentStatus } from '../types';
+import type { Registration, Payment, Person, Event, ActionHistory, FinancialRecord } from '../types';
+import { PackageType, PaymentStatus, FinancialRecordType } from '../types';
 
 // --- Supabase Client Setup ---
 const supabaseUrl = 'https://bjuzljwcbtnzylyirkzu.supabase.co';
@@ -42,6 +41,7 @@ const logAction = async (
     new_data: any
 ) => {
     const ipInfo = await getIpInfo();
+    const currentUser = sessionStorage.getItem('currentUser') || 'Sistema';
 
     const logEntry = {
         action_type,
@@ -50,6 +50,7 @@ const logAction = async (
         description,
         previous_data,
         new_data,
+        actor: currentUser,
         ip_address: ipInfo?.ip_address,
         location_info: ipInfo?.location_info,
     };
@@ -107,28 +108,19 @@ const registrationToSupabase = (registration: Partial<Registration>): any => {
         record.payment_status = registration.payment.status;
         const paymentDetails: { [key: string]: any } = {};
         if (registration.packageType === PackageType.SITIO_BUS) {
-            // Check implicit status based on partial details
+            // FIX: Consider "Paid" if it is explicitly paid OR if it is exempt.
             const siteOk = !!registration.payment.sitePaymentDetails?.isPaid || !!registration.payment.sitePaymentDetails?.isExempt;
             const busOk = !!registration.payment.busPaymentDetails?.isPaid || !!registration.payment.busPaymentDetails?.isExempt;
             
             const siteExempt = !!registration.payment.sitePaymentDetails?.isExempt;
             const busExempt = !!registration.payment.busPaymentDetails?.isExempt;
             
-            // Logic Fix: 
-            // 1. If everything is marked Exempt/Paid in details -> Force PAGO/ISENTO.
-            // 2. If details are NOT fully paid, BUT the incoming status is ALREADY PAGO (legacy data) -> Keep PAGO.
-            // 3. Otherwise -> PENDENTE.
-            
             if (siteExempt && busExempt) {
                 record.payment_status = PaymentStatus.ISENTO;
             } else if (siteOk && busOk) {
                 record.payment_status = PaymentStatus.PAGO;
-            } else if (registration.payment.status === PaymentStatus.PAGO) {
-                // Preserves 'PAGO' status for legacy records that might lack granular site/bus payment flags
-                record.payment_status = PaymentStatus.PAGO;
-            } else {
-                record.payment_status = PaymentStatus.PENDENTE;
-            }
+            } 
+            // Else: Leave record.payment_status as registration.payment.status (set above).
             
             paymentDetails.site = registration.payment.sitePaymentDetails || { isPaid: false, receiptUrl: null };
             paymentDetails.bus = registration.payment.busPaymentDetails || { isPaid: false, receiptUrl: null };
@@ -151,6 +143,24 @@ const eventToSupabase = (event: Partial<Event>): any => ({
     site_price: event.site_price, bus_price: event.bus_price, pix_key: event.pix_key,
     bus_departure_time: event.bus_departure_time, bus_return_time: event.bus_return_time,
     payment_deadline: event.payment_deadline, is_deleted: event.is_deleted, is_archived: event.is_archived,
+});
+
+const financialRecordFromSupabase = (record: any): FinancialRecord => ({
+    id: record.id,
+    eventId: record.event_id,
+    type: record.type,
+    description: record.description,
+    amount: record.amount,
+    date: record.date,
+    created_at: record.created_at,
+});
+
+const financialRecordToSupabase = (record: Partial<FinancialRecord>): any => ({
+    event_id: record.eventId,
+    type: record.type,
+    description: record.description,
+    amount: record.amount,
+    date: record.date,
 });
 
 // --- Contextual Description Generator ---
@@ -249,6 +259,17 @@ const generateActionDescription = async (action_type: string, previous_data: any
                 }
                 return `Dados do evento '${after.name}' atualizados.`;
             }
+            case 'CREATE_FINANCIAL': {
+                const type = new_data.type === FinancialRecordType.INCOME ? 'receita' : 'despesa';
+                return `Nova ${type} registrada: ${new_data.description} (R$ ${new_data.amount.toFixed(2)}).`;
+            }
+            case 'DELETE_FINANCIAL': {
+                const type = previous_data.type === FinancialRecordType.INCOME ? 'Receita' : 'Despesa';
+                return `${type} '${previous_data.description}' excluída.`;
+            }
+            case 'UPDATE_FINANCIAL': {
+                return `Registro financeiro '${new_data.description}' atualizado.`;
+            }
             case 'UNDO_ACTION': return `Ação "${previous_data.description.split('\n')[0]}" foi desfeita.`;
             default: return `Ação do tipo ${action_type} executada.`;
         }
@@ -262,7 +283,7 @@ const generateActionDescription = async (action_type: string, previous_data: any
 // --- Schema Verification ---
 export const verifySchema = async (): Promise<{ success: boolean, missingIn: string[] }> => {
     const columnChecks = ['people', 'events', 'event_registrations'];
-    const tableChecks = ['action_history'];
+    const tableChecks = ['action_history', 'financial_records'];
     const missingIn: string[] = [];
 
     // Check for missing columns
@@ -285,6 +306,16 @@ export const verifySchema = async (): Promise<{ success: boolean, missingIn: str
         
     if (wontAttendError && wontAttendError.message.includes('does not exist')) {
         missingIn.push('column:wont_attend:event_registrations');
+    }
+    
+    // Check for actor in action_history
+    const { error: actorError } = await supabase
+        .from('action_history')
+        .select('actor')
+        .limit(1);
+        
+    if (actorError && actorError.message.includes('does not exist')) {
+        missingIn.push('column:actor:action_history');
     }
 
     // Check for missing tables
@@ -525,6 +556,61 @@ export const deleteEvent = async (eventId: string): Promise<void> => {
     await logAction('DELETE_EVENT', 'events', eventId, description, beforeData, { ...beforeData, is_deleted: true });
 };
 
+// FINANCIAL RECORDS
+export const fetchFinancialRecords = async (eventId: string): Promise<FinancialRecord[]> => {
+    const { data, error } = await supabase.from('financial_records')
+        .select('*')
+        .eq('event_id', eventId)
+        .eq('is_deleted', false)
+        .order('date', { ascending: false });
+    
+    if (error) throw new Error(`Failed to fetch financial records: ${error.message}`);
+    return data.map(financialRecordFromSupabase);
+};
+
+export const createFinancialRecord = async (record: Omit<FinancialRecord, 'id' | 'created_at'>): Promise<FinancialRecord> => {
+    const { data, error } = await supabase.from('financial_records')
+        .insert({ ...financialRecordToSupabase(record), is_deleted: false })
+        .select()
+        .single();
+    
+    if (error) throw new Error(`Failed to create financial record: ${error.message}`);
+    const newRecord = financialRecordFromSupabase(data);
+    const description = await generateActionDescription('CREATE_FINANCIAL', null, newRecord);
+    await logAction('CREATE_FINANCIAL', 'financial_records', newRecord.id, description, null, newRecord);
+    return newRecord;
+};
+
+export const updateFinancialRecord = async (record: FinancialRecord): Promise<FinancialRecord> => {
+    const { data: beforeData, error: beforeError } = await supabase.from('financial_records').select('*').eq('id', record.id).single();
+    if (beforeError) throw new Error(beforeError.message);
+
+    const { data, error } = await supabase.from('financial_records')
+        .update(financialRecordToSupabase(record))
+        .eq('id', record.id)
+        .select()
+        .single();
+        
+    if (error) throw new Error(`Failed to update financial record: ${error.message}`);
+    const updatedRecord = financialRecordFromSupabase(data);
+    const description = await generateActionDescription('UPDATE_FINANCIAL', financialRecordFromSupabase(beforeData), updatedRecord);
+    await logAction('UPDATE_FINANCIAL', 'financial_records', updatedRecord.id, description, financialRecordFromSupabase(beforeData), updatedRecord);
+    return updatedRecord;
+};
+
+export const deleteFinancialRecord = async (recordId: string): Promise<void> => {
+    const { data: beforeData, error: beforeError } = await supabase.from('financial_records').select('*').eq('id', recordId).single();
+    if (beforeError) throw new Error(beforeError.message);
+
+    const { error } = await supabase.from('financial_records').update({ is_deleted: true }).eq('id', recordId);
+    if (error) throw new Error(`Failed to delete financial record: ${error.message}`);
+    
+    const record = financialRecordFromSupabase(beforeData);
+    const description = await generateActionDescription('DELETE_FINANCIAL', record, null);
+    await logAction('DELETE_FINANCIAL', 'financial_records', recordId, description, record, { ...record, is_deleted: true });
+};
+
+
 // HISTORY
 export const fetchHistory = async (limit?: number): Promise<ActionHistory[]> => {
     let query = supabase.from('action_history').select('*').order('created_at', { ascending: false });
@@ -560,11 +646,12 @@ export const undoAction = async (historyId: string, password: string): Promise<v
         if (table_name === 'events') dataToRestore = eventToSupabase(previous_data);
         else if (table_name === 'people') dataToRestore = personToSupabase(previous_data);
         else if (table_name === 'event_registrations') dataToRestore = registrationToSupabase(fromSupabase(previous_data));
+        else if (table_name === 'financial_records') dataToRestore = financialRecordToSupabase(previous_data);
         else dataToRestore = previous_data;
 
         // Remove fields that shouldn't be in an update payload
         const { id, created_at, registration_date, person, people, ...restorePayload } = dataToRestore;
-        delete restorePayload.person_id; // prevent trying to update person_id relation
+        if (restorePayload.person_id) delete restorePayload.person_id; 
 
         const { error } = await supabase.from(table_name).update(restorePayload).eq('id', record_id);
         undoError = error;

@@ -1,9 +1,10 @@
+
 {
   "name": "Gira da Mata",
   "short_name": "Gira da Mata",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#F4F4F5",
+  "background_color": "#FAFAFA",
   "theme_color": "#10B981",
   "description": "Painel de controle para o evento Gira da Mata 2025.",
   "icons": [

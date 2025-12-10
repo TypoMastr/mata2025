@@ -1,3 +1,4 @@
+
 // Note: The static import of GoogleGenAI has been removed to prevent a load-time crash.
 import type { Attendee, Event } from '../types';
 import { PackageType, PaymentStatus } from "../types";
@@ -12,7 +13,15 @@ export const generateReport = async (attendees: Attendee[], buses: BusInfo[], ev
     try {
         // Dynamically import the Google AI library only when this function is called.
         const { GoogleGenAI } = await import('@google/genai');
-        const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+        
+        // Safety check for process.env in browser environments
+        const apiKey = (typeof process !== 'undefined' && process.env) ? process.env.API_KEY : undefined;
+        
+        if (!apiKey) {
+             throw new Error('API Key must be set (process.env.API_KEY)');
+        }
+
+        const ai = new GoogleGenAI({ apiKey });
         const model = 'gemini-2.5-flash';
         
         const eventName = event?.name || "o evento atual";
@@ -47,11 +56,11 @@ export const generateReport = async (attendees: Attendee[], buses: BusInfo[], ev
             model: model,
             contents: prompt,
         });
-        return response.text;
+        return response.text || "Sem resposta do modelo.";
     } catch (error) {
         console.error("Error generating report with Gemini API:", error);
-        if (error instanceof Error && error.message.includes('API Key must be set')) {
-            return "Erro de Configuração: A chave da API do Google AI não foi fornecida. O administrador do sistema precisa configurar a variável de ambiente API_KEY para que este recurso funcione.";
+        if (error instanceof Error && error.message.includes('API Key')) {
+            return "Erro de Configuração: A chave da API do Google AI não foi detectada neste ambiente. No Vercel/Local ela é carregada via .env, mas aqui pode estar ausente.";
         }
         return "Ocorreu um erro ao gerar o relatório. Por favor, tente novamente mais tarde.";
     }

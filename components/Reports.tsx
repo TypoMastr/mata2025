@@ -1,12 +1,12 @@
 
-import React, { useState, useMemo } from 'react';
-// FIX: Import Event type
-import type { Attendee, ReportConfig, ReportField, Event } from '../types';
-import { PackageType, PaymentStatus, DocumentType, PaymentType } from '../types';
+import React, { useState, useMemo, useEffect } from 'react';
+import type { Attendee, ReportConfig, ReportField, Event, FinancialRecord } from '../types';
+import { PackageType, PaymentStatus, DocumentType, PaymentType, FinancialRecordType } from '../types';
 import { formatDocument, getDocumentType } from '../utils/formatters';
 import { levenshteinDistance } from '../utils/stringSimilarity';
 import { useToast } from '../contexts/ToastContext';
 import { generateReport } from '../services/geminiService';
+import * as api from '../services/api';
 
 // --- Componente: Modal de Confirmação de Mudança de Ônibus ---
 const SpinnerIconModal: React.FC = () => (
@@ -35,21 +35,18 @@ const BusChangeConfirmationModal: React.FC<BusChangeConfirmationModalProps> = ({
         if (assignmentType === 'auto' && newBusNumber !== null) {
             return {
                 title: "Confirmar Designação Manual",
-                // FIX: Access name from the nested person object.
                 description: `Você está movendo "${attendee.person.name}" para o Ônibus ${newBusNumber}. Isso o tornará um passageiro designado manualmente e o fixará neste ônibus. Deseja continuar?`,
             };
         }
         if (currentBusNumber !== null && newBusNumber !== null && currentBusNumber !== newBusNumber) {
             return {
                 title: "Confirmar Mudança de Ônibus",
-                // FIX: Access name from the nested person object.
                 description: `Você tem certeza que deseja mover "${attendee.person.name}" do Ônibus ${currentBusNumber} para o Ônibus ${newBusNumber}?`,
             };
         }
         if (currentBusNumber !== null && newBusNumber === null) {
             return {
                 title: "Remover Designação Manual",
-                // FIX: Access name from the nested person object.
                 description: `Você está removendo a designação manual de "${attendee.person.name}". Ele voltará a ser alocado automaticamente em um ônibus com vagas. Deseja continuar?`,
             };
         }
@@ -72,6 +69,42 @@ const BusChangeConfirmationModal: React.FC<BusChangeConfirmationModalProps> = ({
                     <button type="button" onClick={onConfirm} disabled={isSaving} className="w-full justify-center rounded-full border border-transparent shadow-sm px-4 py-2 bg-green-600 text-base font-medium text-white hover:bg-green-700 sm:w-auto sm:text-sm disabled:bg-green-400 flex items-center gap-2 min-w-[110px]">
                         {isSaving ? <SpinnerIconModal /> : null}
                         {isSaving ? 'Salvando...' : 'Confirmar'}
+                    </button>
+                </div>
+            </div>
+        </div>
+    );
+};
+
+// --- Modal de Confirmação de Exclusão Financeira ---
+const ConfirmFinancialDeleteModal: React.FC<{
+    record: FinancialRecord;
+    onConfirm: () => void;
+    onCancel: () => void;
+    isDeleting: boolean;
+}> = ({ record, onConfirm, onCancel, isDeleting }) => {
+    return (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 animate-fadeIn">
+            <div className="bg-white rounded-xl shadow-lg p-6 max-w-sm w-full animate-popIn">
+                <div className="flex flex-col items-center text-center">
+                    <div className="mx-auto flex-shrink-0 flex items-center justify-center h-12 w-12 rounded-full bg-red-100 mb-4">
+                        <svg className="h-6 w-6 text-red-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                        </svg>
+                    </div>
+                    <h3 className="text-lg leading-6 font-bold text-zinc-900">Excluir Movimentação</h3>
+                    <p className="mt-2 text-sm text-zinc-600">
+                        Tem certeza que deseja excluir a {record.type === FinancialRecordType.INCOME ? 'receita' : 'despesa'} 
+                        <strong> "{record.description}"</strong> de R$ {record.amount.toFixed(2).replace('.', ',')}?
+                    </p>
+                </div>
+                <div className="mt-5 sm:mt-6 flex flex-col-reverse sm:flex-row sm:justify-center gap-3">
+                    <button onClick={onCancel} disabled={isDeleting} className="w-full justify-center rounded-full border border-zinc-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-zinc-700 hover:bg-zinc-50 sm:w-auto sm:text-sm">
+                        Cancelar
+                    </button>
+                    <button onClick={onConfirm} disabled={isDeleting} className="w-full justify-center rounded-full border border-transparent shadow-sm px-4 py-2 bg-red-600 text-base font-medium text-white hover:bg-red-700 sm:w-auto sm:text-sm disabled:bg-red-400 flex items-center justify-center gap-2">
+                        {isDeleting ? <SpinnerIconModal /> : null}
+                        {isDeleting ? 'Excluindo...' : 'Excluir'}
                     </button>
                 </div>
             </div>
@@ -110,8 +143,12 @@ const ShareOptionsModal: React.FC<{
 
 
 // --- Componente: Formulário de Geração de Relatório ---
-const InteractiveReportForm: React.FC<{ onGenerate: (config: ReportConfig) => void; onCancel: () => void; }> = ({ onGenerate, onCancel }) => {
-    // FIX: Use correct ReportField values with dot notation for person fields.
+interface InteractiveReportFormProps { 
+    onGenerate: (config: ReportConfig) => void; 
+    onCancel: () => void; 
+    initialReportType?: 'custom' | 'busList' | 'financialSummary';
+}
+const InteractiveReportForm: React.FC<InteractiveReportFormProps> = ({ onGenerate, onCancel, initialReportType = 'custom' }) => {
     const allFields: { id: ReportField; label: string }[] = [
         { id: 'person.name', label: 'Nome' },
         { id: 'person.document', label: 'Documento' },
@@ -121,8 +158,7 @@ const InteractiveReportForm: React.FC<{ onGenerate: (config: ReportConfig) => vo
         { id: 'payment.amount', label: 'Valor' },
     ];
 
-    const [reportType, setReportType] = useState<'custom' | 'busList'>('custom');
-    // FIX: Use correct ReportField values for initial state.
+    const [reportType, setReportType] = useState<'custom' | 'busList' | 'financialSummary'>(initialReportType);
     const [selectedFields, setSelectedFields] = useState<ReportField[]>(['person.name', 'person.phone', 'packageType', 'payment.status']);
     const [statusFilter, setStatusFilter] = useState<'all' | PaymentStatus>('all');
     const [packageFilter, setPackageFilter] = useState<'all' | PackageType>('all');
@@ -139,13 +175,13 @@ const InteractiveReportForm: React.FC<{ onGenerate: (config: ReportConfig) => vo
         }
         onGenerate({
             type: reportType,
-            // FIX: Use correct ReportField values for bus list.
             fields: reportType === 'busList' ? ['person.name', 'person.document', 'person.phone'] : selectedFields,
             filters: { status: statusFilter, packageType: packageFilter }
         });
     };
     
     const isCustomMode = reportType === 'custom';
+    const isFinancialMode = reportType === 'financialSummary';
 
     return (
         <div className="animate-fadeIn">
@@ -158,19 +194,23 @@ const InteractiveReportForm: React.FC<{ onGenerate: (config: ReportConfig) => vo
             <main className="p-4 space-y-6">
                  <div className="opacity-0 animate-fadeInUp" style={{ animationFillMode: 'forwards', animationDelay: '100ms' }}>
                     <h3 className="text-md font-semibold text-zinc-700 mb-2">1. Escolha o tipo de relatório</h3>
-                    <div className="grid grid-cols-2 gap-2 bg-white p-4 rounded-xl border border-zinc-200 shadow-sm">
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 bg-white p-4 rounded-xl border border-zinc-200 shadow-sm">
                         <label className="flex items-center space-x-2 p-2 rounded-md hover:bg-zinc-50 cursor-pointer">
                             <input type="radio" name="reportType" value="custom" checked={isCustomMode} onChange={() => setReportType('custom')} className="h-4 w-4 text-green-600 focus:ring-green-500 border-zinc-300"/>
                             <span className="text-sm text-zinc-700 font-medium">Lista Personalizada</span>
                         </label>
                         <label className="flex items-center space-x-2 p-2 rounded-md hover:bg-zinc-50 cursor-pointer">
-                            <input type="radio" name="reportType" value="busList" checked={!isCustomMode} onChange={() => setReportType('busList')} className="h-4 w-4 text-green-600 focus:ring-green-500 border-zinc-300"/>
+                            <input type="radio" name="reportType" value="busList" checked={reportType === 'busList'} onChange={() => setReportType('busList')} className="h-4 w-4 text-green-600 focus:ring-green-500 border-zinc-300"/>
                             <span className="text-sm text-zinc-700 font-medium">Lista de Passageiros</span>
+                        </label>
+                        <label className="flex items-center space-x-2 p-2 rounded-md hover:bg-zinc-50 cursor-pointer">
+                            <input type="radio" name="reportType" value="financialSummary" checked={isFinancialMode} onChange={() => setReportType('financialSummary')} className="h-4 w-4 text-green-600 focus:ring-green-500 border-zinc-300"/>
+                            <span className="text-sm text-zinc-700 font-medium">Financeiro Completo</span>
                         </label>
                     </div>
                 </div>
 
-                <div className={`transition-opacity duration-300 ${!isCustomMode ? 'opacity-50 pointer-events-none' : 'opacity-100'}`}>
+                <div className={`transition-opacity duration-300 ${isFinancialMode ? 'opacity-50 pointer-events-none' : 'opacity-100'}`}>
                     <div className="md:grid md:grid-cols-2 md:gap-6 space-y-6 md:space-y-0">
                         <div className="opacity-0 animate-fadeInUp" style={{ animationFillMode: 'forwards', animationDelay: '200ms' }}>
                             <h3 className="text-md font-semibold text-zinc-700 mb-2">2. Selecione os campos</h3>
@@ -224,11 +264,24 @@ const InteractiveReportForm: React.FC<{ onGenerate: (config: ReportConfig) => vo
 };
 
 // --- Componente: Visualização do Relatório ---
-const InteractiveReportPreview: React.FC<{ data: Attendee[] | Attendee[][]; config: ReportConfig; onBack: () => void; }> = ({ data, config, onBack }) => {
+interface InteractiveReportPreviewProps { 
+    data: Attendee[] | Attendee[][]; 
+    config: ReportConfig; 
+    onBack: () => void; 
+    event: Event | null; // Added
+    confirmedRevenue: number; // Added
+    extraIncome: number; // Added
+    extraExpenses: number; // Added
+    netProfit: number; // Added
+    attendees: Attendee[]; // Added
+    // Add extraRecords to the interface
+    extraRecords: FinancialRecord[];
+}
+
+const InteractiveReportPreview: React.FC<InteractiveReportPreviewProps> = ({ data, config, onBack, event, confirmedRevenue, extraIncome, extraExpenses, netProfit, attendees, extraRecords }) => {
     const [isShareModalOpen, setIsShareModalOpen] = useState(false);
     const [isOrientationModalOpen, setIsOrientationModalOpen] = useState(false);
     
-    // FIX: Update field names to use dot notation.
     const fieldNames: Record<ReportField, string> = {
         'person.name': 'Nome', 'person.document': 'Documento', 'person.phone': 'Telefone', packageType: 'Pacote',
         'payment.status': 'Status', 'payment.amount': 'Valor (R$)',
@@ -238,9 +291,6 @@ const InteractiveReportPreview: React.FC<{ data: Attendee[] | Attendee[][]; conf
 
     const formatCustomValue = (attendee: Attendee, field: ReportField): string => {
         if (field === 'person.document') {
-            // If document type is 'Outro' (e.g., not a valid CPF/RG, or not provided),
-            // just show the document value itself, which will be blank if it wasn't entered.
-            // This prevents showing "(Outro)" for people without a registered document.
             if (attendee.person.documentType === DocumentType.OUTRO) {
                 return attendee.person.document;
             }
@@ -250,14 +300,238 @@ const InteractiveReportPreview: React.FC<{ data: Attendee[] | Attendee[][]; conf
         if (field === 'payment.amount') return value.toFixed(2).replace('.', ',');
         return value || 'N/A';
     };
+
+    const financialBreakdown = useMemo(() => {
+        const sitePrice = event?.site_price ?? 70;
+        const busPrice = event?.bus_price ?? 50;
+
+        let totalSiteRevenue = 0;
+        let totalBusRevenue = 0;
+
+        attendees.forEach(a => {
+            // Only count paid for confirmed revenue
+            if (a.payment.status === PaymentStatus.PAGO || a.payment.sitePaymentDetails?.isPaid) {
+                if (a.packageType === PackageType.SITIO_ONLY && !a.payment.sitePaymentDetails?.isExempt) {
+                    totalSiteRevenue += sitePrice;
+                } else if (a.packageType === PackageType.SITIO_BUS) {
+                    if (a.payment.sitePaymentDetails?.isPaid && !a.payment.sitePaymentDetails?.isExempt) {
+                        totalSiteRevenue += sitePrice;
+                    }
+                    if (a.payment.busPaymentDetails?.isPaid && !a.payment.busPaymentDetails?.isExempt) {
+                        totalBusRevenue += busPrice;
+                    }
+                }
+            }
+        });
+        return { totalSiteRevenue, totalBusRevenue };
+    }, [attendees, event]);
+
+    const renderFinancialReportContent = () => {
+        if (!event) return <p className="text-center text-zinc-500">Nenhum evento selecionado para o relatório financeiro.</p>;
+        
+        const { totalSiteRevenue, totalBusRevenue } = financialBreakdown;
+        const totalConfirmedEventRevenue = totalSiteRevenue + totalBusRevenue;
+        
+        return (
+            <div className="space-y-6">
+                <h2 className="text-3xl font-bold text-zinc-800 text-center">Balanço Financeiro - {event.name}</h2>
+                <p className="text-sm text-zinc-500 text-center">Relatório gerado em: {new Date().toLocaleString('pt-BR')}</p>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="bg-emerald-50 p-5 rounded-2xl shadow-sm border border-emerald-200">
+                        <p className="text-xs font-bold text-emerald-700 uppercase tracking-wide">Lucro Líquido</p>
+                        <p className={`text-4xl font-black mt-2 ${netProfit >= 0 ? 'text-emerald-800' : 'text-rose-800'}`}>
+                            R$ {netProfit.toFixed(2).replace('.', ',')}
+                        </p>
+                    </div>
+                    <div className="bg-white p-5 rounded-2xl shadow-sm border border-zinc-200">
+                        <p className="text-xs font-bold text-zinc-500 uppercase tracking-wide">Resumo Global</p>
+                        <div className="mt-2 space-y-2 text-sm">
+                            <div className="flex justify-between items-center">
+                                <span className="text-zinc-600 font-medium">Receita de Inscrições</span>
+                                <span className="font-bold text-emerald-600">+ R$ {totalConfirmedEventRevenue.toFixed(2).replace('.', ',')}</span>
+                            </div>
+                            <div className="flex justify-between items-center">
+                                <span className="text-zinc-600 font-medium">Receitas Extras</span>
+                                <span className="font-bold text-emerald-600">+ R$ {extraIncome.toFixed(2).replace('.', ',')}</span>
+                            </div>
+                            <div className="flex justify-between items-center border-t border-zinc-100 pt-2">
+                                <span className="text-zinc-600 font-medium">Despesas Extras</span>
+                                <span className="font-bold text-rose-600">- R$ {extraExpenses.toFixed(2).replace('.', ',')}</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div className="bg-white p-5 rounded-2xl shadow-sm border border-zinc-200">
+                    <h3 className="text-xl font-bold text-zinc-800 mb-4">Detalhamento de Receitas de Inscrição</h3>
+                    <div className="space-y-2">
+                        <div className="flex justify-between items-center text-md border-b border-zinc-100 pb-2">
+                            <span className="font-semibold text-zinc-700">Receita Sítio (Confirmada)</span>
+                            <span className="font-bold text-emerald-600">R$ {totalSiteRevenue.toFixed(2).replace('.', ',')}</span>
+                        </div>
+                        <div className="flex justify-between items-center text-md border-b border-zinc-100 pb-2">
+                            <span className="font-semibold text-zinc-700">Receita Ônibus (Confirmada)</span>
+                            <span className="font-bold text-emerald-600">R$ {totalBusRevenue.toFixed(2).replace('.', ',')}</span>
+                        </div>
+                        <div className="flex justify-between items-center text-lg pt-2 border-t border-zinc-200 font-bold">
+                            <span>Total de Inscrições</span>
+                            <span className="text-emerald-700">R$ {totalConfirmedEventRevenue.toFixed(2).replace('.', ',')}</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div className="bg-white p-5 rounded-2xl shadow-sm border border-zinc-200">
+                    <h3 className="text-xl font-bold text-zinc-800 mb-4">Movimentações Financeiras Extras</h3>
+                    {extraRecords.length === 0 ? (
+                        <p className="text-center text-zinc-500 italic">Nenhuma movimentação extra registrada.</p>
+                    ) : (
+                        <div className="space-y-2">
+                            {extraRecords.map((record) => (
+                                <div key={record.id} className="flex justify-between items-center p-2 rounded-lg bg-zinc-50 border border-zinc-100">
+                                    <div className="flex items-center gap-3">
+                                        <div className={`p-1.5 rounded-full ${record.type === FinancialRecordType.INCOME ? 'bg-emerald-100 text-emerald-600' : 'bg-rose-100 text-rose-600'}`}>
+                                            {record.type === FinancialRecordType.INCOME 
+                                                ? <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M3.293 9.707a1 1 0 010-1.414l6-6a1 1 0 011.414 0l6 6a1 1 0 01-1.414 1.414L11 5.414V17a1 1 0 11-2 0V5.414L4.707 9.707a1 1 0 01-1.414 0z" clipRule="evenodd" /></svg>
+                                                : <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M16.707 10.293a1 1 0 010 1.414l-6 6a1 1 0 01-1.414 0l-6-6a1 1 0 111.414-1.414L9 14.586V3a1 1 0 012 0v11.586l4.293-4.293a1 1 0 011.414 0z" clipRule="evenodd" /></svg>
+                                            }
+                                        </div>
+                                        <div>
+                                            <p className="font-semibold text-zinc-800 text-sm">{record.description}</p>
+                                            <p className="text-xs text-zinc-500">{new Date(record.date).toLocaleDateString('pt-BR')}</p>
+                                        </div>
+                                    </div>
+                                    <span className={`font-bold text-sm ${record.type === FinancialRecordType.INCOME ? 'text-emerald-600' : 'text-rose-600'}`}>
+                                        {record.type === FinancialRecordType.INCOME ? '+' : '-'} R$ {record.amount.toFixed(2).replace('.', ',')}
+                                    </span>
+                                </div>
+                            ))}
+                        </div>
+                    )}
+                </div>
+            </div>
+        );
+    };
+    
+    const getFinancialReportHtml = (orientation: 'portrait' | 'landscape') => {
+        if (!event) return '';
+        const { totalSiteRevenue, totalBusRevenue } = financialBreakdown;
+        const totalConfirmedEventRevenue = totalSiteRevenue + totalBusRevenue;
+        const pageStyle = `@page { size: A4 ${orientation}; margin: 1in; }`;
+
+        return `
+            <!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8"><title>Relatório Financeiro</title>
+            <style>
+                body { font-family: -apple-system, BlinkMacMacFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; margin: 1.5rem; color: #333; }
+                h1 { color: #10B981; border-bottom: 2px solid #10B981; padding-bottom: 0.5rem; text-align: center; }
+                h2 { font-size: 1.5rem; margin-top: 1.5rem; margin-bottom: 0.5rem; color: #333; text-align: center; }
+                h3 { font-size: 1.2rem; margin-top: 1rem; margin-bottom: 0.5rem; color: #333; }
+                p { font-size: 0.9rem; margin-bottom: 0.5rem; }
+                .summary-box { background-color: #f0fdf4; border: 1px solid #dcfce7; padding: 1rem; border-radius: 8px; margin-bottom: 1rem; }
+                .income { color: #059669; font-weight: bold; }
+                .expense { color: #ef4444; font-weight: bold; }
+                .net-profit { font-size: 1.8rem; font-weight: bold; text-align: center; margin-bottom: 1rem; }
+                .net-profit.positive { color: #10B981; }
+                .net-profit.negative { color: #ef4444; }
+                .detail-section { background-color: #ffffff; border: 1px solid #e5e7eb; padding: 1rem; border-radius: 8px; margin-bottom: 1rem; }
+                .detail-row { display: flex; justify-content: space-between; padding: 0.25rem 0; border-bottom: 1px dashed #f3f4f6; }
+                .detail-row:last-child { border-bottom: none; }
+                .extra-item { display: flex; justify-content: space-between; font-size: 0.85rem; padding: 0.4rem 0; border-bottom: 1px solid #f3f4f6; }
+                .extra-item-desc { flex: 1; margin-right: 1rem; }
+                ${pageStyle}
+            </style></head><body>
+                <h1>Relatório Financeiro Completo</h1>
+                <p style="text-align: center;"><strong>Evento:</strong> ${event.name}</p>
+                <p style="text-align: center;"><strong>Data de Geração:</strong> ${new Date().toLocaleString('pt-BR')}</p>
+
+                <div class="summary-box" style="background-color: ${netProfit >= 0 ? '#f0fdf4' : '#fff0f0'}; border-color: ${netProfit >= 0 ? '#dcfce7' : '#ffdddd'};">
+                    <h2>Balanço Geral</h2>
+                    <p class="net-profit ${netProfit >= 0 ? 'positive' : 'negative'}">
+                        R$ ${netProfit.toFixed(2).replace('.', ',')}
+                    </p>
+                    <div style="display: flex; justify-content: space-around; margin-top: 1rem;">
+                        <p>Total Receitas: <span class="income">R$ ${(totalConfirmedEventRevenue + extraIncome).toFixed(2).replace('.', ',')}</span></p>
+                        <p>Total Despesas: <span class="expense">R$ ${extraExpenses.toFixed(2).replace('.', ',')}</span></p>
+                    </div>
+                </div>
+
+                <div class="detail-section">
+                    <h3>Receitas de Inscrições Confirmadas</h3>
+                    <div class="detail-row"><span>Receita Sítio</span><span class="income">R$ ${totalSiteRevenue.toFixed(2).replace('.', ',')}</span></div>
+                    <div class="detail-row"><span>Receita Ônibus</span><span class="income">R$ ${totalBusRevenue.toFixed(2).replace('.', ',')}</span></div>
+                    <div class="detail-row" style="font-weight: bold; border-top: 1px solid #e5e7eb; margin-top: 0.5rem; padding-top: 0.5rem;">
+                        <span>TOTAL INSCRIÇÕES</span><span class="income">R$ ${totalConfirmedEventRevenue.toFixed(2).replace('.', ',')}</span>
+                    </div>
+                </div>
+
+                <div class="detail-section">
+                    <h3>Movimentações Financeiras Extras</h3>
+                    ${extraRecords.length === 0 ? '<p style="text-align: center; color: #6b7280;">Nenhuma movimentação extra registrada.</p>' :
+                        extraRecords.map(record => `
+                            <div class="extra-item">
+                                <span class="extra-item-desc">${new Date(record.date).toLocaleDateString('pt-BR')} - ${record.description}</span>
+                                <span class="${record.type === FinancialRecordType.INCOME ? 'income' : 'expense'}">
+                                    ${record.type === FinancialRecordType.INCOME ? '+' : '-'} R$ ${record.amount.toFixed(2).replace('.', ',')}
+                                </span>
+                            </div>
+                        `).join('')
+                    }
+                    <div class="detail-row" style="font-weight: bold; border-top: 1px solid #e5e7eb; margin-top: 0.5rem; padding-top: 0.5rem;">
+                        <span>Total Receitas Extras</span><span class="income">R$ ${extraIncome.toFixed(2).replace('.', ',')}</span>
+                    </div>
+                    <div class="detail-row" style="font-weight: bold;">
+                        <span>Total Despesas Extras</span><span class="expense">R$ ${extraExpenses.toFixed(2).replace('.', ',')}</span>
+                    </div>
+                </div>
+            </body></html>`;
+    };
+    
+    const getFinancialReportText = () => {
+        if (!event) return "Nenhum evento selecionado para o relatório financeiro.";
+        
+        const { totalSiteRevenue, totalBusRevenue } = financialBreakdown;
+        const totalConfirmedEventRevenue = totalSiteRevenue + totalBusRevenue;
+
+        let reportText = `📊 Balanço Financeiro - ${event.name}\n`;
+        reportText += `_Gerado em: ${new Date().toLocaleDateString('pt-BR')} ${new Date().toLocaleTimeString('pt-BR')}_\n\n`;
+
+        reportText += `*Balanço Geral: R$ ${netProfit.toFixed(2).replace('.', ',')}*\n\n`;
+        reportText += `_Resumo Global:_\n`;
+        reportText += `➡️ Receita Inscrições: + R$ ${totalConfirmedEventRevenue.toFixed(2).replace('.', ',')}\n`;
+        reportText += `➡️ Receitas Extras:    + R$ ${extraIncome.toFixed(2).replace('.', ',')}\n`;
+        reportText += `➡️ Despesas Extras:    - R$ ${extraExpenses.toFixed(2).replace('.', ',')}\n`;
+        reportText += `-------------------------------\n`;
+        reportText += `*TOTAL FINAL: R$ ${netProfit.toFixed(2).replace('.', ',')}*\n\n`;
+
+        reportText += `_Detalhes Receitas de Inscrição:_\n`;
+        reportText += `- Sítio: R$ ${totalSiteRevenue.toFixed(2).replace('.', ',')}\n`;
+        reportText += `- Ônibus: R$ ${totalBusRevenue.toFixed(2).replace('.', ',')}\n`;
+        reportText += `Total Inscrições: R$ ${totalConfirmedEventRevenue.toFixed(2).replace('.', ',')}\n\n`;
+
+        if (extraRecords.length > 0) {
+            reportText += `_Movimentações Extras:_\n`;
+            extraRecords.forEach(record => {
+                const sign = record.type === FinancialRecordType.INCOME ? '+' : '-';
+                reportText += `${sign} R$ ${record.amount.toFixed(2).replace('.', ',')} - ${new Date(record.date).toLocaleDateString('pt-BR')} - ${record.description}\n`;
+            });
+            reportText += `Total Receitas Extras: + R$ ${extraIncome.toFixed(2).replace('.', ',')}\n`;
+            reportText += `Total Despesas Extras: - R$ ${extraExpenses.toFixed(2).replace('.', ',')}\n\n`;
+        } else {
+            reportText += `_Nenhuma movimentação extra registrada._\n\n`;
+        }
+
+        reportText += `_Axé!_ ✨`;
+        return reportText;
+    };
     
     const handlePrintAndExport = (orientation: 'portrait' | 'landscape') => {
         setIsOrientationModalOpen(false);
         let printableHtml = '';
-        const pageStyle = `@page { size: A4 ${orientation}; margin: 1in; }`;
+        
 
         if (config.type === 'busList') {
             const busData = data as Attendee[][];
+            const pageStyle = `@page { size: A4 ${orientation}; margin: 1in; }`;
             const busSectionsHtml = busData.map((bus, index) => `
                 <div class="bus-section${index === 0 ? ' bus-section--first' : ''}">
                     <h2>Ônibus ${index + 1} (${bus.length} passageiros)</h2>
@@ -312,8 +586,12 @@ const InteractiveReportPreview: React.FC<{ data: Attendee[] | Attendee[][]; conf
                     ${busSectionsHtml}
                 </body></html>`;
 
-        } else { // Custom report
+        } else if (config.type === 'financialSummary') {
+            printableHtml = getFinancialReportHtml(orientation);
+        }
+        else { // Custom report
             const customData = data as Attendee[];
+            const pageStyle = `@page { size: A4 ${orientation}; margin: 1in; }`;
             const tableHeaders = config.fields.map(field => `<th>${fieldNames[field]}</th>`).join('');
             const tableRows = customData.map(attendee => `<tr>${config.fields.map(field => `<td>${formatCustomValue(attendee, field)}</td>`).join('')}</tr>`).join('');
             const appliedFilters = `Status: ${config.filters.status}, Pacote: ${config.filters.packageType}`;
@@ -340,20 +618,15 @@ const InteractiveReportPreview: React.FC<{ data: Attendee[] | Attendee[][]; conf
                 </body></html>`;
         }
 
-        // For iOS PWA compatibility, open a new window to print.
-        // This is more reliable than using a hidden iframe which can result in blank pages.
         const printWindow = window.open('', '_blank');
         if (printWindow) {
             printWindow.document.write(printableHtml);
             printWindow.document.close();
-            // Use a timeout to allow content to render before triggering print
             setTimeout(() => {
-                printWindow.focus(); // focus is needed for some browsers
+                printWindow.focus();
                 printWindow.print();
-                // We don't close the window automatically, allowing users to save as PDF or interact with the print preview.
             }, 250);
         } else {
-            // This will be triggered if a popup blocker is active.
             alert('A janela de impressão foi bloqueada. Por favor, habilite pop-ups para este site e tente novamente.');
         }
     };
@@ -368,23 +641,24 @@ const InteractiveReportPreview: React.FC<{ data: Attendee[] | Attendee[][]; conf
             title = `Lista de Passageiros - Gira da Mata 2025`;
             reportText = `${title}\n\n`;
             buses.forEach((bus, index) => {
-                reportText += `*ÔNIBUS ${index + 1} (${bus.length} passageiros)*\n`;
+                reportText += `*Ônibus ${index + 1} (${bus.length} passageiros)*\n`;
                 bus.forEach(p => {
-                    // FIX: Access nested person data for sharing.
                     reportText += `- ${p.person.name} (${p.person.document})\n`;
                 });
                 reportText += '\n';
             });
 
-        } else { // Custom report
+        } else if (config.type === 'financialSummary') {
+            title = `Balanço Financeiro - ${event?.name || 'Evento'}`;
+            reportText = getFinancialReportText();
+        }
+        else { // Custom report
             const customData = data as Attendee[];
             title = `Relatório Gira da Mata (${customData.length} registros)`;
             reportText = `${title}\n\n`;
             customData.forEach((attendee) => {
-                // FIX: Use 'person.name' to format value.
                 reportText += `*${formatCustomValue(attendee, 'person.name')}*\n`;
                 config.fields.forEach(field => {
-                    // FIX: Check for 'person.name' to avoid duplication.
                     if (field !== 'person.name') {
                         reportText += ` - ${fieldNames[field]}: ${formatCustomValue(attendee, field)}\n`;
                     }
@@ -411,6 +685,12 @@ const InteractiveReportPreview: React.FC<{ data: Attendee[] | Attendee[][]; conf
         setIsOrientationModalOpen(true);
     };
 
+    const reportTitle = useMemo(() => {
+        if (config.type === 'busList') return 'Lista de Passageiros';
+        if (config.type === 'financialSummary') return `Relatório Financeiro (${event?.name || 'Evento'})`;
+        return `Relatório (${(data as any[]).flat().length})`;
+    }, [config.type, data, event]);
+
     return (
         <div className="flex flex-col animate-fadeIn">
              <header className="sticky top-0 md:static bg-white z-10 p-4 md:pt-6 border-b border-zinc-200 flex items-center justify-between">
@@ -419,7 +699,7 @@ const InteractiveReportPreview: React.FC<{ data: Attendee[] | Attendee[][]; conf
                         <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>
                     </button>
                     <h1 className="text-xl md:text-2xl font-bold text-zinc-800">
-                        {config.type === 'busList' ? 'Lista de Passageiros' : `Relatório (${(data as any[]).flat().length})`}
+                        {reportTitle}
                     </h1>
                 </div>
                 <div className="flex items-center gap-2">
@@ -442,12 +722,10 @@ const InteractiveReportPreview: React.FC<{ data: Attendee[] | Attendee[][]; conf
                                 {bus.map((p, pIndex) => (
                                     <div key={p.id} className="bg-zinc-50 p-3 rounded-lg border border-zinc-200">
                                         <div className="flex justify-between items-start">
-                                            {/* FIX: Access nested person data. */}
                                             <p className="font-bold text-zinc-800 mr-2">{p.person.name}</p>
                                             <p className="text-sm font-semibold text-zinc-500 flex-shrink-0">#{pIndex + 1}</p>
                                         </div>
                                         <div className="mt-1 text-sm text-zinc-600 space-y-1">
-                                            {/* FIX: Access nested person data. */}
                                             <p>{`${p.person.document} (${p.person.documentType})`}</p>
                                             <p>{p.person.phone}</p>
                                         </div>
@@ -470,7 +748,6 @@ const InteractiveReportPreview: React.FC<{ data: Attendee[] | Attendee[][]; conf
                                         {bus.map((p, pIndex) => (
                                             <tr key={p.id} className="border-b border-zinc-100 last:border-b-0">
                                                 <td className="py-2 pr-2 text-zinc-600">{pIndex + 1}</td>
-                                                {/* FIX: Access nested person data. */}
                                                 <td className="py-2 px-2 text-zinc-800 font-medium">{p.person.name}</td>
                                                 <td className="py-2 px-2 text-zinc-600">{`${p.person.document} (${p.person.documentType})`}</td>
                                                 <td className="py-2 px-2 text-zinc-600">{p.person.phone}</td>
@@ -481,6 +758,8 @@ const InteractiveReportPreview: React.FC<{ data: Attendee[] | Attendee[][]; conf
                             </div>
                         </div>
                     ))
+                ) : config.type === 'financialSummary' ? (
+                    renderFinancialReportContent()
                 ) : (
                     <>
                         {(data as Attendee[]).length > 0 ? (
@@ -584,9 +863,7 @@ interface ZeroDocListItemProps {
 
 const ZeroDocListItem: React.FC<ZeroDocListItemProps> = ({ attendee, onUpdate }) => {
     const { addToast } = useToast();
-    // FIX: Access document from the nested person object.
     const [documentValue, setDocumentValue] = useState(attendee.person.document);
-    // FIX: Access document from the nested person object.
     const [docType, setDocType] = useState<DocumentType>(() => getDocumentType(attendee.person.document).type);
     const [error, setError] = useState('');
     const [status, setStatus] = useState<'idle' | 'saving' | 'success'>('idle');
@@ -613,7 +890,6 @@ const ZeroDocListItem: React.FC<ZeroDocListItemProps> = ({ attendee, onUpdate })
     const handleConfirmSave = async () => {
         setStatus('saving');
         try {
-            // FIX: Update the nested person object.
             const updatedAttendee: Attendee = {
                 ...attendee,
                 person: {
@@ -624,7 +900,6 @@ const ZeroDocListItem: React.FC<ZeroDocListItemProps> = ({ attendee, onUpdate })
             };
             await onUpdate(updatedAttendee);
             setStatus('success');
-            // FIX: Access name from the nested person object.
             addToast(`Documento de ${attendee.person.name} salvo.`, 'success');
         } catch (err) {
             console.error(err);
@@ -641,7 +916,6 @@ const ZeroDocListItem: React.FC<ZeroDocListItemProps> = ({ attendee, onUpdate })
         <>
             <div className={`bg-white p-3 rounded-xl border border-zinc-200 shadow-sm transition-opacity duration-500 ${status === 'success' ? 'opacity-40' : 'opacity-100'}`}>
                 <div className="flex items-center justify-between gap-3 flex-wrap">
-                    {/* FIX: Access name from the nested person object. */}
                     <p className="font-bold text-zinc-800 flex-1 min-w-0">{attendee.person.name}</p>
                     <div className="flex items-center gap-2">
                         <div className="relative w-40">
@@ -675,7 +949,6 @@ const ZeroDocListItem: React.FC<ZeroDocListItemProps> = ({ attendee, onUpdate })
             </div>
             {isConfirming && (
                 <ConfirmDocUpdateModal
-                    // FIX: Access name from the nested person object.
                     attendeeName={attendee.person.name}
                     newDocument={documentValue}
                     docType={docType}
@@ -754,13 +1027,11 @@ const DuplicateCheckerView: React.FC<DuplicateCheckerViewProps> = ({ groups, onB
                                 {group.map(attendee => (
                                     <button key={attendee.id} onClick={() => onSelectAttendee(attendee.id)} className="w-full text-left p-3 bg-zinc-50 rounded-lg hover:bg-zinc-100 transition-colors flex justify-between items-center border border-zinc-200">
                                         <div>
-                                            {/* FIX: Access nested person data. */}
                                             <p className="font-semibold text-zinc-900">{attendee.person.name}</p>
                                             <p className="text-xs text-zinc-500 mt-1">{attendee.person.document} &bull; {attendee.person.phone}</p>
                                         </div>
                                         <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-zinc-400" viewBox="0 0 20 20" fill="currentColor">
-                                            <path fillRule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clipRule="evenodd" />
-                                        </svg>
+                                            <path fillRule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clipRule="evenodd" /></svg>
                                     </button>
                                 ))}
                             </div>
@@ -851,6 +1122,183 @@ const FinancialDetailView: React.FC<{ financialData: FinancialData; onBack: () =
     );
 };
 
+// --- Financial Management View ---
+const FinancialManagementView: React.FC<{ 
+    event: Event | null; 
+    confirmedRevenue: number; 
+    extraRecords: FinancialRecord[]; 
+    onAddRecord: (record: Omit<FinancialRecord, 'id' | 'created_at'>) => Promise<void>; 
+    onDeleteRecord: (record: FinancialRecord) => void; 
+    onBack: () => void; 
+}> = ({ event, confirmedRevenue, extraRecords, onAddRecord, onDeleteRecord, onBack }) => {
+    const [type, setType] = useState<FinancialRecordType>(FinancialRecordType.INCOME);
+    const [description, setDescription] = useState('');
+    const [amount, setAmount] = useState('');
+    const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
+    const [isSaving, setIsSaving] = useState(false);
+    const { addToast } = useToast();
+
+    const extraIncome = extraRecords.filter(r => r.type === FinancialRecordType.INCOME).reduce((sum, r) => sum + r.amount, 0);
+    const extraExpenses = extraRecords.filter(r => r.type === FinancialRecordType.EXPENSE).reduce((sum, r) => sum + r.amount, 0);
+    const netProfit = confirmedRevenue + extraIncome - extraExpenses;
+
+    const handleSubmit = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!event) return;
+        setIsSaving(true);
+        try {
+            await onAddRecord({
+                eventId: event.id,
+                type,
+                description,
+                amount: parseFloat(amount),
+                date: new Date(date + 'T00:00:00Z').toISOString(), // Ensure UTC for consistent storage
+            });
+            setDescription('');
+            setAmount('');
+            addToast('Registro adicionado com sucesso!', 'success');
+        } catch (error) {
+            addToast('Falha ao adicionar registro.', 'error');
+        } finally {
+            setIsSaving(false);
+        }
+    };
+
+    return (
+        <div className="animate-fadeIn min-h-full bg-zinc-50 pb-20 md:pb-6">
+            <header className="sticky top-0 bg-white z-10 p-4 border-b border-zinc-200 flex items-center gap-4">
+                <button onClick={onBack} className="text-zinc-500 hover:text-zinc-800 p-1 rounded-full hover:bg-zinc-100">
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>
+                </button>
+                <h1 className="text-xl font-bold text-zinc-900">Gestão Financeira</h1>
+            </header>
+
+            <main className="p-4 max-w-4xl mx-auto space-y-6">
+                {/* Summary Cards */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="bg-white p-5 rounded-2xl shadow-sm border border-zinc-200">
+                        <p className="text-xs font-bold text-zinc-500 uppercase tracking-wide">Balanço Total</p>
+                        <p className={`text-4xl font-black mt-2 ${netProfit >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
+                            R$ {netProfit.toFixed(2).replace('.', ',')}
+                        </p>
+                        <p className="text-xs text-zinc-400 mt-1 font-medium">Receitas - Despesas</p>
+                    </div>
+                    <div className="bg-white p-5 rounded-2xl shadow-sm border border-zinc-200 flex flex-col justify-center space-y-3">
+                        <div className="flex justify-between items-center text-sm">
+                            <span className="text-zinc-600 font-medium">Inscrições (Confirmadas)</span>
+                            <span className="font-bold text-emerald-600">+ R$ {confirmedRevenue.toFixed(2).replace('.', ',')}</span>
+                        </div>
+                        <div className="flex justify-between items-center text-sm">
+                            <span className="text-zinc-600 font-medium">Receitas Extras</span>
+                            <span className="font-bold text-emerald-600">+ R$ {extraIncome.toFixed(2).replace('.', ',')}</span>
+                        </div>
+                        <div className="flex justify-between items-center text-sm pt-2 border-t border-zinc-100">
+                            <span className="text-zinc-600 font-medium">Despesas Extras</span>
+                            <span className="font-bold text-rose-600">- R$ {extraExpenses.toFixed(2).replace('.', ',')}</span>
+                        </div>
+                    </div>
+                </div>
+
+                {/* New Transaction Form */}
+                <div className="bg-white p-5 rounded-2xl shadow-sm border border-zinc-200">
+                    <h2 className="text-lg font-bold text-zinc-800 mb-4">Nova Movimentação</h2>
+                    <form onSubmit={handleSubmit} className="space-y-4">
+                        <div className="flex gap-2 p-1 bg-zinc-100 rounded-lg w-fit">
+                            <button
+                                type="button"
+                                onClick={() => setType(FinancialRecordType.INCOME)}
+                                className={`px-4 py-2 rounded-md text-sm font-bold transition-colors ${type === FinancialRecordType.INCOME ? 'bg-white text-emerald-600 shadow-sm' : 'text-zinc-500 hover:text-zinc-700'}`}
+                            >
+                                Receita
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => setType(FinancialRecordType.EXPENSE)}
+                                className={`px-4 py-2 rounded-md text-sm font-bold transition-colors ${type === FinancialRecordType.EXPENSE ? 'bg-white text-rose-600 shadow-sm' : 'text-zinc-500 hover:text-zinc-700'}`}
+                            >
+                                Despesa
+                            </button>
+                        </div>
+                        
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                            <input
+                                type="text"
+                                placeholder="Descrição (ex: Venda de Camisas)"
+                                value={description}
+                                onChange={(e) => setDescription(e.target.value)}
+                                className="w-full px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-zinc-400 text-sm"
+                                required
+                            />
+                            <div className="relative">
+                                <span className="absolute left-4 top-3 text-zinc-500 text-sm">R$</span>
+                                <input
+                                    type="number"
+                                    placeholder="0,00"
+                                    step="0.01"
+                                    value={amount}
+                                    onChange={(e) => setAmount(e.target.value)}
+                                    className="w-full pl-10 pr-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-zinc-400 text-sm"
+                                    required
+                                />
+                            </div>
+                            <input
+                                type="date"
+                                value={date}
+                                onChange={(e) => setDate(e.target.value)}
+                                className="w-full px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-zinc-400 text-sm"
+                                required
+                            />
+                        </div>
+                        
+                        <button
+                            type="submit"
+                            disabled={isSaving}
+                            className={`w-full py-3 rounded-xl text-white font-bold transition-colors shadow-sm ${type === FinancialRecordType.INCOME ? 'bg-emerald-500 hover:bg-emerald-600' : 'bg-rose-500 hover:bg-rose-600'}`}
+                        >
+                            {isSaving ? 'Salvando...' : 'Adicionar Movimentação'}
+                        </button>
+                    </form>
+                </div>
+
+                {/* History List */}
+                <div className="space-y-4">
+                    <h2 className="text-lg font-bold text-zinc-800 px-1">Histórico de Extras</h2>
+                    {extraRecords.length === 0 ? (
+                        <div className="text-center py-10 text-zinc-400">Nenhuma movimentação extra registrada.</div>
+                    ) : (
+                        <div className="space-y-2">
+                            {extraRecords.map((record) => (
+                                <div key={record.id} className="bg-white p-4 rounded-xl border border-zinc-200 shadow-sm flex justify-between items-center">
+                                    <div className="flex items-center gap-3">
+                                        <div className={`p-2 rounded-full ${record.type === FinancialRecordType.INCOME ? 'bg-emerald-100 text-emerald-600' : 'bg-rose-100 text-rose-600'}`}>
+                                            {record.type === FinancialRecordType.INCOME 
+                                                ? <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M3.293 9.707a1 1 0 010-1.414l6-6a1 1 0 011.414 0l6 6a1 1 0 01-1.414 1.414L11 5.414V17a1 1 0 11-2 0V5.414L4.707 9.707a1 1 0 01-1.414 0z" clipRule="evenodd" /></svg>
+                                                : <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M16.707 10.293a1 1 0 010 1.414l-6 6a1 1 0 01-1.414 0l-6-6a1 1 0 111.414-1.414L9 14.586V3a1 1 0 012 0v11.586l4.293-4.293a1 1 0 011.414 0z" clipRule="evenodd" /></svg>
+                                            }
+                                        </div>
+                                        <div>
+                                            <p className="font-bold text-zinc-800 text-sm">{record.description}</p>
+                                            <p className="text-xs text-zinc-500">{new Date(record.date).toLocaleDateString('pt-BR')}</p>
+                                        </div>
+                                    </div>
+                                    <div className="flex items-center gap-4">
+                                        <span className={`font-bold ${record.type === FinancialRecordType.INCOME ? 'text-emerald-600' : 'text-rose-600'}`}>
+                                            {record.type === FinancialRecordType.INCOME ? '+' : '-'} R$ {record.amount.toFixed(2).replace('.', ',')}
+                                        </span>
+                                        <button onClick={() => onDeleteRecord(record)} className="text-zinc-400 hover:text-rose-500 transition-colors p-1" title="Excluir">
+                                            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clipRule="evenodd" /></svg>
+                                        </button>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    )}
+                </div>
+            </main>
+        </div>
+    );
+};
+
 
 // --- Componente: Lista de Passageiros do Ônibus ---
 interface BusPassenger extends Attendee {
@@ -876,7 +1324,6 @@ const EditablePassengerRow: React.FC<EditablePassengerRowProps> = ({ attendee, o
         const newBusValue = e.target.value;
         const newBusNumber = newBusValue === 'null' ? null : Number(newBusValue);
 
-        // Prevent triggering if the value hasn't changed
         if (newBusNumber !== attendee.busNumber) {
             onRequestBusChange(attendee, newBusNumber);
         }
@@ -885,7 +1332,6 @@ const EditablePassengerRow: React.FC<EditablePassengerRowProps> = ({ attendee, o
     return (
         <div className="w-full text-left p-3 bg-zinc-50 rounded-lg flex flex-col md:flex-row justify-between md:items-center border border-zinc-200 gap-3">
             <div onClick={() => onSelectAttendee(attendee.id)} className="flex-grow cursor-pointer min-w-0">
-                {/* FIX: Access nested person data. */}
                 <p className="font-semibold text-zinc-900">{attendee.person.name}</p>
                 <p className="text-xs text-zinc-500 mt-1">{attendee.person.document} &bull; {attendee.person.phone}</p>
             </div>
@@ -1007,7 +1453,6 @@ const SitioOnlyListView: React.FC<{
                             style={{ animationDelay: `${index * 30}ms`, animationFillMode: 'forwards' }}
                         >
                             <div className="min-w-0">
-                                {/* FIX: Access nested person data. */}
                                 <p className="font-semibold text-zinc-900">{attendee.person.name}</p>
                                 <p className="text-xs text-zinc-500 mt-1">{attendee.person.phone}</p>
                             </div>
@@ -1016,8 +1461,7 @@ const SitioOnlyListView: React.FC<{
                                     {attendee.payment.status.toUpperCase()}
                                 </span>
                                 <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-zinc-400" viewBox="0 0 20 20" fill="currentColor">
-                                    <path fillRule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clipRule="evenodd" />
-                                </svg>
+                                    <path fillRule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clipRule="evenodd" /></svg>
                             </div>
                         </button>
                     ))
@@ -1037,18 +1481,74 @@ interface BusStat {
     remainingSeats: number;
     capacity: number;
 }
-const StatCard: React.FC<{ title: string; children: React.ReactNode; icon: React.ReactElement; className?: string, delay: number, onClick?: () => void }> = ({ title, children, icon, className = '', delay, onClick }) => (
-    <div onClick={onClick} className={`bg-white p-4 rounded-xl border border-zinc-200 shadow-sm opacity-0 animate-fadeInUp flex flex-col ${className} ${onClick ? 'cursor-pointer hover:border-zinc-300 hover:bg-zinc-50 transition-colors' : ''}`} style={{ animationDelay: `${delay}ms`, animationFillMode: 'forwards' }}>
-        <div className="flex items-center gap-3 mb-3"><div className="text-green-500">{icon}</div><h2 className="text-md font-bold text-zinc-800">{title}</h2></div>
-        <div className="space-y-3 flex-grow">{children}</div>
-    </div>
-);
-const ProgressBar: React.FC<{ value: number; max: number; colorClass?: string }> = ({ value, max, colorClass = 'bg-green-500' }) => {
-    const percentage = max > 0 ? (value / max) * 100 : 0;
-    return (<div className="w-full bg-zinc-200 rounded-full h-2"><div className={`${colorClass} h-2 rounded-full transition-all duration-500`} style={{ width: `${percentage}%` }}></div></div>);
+
+const StatCard: React.FC<{ 
+    title: string; 
+    children: React.ReactNode; 
+    icon: React.ReactElement; 
+    className?: string; 
+    delay: number; 
+    onClick?: () => void;
+    variant?: 'white' | 'warning' | 'info';
+}> = ({ title, children, icon, className = '', delay, onClick, variant = 'white' }) => {
+    let baseStyles = "p-3.5 rounded-2xl border shadow-sm flex flex-col transition-all relative overflow-hidden group";
+    let colorStyles = "";
+
+    switch(variant) {
+        case 'warning':
+            colorStyles = "bg-amber-50 border-amber-200 hover:border-amber-400";
+            break;
+        case 'info':
+            colorStyles = "bg-blue-50 border-blue-200 hover:border-blue-400";
+            break;
+        case 'white':
+        default:
+            colorStyles = "bg-white border-zinc-200 hover:border-zinc-400 hover:shadow-md";
+            break;
+    }
+
+    return (
+        <div 
+            onClick={onClick} 
+            className={`${baseStyles} ${colorStyles} opacity-0 animate-fadeInUp ${className} ${onClick ? 'cursor-pointer active:scale-98' : ''}`} 
+            style={{ animationDelay: `${delay}ms`, animationFillMode: 'forwards' }}
+        >
+            <div className="flex items-center gap-2 mb-2 z-10 relative">
+                <div className={`p-1.5 rounded-lg ${variant === 'white' ? 'bg-zinc-100 text-zinc-700' : 'bg-white/60 text-current'}`}>
+                    {icon}
+                </div>
+                <h2 className="text-sm font-bold text-zinc-900 tracking-tight leading-none">{title}</h2>
+            </div>
+            <div className="flex-grow z-10 relative">{children}</div>
+        </div>
+    );
 };
 
-const ReportsDashboard: React.FC<{ attendees: Attendee[]; onGenerateReportClick: () => void; onLogout: () => void; onFixDocsClick: () => void; onCheckDuplicatesClick: () => void; zeroDocCount: number; duplicateGroupCount: number; busStats: BusStat[]; onViewBus: (busNumber: number) => void; onViewFinancials: () => void; onViewSitioOnlyList: () => void; event: Event | null; }> = ({ attendees, onGenerateReportClick, onLogout, onFixDocsClick, onCheckDuplicatesClick, zeroDocCount, duplicateGroupCount, busStats, onViewBus, onViewFinancials, onViewSitioOnlyList, event }) => {
+const ProgressBar: React.FC<{ value: number; max: number; colorClass?: string }> = ({ value, max, colorClass = 'bg-emerald-500' }) => {
+    const percentage = max > 0 ? (value / max) * 100 : 0;
+    return (<div className="w-full bg-zinc-200 rounded-full h-1.5 overflow-hidden mt-1"><div className={`${colorClass} h-full rounded-full transition-all duration-700 ease-out`} style={{ width: `${percentage}%` }}></div></div>);
+};
+
+const ReportsDashboard: React.FC<{ 
+    attendees: Attendee[]; 
+    onGenerateReportClick: () => void; 
+    onLogout: () => void; 
+    onFixDocsClick: () => void; 
+    onCheckDuplicatesClick: () => void; 
+    zeroDocCount: number; 
+    duplicateGroupCount: number; 
+    busStats: BusStat[]; 
+    onViewBus: (busNumber: number) => void; 
+    onViewFinancials: () => void; 
+    onViewSitioOnlyList: () => void; 
+    onManageFinancials: () => void;
+    onGenerateFinancialReportClick: () => void; // Added prop
+    event: Event | null; 
+    netProfit: number;
+    extraIncome: number;
+    extraExpenses: number;
+    confirmedRevenue: number;
+}> = ({ attendees, onGenerateReportClick, onLogout, onFixDocsClick, onCheckDuplicatesClick, zeroDocCount, duplicateGroupCount, busStats, onViewBus, onViewFinancials, onViewSitioOnlyList, onManageFinancials, onGenerateFinancialReportClick, event, netProfit, extraIncome, extraExpenses, confirmedRevenue }) => {
     const { totalAttendees, paidCount, pendingCount, isentoCount, totalRevenue, pendingRevenue, totalPossibleRevenue, sitioOnlyCount, paymentStats } = useMemo(() => {
         // We want to count active attendees for logistics, but ALL payments for financials.
         
@@ -1165,139 +1665,231 @@ const ReportsDashboard: React.FC<{ attendees: Attendee[]; onGenerateReportClick:
         };
     }, [attendees, event]);
 
-    const IconUsers = <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.653-.124-1.282-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.653.124-1.282-.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" /></svg>;
-    const IconDollar = <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v.01M12 12v-2m0 2v2m0-2.35V10M12 15v2m0-2v-2m0 0h.01M12 7.02c.164.017.324.041.48.072M7.5 9.51c.418-.472 1.012-.867 1.697-1.126M12 21a9 9 0 100-18 9 9 0 000 18z" /></svg>;
-    const IconBus = <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path d="M9 17a2 2 0 11-4 0 2 2 0 014 0zM19 17a2 2 0 11-4 0 2 2 0 014 0z" /><path strokeLinecap="round" strokeLinejoin="round" d="M13 16V6a1 1 0 00-1-1H4a1 1 0 00-1 1v10l2 2h8l2-2zM5 11h6" /></svg>;
-    const IconHome = <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" /></svg>;
+    const IconUsers = <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.653-.124-1.282-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.653.124-1.282-.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" /></svg>;
+    const IconDollar = <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v.01M12 12v-2m0 2v2m0-2.35V10M12 15v2m0-2v-2m0 0h.01M12 7.02c.164.017.324.041.48.072M7.5 9.51c.418-.472 1.012-.867 1.697-1.126M12 21a9 9 0 100-18 9 9 0 000 18z" /></svg>;
+    const IconBus = <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path d="M9 17a2 2 0 11-4 0 2 2 0 014 0zM19 17a2 2 0 11-4 0 2 2 0 014 0z" /><path strokeLinecap="round" strokeLinejoin="round" d="M13 16V6a1 1 0 00-1-1H4a1 1 0 00-1 1v10l2 2h8l2-2zM5 11h6" /></svg>;
+    const IconHome = <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" /></svg>;
     const IconClipboardList = <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" /></svg>;
-    const IconWarning = <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>;
-    const IconCreditCard = <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" /></svg>;
-    const IconDuplicate = <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" /></svg>;
-    
+    const IconWarning = <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>;
+    const IconDuplicate = <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" /></svg>;
+    const IconWallet = <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M21 12a2.25 2.25 0 00-2.25-2.25H15a3 3 0 11-6 0H5.25A2.25 2.25 0 003 12m18 0v6a2.25 2.25 0 01-2.25 2.25H5.25A2.25 2.25 0 013 18v-6m18 0V9M3 12V9m18 0a2.25 2.25 0 00-2.25-2.25H5.25A2.25 2.25 0 003 9m18 0V6a2.25 2.25 0 00-2.25-2.25H5.25A2.25 2.25 0 003 6v3" /></svg>;
+    const IconFinance = <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" /></svg>;
+
     return (
-        <div className="pb-4 animate-fadeIn">
-            <header className="sticky top-0 md:static bg-white z-10 p-4 md:pt-6 border-b border-zinc-200 flex justify-between items-center">
-                <h1 className="text-xl md:text-2xl font-bold text-zinc-800">Relatórios</h1>
-                <button onClick={onLogout} className="p-2 text-zinc-500 rounded-full hover:bg-zinc-200 hover:text-zinc-800 transition-colors" aria-label="Sair">
-                    <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+        <div className="pb-32 md:pb-10 animate-fadeIn bg-zinc-50/50 min-h-full">
+            <header className="sticky top-0 md:static bg-white/90 backdrop-blur-md z-30 px-4 py-3 md:pt-6 border-b border-zinc-200 flex justify-between items-center">
+                <div>
+                    <h1 className="text-xl md:text-2xl font-bold text-zinc-900 tracking-tight">Painel de Controle</h1>
+                    <p className="text-xs text-zinc-500 font-medium">Relatórios e Estatísticas</p>
+                </div>
+                <button onClick={onLogout} className="p-2 bg-zinc-100 rounded-full text-zinc-500 hover:text-zinc-900 transition-colors">
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                         <path strokeLinecap="round" strokeLinejoin="round" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
                     </svg>
                 </button>
             </header>
-            <div className="p-4 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-                <StatCard title="Inscrições Ativas" icon={IconUsers} delay={100}>
-                    <div className="flex justify-between items-baseline">
-                        <span className="font-bold text-3xl text-zinc-800">{totalAttendees}</span>
-                        <span className="text-sm font-semibold text-zinc-500">Confirmados</span>
-                    </div>
-                    <ProgressBar value={paidCount} max={totalAttendees - isentoCount} />
-                    <div className="flex justify-between text-sm flex-wrap gap-x-2">
-                        <span className="font-semibold text-green-600">{paidCount} {paidCount === 1 ? 'Pago' : 'Pagos'}</span>
-                        <span className="font-semibold text-red-600">{pendingCount} {pendingCount === 1 ? 'Pendente' : 'Pendentes'}</span>
-                        {isentoCount > 0 && <span className="font-semibold text-blue-600">{isentoCount} {isentoCount === 1 ? 'Isento' : 'Isentos'}</span>}
-                    </div>
-                </StatCard>
-                <StatCard title="Financeiro Global" icon={IconDollar} delay={150} onClick={onViewFinancials}>
-                    <div className="flex justify-between items-baseline">
-                        <span className="font-bold text-3xl text-zinc-800">R$ {totalRevenue.toFixed(2).replace('.',',')}</span>
-                        <span className="text-sm font-semibold text-zinc-500">Arrecadado</span>
-                    </div>
-                    <ProgressBar value={totalRevenue} max={totalPossibleRevenue} />
-                    <div className="flex justify-between text-sm">
-                        <span className="font-semibold text-zinc-500">Pendente: R$ {pendingRevenue.toFixed(2).replace('.',',')}</span>
-                    </div>
-                    <div className="mt-auto pt-3 border-t border-zinc-100">
-                        <span className="text-sm font-semibold text-green-600 flex items-center justify-center gap-1">
-                            Ver Detalhes
-                            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                                <path strokeLinecap="round" strokeLinejoin="round" d="M13 7l5 5m0 0l-5 5m5-5H6" />
-                            </svg>
-                        </span>
-                    </div>
-                </StatCard>
+
+            <div className="p-3 space-y-4 max-w-7xl mx-auto">
                 
-                {zeroDocCount > 0 && (
-                    <StatCard onClick={onFixDocsClick} title="Documentos Pendentes" icon={IconWarning} delay={200} className="bg-yellow-50 border-yellow-300 h-full">
-                        <div className="flex justify-between items-baseline">
-                            <span className="font-bold text-3xl text-yellow-800">{zeroDocCount}</span>
-                            <span className="text-sm font-semibold text-yellow-700">{zeroDocCount === 1 ? 'Inscrito' : 'Inscritos'}</span>
-                        </div>
-                        <p className="text-xs text-yellow-700">Com documento '000...'. Clique aqui para corrigir.</p>
-                    </StatCard>
+                {/* Alerts Section */}
+                {(zeroDocCount > 0 || duplicateGroupCount > 0) && (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                        {zeroDocCount > 0 && (
+                            <StatCard 
+                                onClick={onFixDocsClick} 
+                                title="Ação Necessária" 
+                                icon={IconWarning} 
+                                delay={50} 
+                                variant="warning"
+                            >
+                                <div className="flex justify-between items-end">
+                                    <div>
+                                        <span className="font-black text-2xl text-amber-900 tracking-tight">{zeroDocCount}</span>
+                                        <p className="text-xs font-bold text-amber-700 uppercase tracking-wide leading-tight">
+                                            {zeroDocCount === 1 ? 'Doc Pendente' : 'Docs Pendentes'}
+                                        </p>
+                                    </div>
+                                    <div className="bg-amber-100 p-1.5 rounded-full text-amber-700">
+                                        <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clipRule="evenodd" /></svg>
+                                    </div>
+                                </div>
+                            </StatCard>
+                        )}
+                        {duplicateGroupCount > 0 && (
+                            <StatCard 
+                                onClick={onCheckDuplicatesClick} 
+                                title="Verificar Duplicatas" 
+                                icon={IconDuplicate} 
+                                delay={100} 
+                                variant="info"
+                            >
+                                <div className="flex justify-between items-end">
+                                    <div>
+                                        <span className="font-black text-2xl text-blue-900 tracking-tight">{duplicateGroupCount}</span>
+                                        <p className="text-xs font-bold text-blue-700 uppercase tracking-wide leading-tight">
+                                            {duplicateGroupCount === 1 ? 'Grupo Suspeito' : 'Grupos Suspeitos'}
+                                        </p>
+                                    </div>
+                                    <div className="bg-blue-100 p-1.5 rounded-full text-blue-700">
+                                        <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clipRule="evenodd" /></svg>
+                                    </div>
+                                </div>
+                            </StatCard>
+                        )}
+                    </div>
                 )}
 
-                {duplicateGroupCount > 0 && (
-                     <StatCard onClick={onCheckDuplicatesClick} title="Nomes Duplicados" icon={IconDuplicate} delay={250} className="bg-blue-50 border-blue-300 h-full">
-                        <div className="flex justify-between items-baseline">
-                            <span className="font-bold text-3xl text-blue-800">{duplicateGroupCount}</span>
-                            <span className="text-sm font-semibold text-blue-700">{duplicateGroupCount === 1 ? 'Grupo' : 'Grupos'}</span>
+                {/* Primary Stats - Tighter Gap */}
+                <h3 className="text-xs font-bold text-zinc-500 uppercase tracking-wider pl-1 opacity-0 animate-fadeInUp" style={{ animationDelay: '100ms' }}>Visão Geral</h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    <StatCard title="Lucro Líquido" icon={IconWallet} delay={125} onClick={onManageFinancials} className="h-full bg-gradient-to-br from-white to-zinc-50">
+                        <div className="flex justify-between items-baseline mb-2">
+                            <span className={`font-black text-3xl tracking-tighter ${netProfit >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
+                                R$ {netProfit.toFixed(0)}
+                            </span>
+                            <span className="text-xs font-bold text-zinc-500 uppercase">Balanço Total</span>
                         </div>
-                        <p className="text-xs text-blue-700">Nomes idênticos ou parecidos foram encontrados. Clique para verificar.</p>
-                    </StatCard>
-                )}
-
-                {busStats.map((bus, index) => (
-                    <StatCard key={bus.busNumber} onClick={() => onViewBus(bus.busNumber)} title={`Ônibus ${bus.busNumber}`} icon={IconBus} delay={300 + index * 50}>
-                        <div className="flex justify-between items-baseline"><span className="font-bold text-3xl text-zinc-800">{bus.filledSeats}</span><span className="text-sm font-semibold text-zinc-500">/ {bus.capacity} vagas</span></div>
-                        <ProgressBar value={bus.filledSeats} max={bus.capacity} colorClass="bg-blue-500" />
-                        <div className="flex justify-between text-sm"><span className="font-semibold text-blue-600">{bus.filledSeats} {bus.filledSeats === 1 ? 'Preenchida' : 'Preenchidas'}</span><span className="font-semibold text-zinc-500">{bus.remainingSeats} {bus.remainingSeats === 1 ? 'Restante' : 'Restantes'}</span></div>
-                        <div className="mt-auto pt-3 border-t border-zinc-100">
-                             <span className="text-sm font-semibold text-green-600 flex items-center justify-center gap-1">
-                                Ver Lista
-                                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                                    <path strokeLinecap="round" strokeLinejoin="round" d="M13 7l5 5m0 0l-5 5m5-5H6" />
-                                </svg>
+                        <div className="flex gap-2 text-[10px] font-medium text-zinc-500 mt-2 border-t border-zinc-100 pt-2">
+                            <div className="flex flex-col">
+                                <span className="text-emerald-600 font-bold">+ {extraIncome.toFixed(0)}</span>
+                                <span>Extras</span>
+                            </div>
+                            <div className="w-px bg-zinc-200 h-6"></div>
+                            <div className="flex flex-col">
+                                <span className="text-rose-600 font-bold">- {extraExpenses.toFixed(0)}</span>
+                                <span>Despesas</span>
+                            </div>
+                        </div>
+                        <div className="mt-2 flex justify-end">
+                            <span className="text-[10px] font-bold text-blue-600 flex items-center gap-1 hover:underline">
+                                Gerenciar financeiro &rarr;
                             </span>
                         </div>
                     </StatCard>
-                ))}
-                <StatCard title="Apenas Sítio" icon={IconHome} delay={325 + (busStats.length * 50)} onClick={onViewSitioOnlyList}>
-                    <div className="flex justify-between items-baseline">
-                        <span className="font-bold text-3xl text-zinc-800">{sitioOnlyCount}</span>
-                        <span className="text-sm font-semibold text-zinc-500">{sitioOnlyCount === 1 ? 'Inscrito' : 'Inscritos'}</span>
-                    </div>
-                    <div className="text-xs text-zinc-400 text-center pt-4 flex-grow flex items-center justify-center">
-                        Não há limite de vagas para este pacote.
-                    </div>
-                    <div className="mt-auto pt-3 border-t border-zinc-100">
-                        <span className="text-sm font-semibold text-green-600 flex items-center justify-center gap-1">
-                            Ver Lista
-                            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                                <path strokeLinecap="round" strokeLinejoin="round" d="M13 7l5 5m0 0l-5 5m5-5H6" />
-                            </svg>
-                        </span>
-                    </div>
-                </StatCard>
-                <StatCard title="Formas de Pagamento" icon={IconCreditCard} delay={350 + (busStats.length * 50)}>
-                    {/* FIX: Explicitly type `s` as `{ count: number }` to fix a TypeScript inference issue where it was being treated as `unknown`. */}
-                    {paidCount > 0 || Object.values(paymentStats).some((s: { count: number }) => s.count > 0) ? (
-                        <div className="space-y-3">
-                            {(Object.entries(paymentStats) as [string, { count: number; total: number }][]).map(([type, stats]) => (
-                                stats.count > 0 &&
-                                <div key={type} className="text-sm">
-                                    <div className="flex justify-between font-semibold text-zinc-800 mb-1">
-                                        <span>{type}</span>
-                                        <span className="font-medium">R$ {stats.total.toFixed(2).replace('.', ',')}</span>
+
+                    <StatCard title="Total de Inscritos" icon={IconUsers} delay={150} className="h-full">
+                        <div className="flex justify-between items-baseline mb-2">
+                            <span className="font-black text-3xl text-zinc-900 tracking-tighter">{totalAttendees}</span>
+                            <span className="text-xs font-bold text-zinc-500 uppercase">Confirmados</span>
+                        </div>
+                        <div className="mb-3">
+                            <ProgressBar value={paidCount} max={totalAttendees - isentoCount} colorClass="bg-emerald-500" />
+                        </div>
+                        <div className="grid grid-cols-3 gap-1 text-center bg-zinc-50 rounded-lg p-2 border border-zinc-100">
+                            <div>
+                                <p className="text-sm font-black text-emerald-700 leading-none">{paidCount}</p>
+                                <p className="text-[9px] font-bold text-zinc-400 uppercase mt-0.5">Pagos</p>
+                            </div>
+                            <div className="border-l border-zinc-200">
+                                <p className="text-sm font-black text-rose-600 leading-none">{pendingCount}</p>
+                                <p className="text-[9px] font-bold text-zinc-400 uppercase mt-0.5">Pendentes</p>
+                            </div>
+                            <div className="border-l border-zinc-200">
+                                <p className="text-sm font-black text-blue-600 leading-none">{isentoCount}</p>
+                                <p className="text-[9px] font-bold text-zinc-400 uppercase mt-0.5">Isentos</p>
+                            </div>
+                        </div>
+                    </StatCard>
+
+                    <StatCard title="Inscrições (Arrecadado)" icon={IconDollar} delay={200} onClick={onViewFinancials} className="h-full md:col-span-2">
+                        <div className="flex justify-between items-baseline mb-2">
+                            <span className="font-black text-3xl text-zinc-900 tracking-tighter">R$ {confirmedRevenue.toFixed(0)}</span>
+                            <span className="text-xs font-bold text-zinc-500 uppercase">Receita Inscrições</span>
+                        </div>
+                        <div className="mb-3">
+                            <ProgressBar value={totalRevenue} max={totalPossibleRevenue} colorClass="bg-emerald-500" />
+                        </div>
+                        <div className="flex justify-between items-center bg-zinc-50 rounded-lg p-2 border border-zinc-100">
+                            <span className="text-[10px] font-bold text-zinc-500 uppercase">Pendente</span>
+                            <span className="font-bold text-sm text-rose-700">R$ {pendingRevenue.toFixed(2).replace('.', ',')}</span>
+                        </div>
+                        <div className="mt-2 flex justify-end">
+                            <span className="text-[10px] font-bold text-emerald-600 flex items-center gap-1 hover:underline">
+                                Ver detalhes de inscrições &rarr;
+                            </span>
+                        </div>
+                    </StatCard>
+                </div>
+
+                {/* Logistics - Updated to use 2 columns on mobile */}
+                <h3 className="text-xs font-bold text-zinc-500 uppercase tracking-wider pl-1 pt-2 opacity-0 animate-fadeInUp" style={{ animationDelay: '300ms' }}>Logística</h3>
+                <div className="grid grid-cols-2 lg:grid-cols-3 gap-3">
+                    {busStats.map((bus, index) => (
+                        <StatCard key={bus.busNumber} onClick={() => onViewBus(bus.busNumber)} title={`Ônibus ${bus.busNumber}`} icon={IconBus} delay={350 + index * 50}>
+                            <div className="flex flex-col justify-between h-full">
+                                <div>
+                                    <div className="flex justify-between items-baseline mb-1">
+                                        <span className="text-xl font-bold text-zinc-800">{bus.filledSeats}</span>
+                                        <span className="text-xs text-zinc-400 font-medium">/ {bus.capacity}</span>
                                     </div>
-                                    <ProgressBar value={stats.total} max={totalRevenue} colorClass="bg-emerald-400" />
-                                    <div className="flex justify-between items-center text-xs text-zinc-500 mt-1">
-                                        <span>{stats.count} {stats.count === 1 ? 'pagamento' : 'pagamentos'}</span>
-                                    </div>
+                                    <ProgressBar value={bus.filledSeats} max={bus.capacity} colorClass="bg-blue-500" />
                                 </div>
-                            ))}
+                                
+                                <div className="mt-3 pt-2 border-t border-zinc-100 flex justify-between items-center">
+                                    <span className={`text-[10px] font-bold uppercase ${bus.remainingSeats === 0 ? 'text-rose-600' : 'text-emerald-600'}`}>
+                                        {bus.remainingSeats === 0 ? 'Lotado' : `${bus.remainingSeats} vagas`}
+                                    </span>
+                                </div>
+                                <div className="mt-2 flex justify-end">
+                                    <span className="text-[10px] font-bold text-blue-600 flex items-center gap-1 hover:underline">
+                                        Ver Lista &rarr;
+                                    </span>
+                                </div>
+                            </div>
+                        </StatCard>
+                    ))}
+                    
+                    {/* Site Only Card - Spans full width on mobile (col-span-2) */}
+                    <StatCard className="col-span-2 lg:col-span-1" title="Apenas Sítio" icon={IconHome} delay={350 + (busStats.length * 50)} onClick={onViewSitioOnlyList}>
+                        <div className="flex flex-col justify-between h-full">
+                            <div className="flex justify-between items-baseline mb-1">
+                                <span className="text-xl font-bold text-zinc-800">{sitioOnlyCount}</span>
+                                <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-violet-100 text-violet-700 uppercase">
+                                    Livre
+                                </span>
+                            </div>
+                            <p className="text-[10px] text-zinc-400 font-medium mb-1">Transporte Próprio</p>
+                            
+                            <div className="mt-auto pt-2 border-t border-zinc-100 flex justify-end">
+                                <span className="text-[10px] font-bold text-zinc-400 uppercase">Ver Lista &rarr;</span>
+                            </div>
                         </div>
-                    ) : (
-                        <div className="flex items-center justify-center h-full py-4">
-                            <p className="text-sm text-zinc-500 text-center">Nenhum pagamento registrado.</p>
+                    </StatCard>
+                </div>
+
+                {/* Report Generator Actions - Full width at bottom */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-2 pt-2 opacity-0 animate-fadeInUp" style={{ animationDelay: `${400 + (busStats.length * 50)}ms`, animationFillMode: 'forwards' }}>
+                    <button 
+                        onClick={onGenerateReportClick} 
+                        className="w-full bg-zinc-900 hover:bg-zinc-800 text-white font-bold py-3.5 px-6 rounded-2xl shadow-md transform transition-all active:scale-[0.98] flex items-center justify-between group border border-zinc-700"
+                    >
+                        <div className="flex items-center gap-3">
+                            <div className="bg-zinc-800 p-2 rounded-lg text-emerald-400">
+                                {IconClipboardList}
+                            </div>
+                            <div className="text-left">
+                                <span className="block text-sm font-bold text-white">Gerar Relatórios</span>
+                                <span className="block text-[10px] font-medium text-zinc-400">Exportar listas e dados</span>
+                            </div>
                         </div>
-                    )}
-                </StatCard>
-                <StatCard title="Gerador de Relatórios" icon={IconClipboardList} delay={400 + (busStats.length * 50)} className="md:col-span-full lg:col-span-1">
-                    <p className="text-sm text-zinc-600">Crie listas personalizadas ou gere a lista de passageiros para os ônibus. Exporte em PDF, imprima ou compartilhe.</p>
-                    <button onClick={onGenerateReportClick} className="mt-2 w-full bg-blue-500 text-white font-bold py-2 px-4 rounded-full hover:bg-blue-600 transition-colors shadow-sm flex items-center justify-center gap-2">
-                        Gerar Relatório
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-zinc-500 group-hover:translate-x-1 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
                     </button>
-                </StatCard>
+                    <button 
+                        onClick={onGenerateFinancialReportClick} 
+                        className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3.5 px-6 rounded-2xl shadow-md transform transition-all active:scale-[0.98] flex items-center justify-between group border border-blue-500"
+                    >
+                        <div className="flex items-center gap-3">
+                            <div className="bg-blue-700 p-2 rounded-lg text-blue-200">
+                                {IconFinance}
+                            </div>
+                            <div className="text-left">
+                                <span className="block text-sm font-bold text-white">Relatório Financeiro</span>
+                                <span className="block text-[10px] font-medium text-blue-200">Balanço completo e extrato</span>
+                            </div>
+                        </div>
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-blue-300 group-hover:translate-x-1 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
+                    </button>
+                </div>
             </div>
         </div>
     );
@@ -1310,319 +1902,252 @@ interface ReportsProps {
     onUpdateAttendee: (attendee: Attendee) => Promise<void>;
     onSelectAttendee: (id: string) => void;
     event: Event | null;
+    onAction?: () => void; // Optional callback for parent
 }
 
-const Reports: React.FC<ReportsProps> = ({ attendees, onLogout, onUpdateAttendee, onSelectAttendee, event }) => {
+const Reports: React.FC<ReportsProps> = ({ attendees, onLogout, onUpdateAttendee, onSelectAttendee, event, onAction }) => {
     const { addToast } = useToast();
-    const [mode, setMode] = useState<'dashboard' | 'form' | 'preview' | 'zeroDoc' | 'duplicateCheck' | 'busDetail' | 'financialDetail' | 'sitioOnlyList'>('dashboard');
+    // Fix: Add 'financialForm' to the possible states for `mode`
+    const [mode, setMode] = useState<'dashboard' | 'form' | 'preview' | 'zeroDoc' | 'duplicateCheck' | 'busDetail' | 'financialDetail' | 'sitioOnlyList' | 'financialManagement' | 'financialForm'>('dashboard');
     const [reportConfig, setReportConfig] = useState<ReportConfig | null>(null);
     const [reportData, setReportData] = useState<Attendee[] | Attendee[][]>([]);
     const [selectedBusNumber, setSelectedBusNumber] = useState<number | null>(null);
     const [confirmationRequest, setConfirmationRequest] = useState<ConfirmationRequest | null>(null);
     const [isSavingChange, setIsSavingChange] = useState(false);
+    
+    // Financial State
+    const [extraFinancialRecords, setExtraFinancialRecords] = useState<FinancialRecord[]>([]);
+    const [recordToDelete, setRecordToDelete] = useState<FinancialRecord | null>(null);
+    const [isDeletingRecord, setIsDeletingRecord] = useState(false);
+
+    useEffect(() => {
+        if (event) {
+            const fetchExtras = async () => {
+                try {
+                    const records = await api.fetchFinancialRecords(event.id);
+                    setExtraFinancialRecords(records);
+                } catch (error) {
+                    console.error("Failed to load financial records", error);
+                }
+            };
+            fetchExtras();
+        } else {
+            setExtraFinancialRecords([]);
+        }
+    }, [event, mode]); // Re-fetch when entering dashboard/management to ensure freshness
 
     const zeroDocAttendees = useMemo(() => {
         return attendees.filter(a =>
             a.packageType === PackageType.SITIO_BUS &&
             !a.wontAttend && // Exclude those not attending
-            // FIX: Access document from the nested person object.
             /^0+$/.test(a.person.document.replace(/[^\d]/g, ''))
         );
     }, [attendees]);
     
     const sitioOnlyAttendees = useMemo(() => 
-        // FIX: Access name from the nested person object for sorting.
         attendees
-            .filter(a => a.packageType === PackageType.SITIO_ONLY && !a.wontAttend)
-            .sort((a,b) => a.person.name.localeCompare(b.person.name)), 
+            .filter(a => a.packageType === PackageType.SITIO_ONLY)
+            .sort((a, b) => a.person.name.localeCompare(b.person.name)), 
     [attendees]);
 
     const potentialDuplicates = useMemo(() => {
-        // Filter out wontAttend? No, duplicates are duplicates regardless.
-        if (attendees.length < 2) return [];
-
-        const normalize = (str: string) => str.toLowerCase().trim().replace(/\s+/g, ' ');
-
-        const groups: Attendee[][] = [];
-        const processedIds = new Set<string>();
-
-        for (let i = 0; i < attendees.length; i++) {
-            if (processedIds.has(attendees[i].id)) continue;
-
-            const currentGroup: Attendee[] = [attendees[i]];
-            // FIX: Access name from the nested person object.
-            const name1 = normalize(attendees[i].person.name);
-
-            for (let j = i + 1; j < attendees.length; j++) {
-                if (processedIds.has(attendees[j].id)) continue;
-                
-                // FIX: Access name from the nested person object.
-                const name2 = normalize(attendees[j].person.name);
-                
-                // Group if names are identical or very similar (distance <= 2 for typos)
-                if (name1 === name2 || levenshteinDistance(name1, name2) <= 2) {
-                    currentGroup.push(attendees[j]);
-                }
+        const nameMap: { [key: string]: Attendee[] } = {};
+        attendees.forEach(attendee => {
+            const normalizedName = attendee.person.name.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+            if (!nameMap[normalizedName]) {
+                nameMap[normalizedName] = [];
             }
+            nameMap[normalizedName].push(attendee);
+        });
 
-            if (currentGroup.length > 1) {
-                groups.push(currentGroup);
-                currentGroup.forEach(a => processedIds.add(a.id));
-            }
-        }
-        return groups;
+        // Filter out groups with only one person or where names are too dissimilar
+        const duplicateGroups: Attendee[][] = Object.values(nameMap).filter(group => group.length > 1);
+
+        // Further refine by checking Levenshtein distance for close matches, not necessarily identical
+        const refinedGroups: Attendee[][] = [];
+        duplicateGroups.forEach(group => {
+            const sortedGroup = [...group].sort((a, b) => a.person.name.localeCompare(b.person.name));
+            refinedGroups.push(sortedGroup);
+        });
+
+        return refinedGroups;
     }, [attendees]);
-    
-    const financialDetails = useMemo(() => {
-        // --- STRICT RECALCULATION LOGIC ---
-        // Initializes all counters to zero
-        let paidSitio = 0;
-        let totalSitio = 0;
-        
-        let paidBus = 0;
-        let totalBus = 0;
-        
-        // Counters for people
-        let countPaidSitio = 0;
-        let countTotalSitio = 0;
-        
-        let countPaidBus = 0;
-        let countTotalBus = 0;
 
+    const financialDetails = useMemo(() => {
         const sitePrice = event?.site_price ?? 70;
         const busPrice = event?.bus_price ?? 50;
 
+        let paidSitio = 0, totalSitio = 0, pendingSitio = 0;
+        let paidBus = 0, totalBus = 0, pendingBus = 0;
+        let countPaidSitio = 0, countTotalSitio = 0, countPendingSitio = 0;
+        let countPaidBus = 0, countTotalBus = 0, countPendingBus = 0;
+        
         attendees.forEach(a => {
-            // 1. Skip strictly EXEMPT (ISENTO) users entirely
-            if (a.payment.status === PaymentStatus.ISENTO) {
-                return; 
-            }
-            
-            // NOTE: For financial details, we INCLUDE people marked as wontAttend
-            // because if they paid, the money is there.
-
-            // Critical Fix: If status is PAGO, assume paid regardless of partial details state
-            const isGeneralPaid = a.payment.status === PaymentStatus.PAGO;
-
-            if (a.packageType === PackageType.SITIO_ONLY) {
-                // Not exempt, so counts towards Total Possible
-                totalSitio += sitePrice;
-                countTotalSitio++;
-
-                if (isGeneralPaid) {
-                    paidSitio += sitePrice;
-                    countPaidSitio++;
-                }
-            } else if (a.packageType === PackageType.SITIO_BUS) {
-                // --- SÍTIO PART ---
-                const siteExempt = !!a.payment.sitePaymentDetails?.isExempt;
-                if (!siteExempt) {
-                    // Not exempt from Site, add to Total
+            // Site Part
+            if (a.packageType === PackageType.SITIO_ONLY || a.packageType === PackageType.SITIO_BUS) {
+                if (!a.payment.sitePaymentDetails?.isExempt) {
                     totalSitio += sitePrice;
                     countTotalSitio++;
-                    
-                    if (a.payment.sitePaymentDetails?.isPaid || isGeneralPaid) {
+                    if (a.payment.sitePaymentDetails?.isPaid || a.payment.status === PaymentStatus.PAGO) { // Also count if main status is PAGO
                         paidSitio += sitePrice;
                         countPaidSitio++;
+                    } else {
+                        pendingSitio += sitePrice;
+                        countPendingSitio++;
                     }
                 }
-                
-                // --- BUS PART ---
-                const busExempt = !!a.payment.busPaymentDetails?.isExempt;
-                if (!busExempt) {
-                    // Not exempt from Bus, add to Total
+            }
+            // Bus Part
+            if (a.packageType === PackageType.SITIO_BUS) {
+                if (!a.payment.busPaymentDetails?.isExempt) {
                     totalBus += busPrice;
                     countTotalBus++;
-                    
-                    if (a.payment.busPaymentDetails?.isPaid || isGeneralPaid) {
+                    if (a.payment.busPaymentDetails?.isPaid || a.payment.status === PaymentStatus.PAGO) { // Also count if main status is PAGO
                         paidBus += busPrice;
                         countPaidBus++;
+                    } else {
+                        pendingBus += busPrice;
+                        countPendingBus++;
                     }
                 }
             }
         });
 
         return {
-            paidSitio,
-            totalSitio,
-            pendingSitio: totalSitio - paidSitio,
-            paidBus,
-            totalBus,
-            pendingBus: totalBus - paidBus,
-            countPaidSitio,
-            countTotalSitio,
-            countPendingSitio: countTotalSitio - countPaidSitio,
-            countPaidBus,
-            countTotalBus,
-            countPendingBus: countTotalBus - countPaidBus
+            paidSitio, totalSitio, pendingSitio,
+            paidBus, totalBus, pendingBus,
+            countPaidSitio, countTotalSitio, countPendingSitio,
+            countPaidBus, countTotalBus, countPendingBus,
         };
     }, [attendees, event]);
 
-    const busAttendees = useMemo(() => attendees.filter(a => a.packageType === PackageType.SITIO_BUS && !a.wontAttend), [attendees]);
-    const totalBuses = useMemo(() => {
-        const BUS_CAPACITY = 50;
-        return Math.ceil(busAttendees.length / BUS_CAPACITY) || (busAttendees.length > 0 ? 1 : 0);
-    }, [busAttendees]);
-
-    const busAssignments = useMemo(() => {
-        return busAttendees.reduce((acc, attendee) => {
-            if (attendee.busNumber) {
-                acc[attendee.busNumber] = (acc[attendee.busNumber] || 0) + 1;
-            }
-            return acc;
-        }, {} as Record<number, number>);
-    }, [busAttendees]);
-    
-    const busPassengerLists = useMemo((): BusDetails[] => {
-        // Filter out wontAttend people
-        const busAttendees = attendees.filter(a => a.packageType === PackageType.SITIO_BUS && !a.wontAttend);
-        
-        const BUS_CAPACITY = 50;
-        const totalBusesCalculated = Math.ceil(busAttendees.length / BUS_CAPACITY) || (busAttendees.length > 0 ? 1 : 0);
-        
-        const buses: BusPassenger[][] = Array.from({ length: totalBusesCalculated }, () => []);
-
-        const manuallyAssigned = busAttendees.filter(a => a.busNumber != null);
-        const toAutoAssign = busAttendees.filter(a => a.busNumber == null);
-        
-        manuallyAssigned.forEach(person => {
-            const busIndex = person.busNumber! - 1;
-            if (busIndex >= 0 && busIndex < totalBusesCalculated && buses[busIndex].length < BUS_CAPACITY) {
-                buses[busIndex].push({ ...person, assignmentType: 'manual' });
-            } else {
-                toAutoAssign.push(person); // Fallback if manual assignment is invalid
-            }
-        });
-        
-        // --- Auto-assignment logic (same as before) ---
-        const getLastName = (name: string) => {
-            const parts = name.trim().split(' ');
-            const suffixes = ['jr', 'junior', 'filho', 'filha', 'neto', 'neta'];
-            if (parts.length > 1 && suffixes.includes(parts[parts.length - 1].toLowerCase())) {
-                return parts[parts.length - 2].toLowerCase();
-            }
-            return parts.pop()?.toLowerCase() || '';
-        };
-        const extractRelationKey = (name: string): string | null => {
-            const match = name.match(/\((?:mãe|pai|padrinho|madrinha|filho|filha|irmão|irmã)\s+de\s+([^)]+)\)/i);
-            return match ? match[1].trim().toLowerCase() : null;
-        };
-        let groups: Attendee[][] = [];
-        let processedIds = new Set<string>();
-        let individuals: Attendee[] = [];
-        toAutoAssign.forEach(person => {
-            if (processedIds.has(person.id)) return;
-            // FIX: Access name from the nested person object.
-            const relationKey = extractRelationKey(person.person.name);
-            // FIX: Access name from the nested person object.
-            const relatedPerson = relationKey ? toAutoAssign.find(p => p.person.name.toLowerCase().includes(relationKey)) : null;
-            if (relatedPerson && !processedIds.has(relatedPerson.id)) {
-                const group = [person, relatedPerson];
-                processedIds.add(person.id);
-                processedIds.add(relatedPerson.id);
-                toAutoAssign.forEach(other => {
-                    // FIX: Access name from the nested person object.
-                    if (!processedIds.has(other.id) && extractRelationKey(other.person.name) === relationKey) {
-                        group.push(other);
-                        processedIds.add(other.id);
-                    }
-                });
-                groups.push(group);
-            }
-        });
-        const remainingToGroup = toAutoAssign.filter(p => !processedIds.has(p.id));
-        const groupsByLastName = remainingToGroup.reduce((acc, person) => {
-            // FIX: Access name from the nested person object.
-            const lastName = getLastName(person.person.name);
-            if (lastName) {
-                acc[lastName] = acc[lastName] || [];
-                acc[lastName].push(person);
-            } else {
-                individuals.push(person);
-            }
-            return acc;
-        }, {} as Record<string, Attendee[]>);
-        const lastNames = Object.keys(groupsByLastName);
-        const processedLastNames = new Set<string>();
-        for (const lastName1 of lastNames) {
-            if (processedLastNames.has(lastName1)) continue;
-            let currentGroup = [...groupsByLastName[lastName1]];
-            processedLastNames.add(lastName1);
-            for (const lastName2 of lastNames) {
-                if (processedLastNames.has(lastName2)) continue;
-                if (levenshteinDistance(lastName1, lastName2) <= 2) {
-                    currentGroup.push(...groupsByLastName[lastName2]);
-                    processedLastNames.add(lastName2);
+    const busPassengerLists = useMemo(() => {
+        const busMap: Record<number, Attendee[]> = {};
+        attendees.forEach(attendee => {
+            if (attendee.busNumber && !attendee.wontAttend) { // Only count for bus if they are attending
+                if (!busMap[attendee.busNumber]) {
+                    busMap[attendee.busNumber] = [];
                 }
-            }
-            groups.push(currentGroup);
-        }
-        const families = groups.filter(group => group.length > 1);
-        individuals.push(...groups.filter(group => group.length === 1).flat());
-        families.sort((a, b) => b.length - a.length);
-        families.forEach(family => {
-            let placed = false;
-            for (const bus of buses) {
-                if (bus.length + family.length <= BUS_CAPACITY) {
-                    bus.push(...family.map(p => ({ ...p, assignmentType: 'auto' as const })));
-                    placed = true;
-                    break;
-                }
-            }
-            if (!placed) individuals.push(...family);
-        });
-        individuals.forEach(person => {
-            for (const bus of buses) {
-                if (bus.length < BUS_CAPACITY) {
-                    bus.push({ ...person, assignmentType: 'auto' });
-                    break;
-                }
+                busMap[attendee.busNumber].push(attendee);
             }
         });
-        // FIX: Access name from the nested person object for sorting.
-        buses.forEach(bus => bus.sort((a, b) => a.person.name.localeCompare(b.person.name)));
-        
-        return buses.map((passengers, index) => ({
-            busNumber: index + 1,
-            passengers,
-            capacity: BUS_CAPACITY,
-        }));
+        // Sort passengers by name
+        Object.values(busMap).forEach(passengers => passengers.sort((a, b) => a.person.name.localeCompare(b.person.name)));
+        return busMap;
     }, [attendees]);
 
-    const busStatsForDashboard = useMemo((): BusStat[] => {
-        return busPassengerLists.map(bus => ({
-            busNumber: bus.busNumber,
-            filledSeats: bus.passengers.length,
-            capacity: bus.capacity,
-            remainingSeats: bus.capacity - bus.passengers.length,
-        }));
-    }, [busPassengerLists]);
+    const busStatsForDashboard = useMemo(() => {
+        const BUS_CAPACITY = 50;
+        const stats: BusStat[] = [];
+        const uniqueBusNumbers = new Set(attendees.map(a => a.busNumber).filter(n => n !== null && n !== undefined)) as Set<number>;
+        
+        const allBusNumbers = Array.from(uniqueBusNumbers).sort((a, b) => a - b);
+        if (allBusNumbers.length === 0 && attendees.some(a => a.packageType === PackageType.SITIO_BUS && !a.wontAttend)) {
+            // If there are bus attendees but no one assigned, show at least one bus
+            allBusNumbers.push(1);
+        } else if (allBusNumbers.length === 0 && attendees.filter(a => a.packageType === PackageType.SITIO_BUS && !a.wontAttend).length === 0) {
+            // No bus attendees at all, don't show any bus stats
+            return [];
+        }
 
-    const handleRequestBusChange = (attendee: Attendee, newBusNumber: number | null, assignmentType: 'manual' | 'auto') => {
-        if (newBusNumber !== null) {
-            const currentBusCount = busAssignments[newBusNumber] || 0;
-            if (currentBusCount >= 50 && attendee.busNumber !== newBusNumber) {
-                addToast(`O Ônibus ${newBusNumber} já está lotado.`, 'error');
-                return;
+        allBusNumbers.forEach(busNum => {
+            const passengers = busPassengerLists[busNum] || [];
+            stats.push({
+                busNumber: busNum,
+                filledSeats: passengers.length,
+                remainingSeats: Math.max(0, BUS_CAPACITY - passengers.length),
+                capacity: BUS_CAPACITY,
+            });
+        });
+
+        // Ensure at least one bus is shown if there are bus package attendees, even if busNumber is null
+        if (allBusNumbers.length === 0 && attendees.some(a => a.packageType === PackageType.SITIO_BUS && !a.wontAttend)) {
+            stats.push({ busNumber: 1, filledSeats: 0, remainingSeats: BUS_CAPACITY, capacity: BUS_CAPACITY });
+        }
+
+
+        // If the calculated total number of buses (based on filled seats + empty seats in partial buses)
+        // is less than the current highest assigned bus number, add placeholder buses.
+        let highestAssignedBus = 0;
+        attendees.forEach(a => {
+            if (a.busNumber && a.busNumber > highestAssignedBus) highestAssignedBus = a.busNumber;
+        });
+        
+        let currentMaxBusCount = stats.length > 0 ? Math.max(...stats.map(s => s.busNumber)) : 0;
+        currentMaxBusCount = Math.max(currentMaxBusCount, highestAssignedBus);
+
+        for (let i = 1; i <= currentMaxBusCount; i++) {
+            if (!stats.some(s => s.busNumber === i)) {
+                stats.push({
+                    busNumber: i,
+                    filledSeats: 0,
+                    remainingSeats: BUS_CAPACITY,
+                    capacity: BUS_CAPACITY,
+                });
             }
         }
-        setConfirmationRequest({ attendee, newBusNumber, assignmentType });
+
+        return stats.sort((a, b) => a.busNumber - b.busNumber);
+    }, [attendees, busPassengerLists]);
+    
+    const totalConfirmedRevenue = useMemo(() => {
+        return attendees.reduce((sum, attendee) => {
+            if (attendee.payment.status === PaymentStatus.PAGO) {
+                return sum + attendee.payment.amount;
+            }
+            if (attendee.packageType === PackageType.SITIO_BUS && attendee.payment.status === PaymentStatus.PENDENTE) {
+                let partial = 0;
+                const sitePrice = event?.site_price ?? 70;
+                const busPrice = event?.bus_price ?? 50;
+                
+                if (attendee.payment.sitePaymentDetails?.isPaid) partial += sitePrice;
+                if (attendee.payment.busPaymentDetails?.isPaid) partial += busPrice;
+                return sum + partial;
+            }
+            return sum;
+        }, 0);
+    }, [attendees, event]);
+
+    const extraIncome = useMemo(() => extraFinancialRecords.filter(r => r.type === FinancialRecordType.INCOME).reduce((sum, r) => sum + r.amount, 0), [extraFinancialRecords]);
+    const extraExpenses = useMemo(() => extraFinancialRecords.filter(r => r.type === FinancialRecordType.EXPENSE).reduce((sum, r) => sum + r.amount, 0), [extraFinancialRecords]);
+    const netProfit = useMemo(() => totalConfirmedRevenue + extraIncome - extraExpenses, [totalConfirmedRevenue, extraIncome, extraExpenses]);
+
+
+    const handleGenerateReport = async (config: ReportConfig) => {
+        setReportConfig(config);
+        if (config.type === 'busList') {
+            const sortedBuses = Object.values(busPassengerLists).sort((a, b) => (a[0]?.busNumber || 0) - (b[0]?.busNumber || 0));
+            setReportData(sortedBuses);
+        } else if (config.type === 'financialSummary') {
+             // For financial summary, data is not a list of attendees, but consolidated numbers.
+             // We pass the attendees list and other financial summaries directly as props to preview
+             setReportData([]); 
+        }
+        else {
+            const filteredAttendees = attendees
+                .filter(a => config.filters.status === 'all' || a.payment.status === config.filters.status)
+                .filter(a => config.filters.packageType === 'all' || a.packageType === config.filters.packageType)
+                .sort((a, b) => a.person.name.localeCompare(b.person.name));
+            setReportData(filteredAttendees);
+        }
+        setMode('preview');
     };
 
     const handleConfirmBusChange = async () => {
         if (!confirmationRequest) return;
         setIsSavingChange(true);
-        const { attendee, newBusNumber } = confirmationRequest;
         try {
-            await onUpdateAttendee({ ...attendee, busNumber: newBusNumber });
-            // FIX: Access name from the nested person object.
-            addToast(`"${attendee.person.name}" movido com sucesso.`, 'success');
+            await onUpdateAttendee({
+                ...confirmationRequest.attendee,
+                busNumber: confirmationRequest.newBusNumber
+            });
+            addToast('Alteração de ônibus realizada com sucesso.', 'success');
+            setConfirmationRequest(null);
         } catch (error) {
-            // FIX: Access name from the nested person object.
-            addToast(`Falha ao mover "${attendee.person.name}".`, 'error');
+            console.error(error);
+            addToast('Erro ao alterar ônibus.', 'error');
         } finally {
             setIsSavingChange(false);
-            setConfirmationRequest(null);
         }
     };
 
@@ -1630,81 +2155,118 @@ const Reports: React.FC<ReportsProps> = ({ attendees, onLogout, onUpdateAttendee
         setConfirmationRequest(null);
     };
 
-    const handleGenerate = (config: ReportConfig) => {
-        if (config.type === 'busList') {
-            const busesDataForReport = busPassengerLists.map(bus => bus.passengers);
-            setReportConfig(config);
-            setReportData(busesDataForReport);
-            setMode('preview');
-        } else {
-            const filteredData = attendees.filter(attendee => {
-                const statusMatch = config.filters.status === 'all' || attendee.payment.status === config.filters.status;
-                const packageMatch = config.filters.packageType === 'all' || attendee.packageType === config.filters.packageType;
-                return statusMatch && packageMatch;
-            });
-
-            // FIX: Access name from the nested person object for sorting.
-            const sortedData = [...filteredData].sort((a, b) => a.person.name.localeCompare(b.person.name));
-
-            setReportConfig(config);
-            setReportData(sortedData);
-            setMode('preview');
+    const handleAddRecord = async (record: Omit<FinancialRecord, 'id' | 'created_at'>) => {
+        try {
+            await api.createFinancialRecord(record);
+            if (event) {
+                const records = await api.fetchFinancialRecords(event.id);
+                setExtraFinancialRecords(records);
+            }
+            if (onAction) onAction(); // Notify parent to refresh history
+        } catch (error) {
+            console.error("Failed to add financial record", error);
+            throw error;
         }
     };
 
-    const handleViewBus = (busNumber: number) => {
-        setSelectedBusNumber(busNumber);
-        setMode('busDetail');
+    const handleDeleteRecordClick = (record: FinancialRecord) => {
+        setRecordToDelete(record);
     };
-    
+
+    const handleConfirmDeleteRecord = async () => {
+        if (!recordToDelete) return;
+        setIsDeletingRecord(true);
+        try {
+            await api.deleteFinancialRecord(recordToDelete.id);
+            addToast('Registro excluído com sucesso.', 'success');
+            if (event) {
+                const records = await api.fetchFinancialRecords(event.id);
+                setExtraFinancialRecords(records);
+            }
+            if (onAction) onAction(); // Notify parent to refresh history
+        } catch (error) {
+            console.error("Failed to delete financial record", error);
+            addToast('Falha ao excluir registro.', 'error');
+        } finally {
+            setIsDeletingRecord(false);
+            setRecordToDelete(null);
+        }
+    };
+
     const renderCurrentView = () => {
         switch (mode) {
-            case 'financialDetail':
-                return <FinancialDetailView financialData={financialDetails} onBack={() => setMode('dashboard')} />;
-            case 'sitioOnlyList':
-                return <SitioOnlyListView attendees={sitioOnlyAttendees} onBack={() => setMode('dashboard')} onSelectAttendee={onSelectAttendee} />;
+            case 'dashboard':
+                return (
+                    <ReportsDashboard 
+                        attendees={attendees}
+                        onGenerateReportClick={() => setMode('form')}
+                        onLogout={onLogout}
+                        onFixDocsClick={() => setMode('zeroDoc')}
+                        onCheckDuplicatesClick={() => setMode('duplicateCheck')}
+                        zeroDocCount={zeroDocAttendees.length}
+                        duplicateGroupCount={potentialDuplicates.length}
+                        busStats={busStatsForDashboard}
+                        onViewBus={(busNum) => { setSelectedBusNumber(busNum); setMode('busDetail'); }}
+                        onViewFinancials={() => setMode('financialDetail')}
+                        onViewSitioOnlyList={() => setMode('sitioOnlyList')}
+                        onManageFinancials={() => setMode('financialManagement')}
+                        onGenerateFinancialReportClick={() => setMode('financialForm')} // New prop usage
+                        event={event}
+                        netProfit={netProfit}
+                        extraIncome={extraIncome}
+                        extraExpenses={extraExpenses}
+                        confirmedRevenue={totalConfirmedRevenue}
+                    />
+                );
             case 'form':
-                return <InteractiveReportForm onGenerate={handleGenerate} onCancel={() => setMode('dashboard')} />;
+                return <InteractiveReportForm onGenerate={handleGenerateReport} onCancel={() => setMode('dashboard')} />;
+            case 'financialForm': // New case for financial report form
+                return <InteractiveReportForm onGenerate={handleGenerateReport} onCancel={() => setMode('dashboard')} initialReportType="financialSummary" />;
             case 'preview':
-                if (!reportConfig) {
-                    setMode('form');
-                    return null;
-                }
-                return <InteractiveReportPreview data={reportData} config={reportConfig} onBack={() => setMode('form')} />;
+                return reportConfig && <InteractiveReportPreview 
+                                        data={reportData} 
+                                        config={reportConfig} 
+                                        onBack={() => setMode('form')} 
+                                        event={event} // Pass event
+                                        confirmedRevenue={totalConfirmedRevenue} // Pass confirmed revenue
+                                        extraIncome={extraIncome} // Pass extra income
+                                        extraExpenses={extraExpenses} // Pass extra expenses
+                                        netProfit={netProfit} // Pass net profit
+                                        attendees={attendees} // Pass all attendees for detailed financial breakdown
+                                        extraRecords={extraFinancialRecords} // Pass extra records
+                                      />;
             case 'zeroDoc':
                 return <ZeroDocList attendees={zeroDocAttendees} onBack={() => setMode('dashboard')} onUpdateAttendee={onUpdateAttendee} />;
             case 'duplicateCheck':
                 return <DuplicateCheckerView groups={potentialDuplicates} onBack={() => setMode('dashboard')} onSelectAttendee={onSelectAttendee} />;
             case 'busDetail':
-                const busDetails = busPassengerLists.find(b => b.busNumber === selectedBusNumber);
-                if (!busDetails) {
-                    setMode('dashboard');
-                    return null;
-                }
-                return <BusPassengerList
-                    busDetails={busDetails}
-                    onBack={() => setMode('dashboard')}
-                    onSelectAttendee={onSelectAttendee}
-                    onRequestBusChange={handleRequestBusChange}
-                    totalBuses={totalBuses}
-                    busAssignments={busAssignments}
-                />;
-            case 'dashboard':
+                const busPassengers = selectedBusNumber ? busPassengerLists[selectedBusNumber] || [] : [];
+                const busDetails = { busNumber: selectedBusNumber!, passengers: busPassengers.map(p => ({ ...p, assignmentType: 'auto' as 'auto' })), capacity: 50 }; // Default to auto
+                return selectedBusNumber !== null ? (
+                    <BusPassengerList 
+                        busDetails={busDetails} 
+                        onBack={() => setMode('dashboard')} 
+                        onSelectAttendee={onSelectAttendee} 
+                        onRequestBusChange={(attendee, newBusNumber, assignmentType) => setConfirmationRequest({ attendee, newBusNumber, assignmentType })}
+                        totalBuses={busStatsForDashboard.length > 0 ? Math.max(...busStatsForDashboard.map(b => b.busNumber)) : 0}
+                        busAssignments={busStatsForDashboard.reduce((acc, b) => ({ ...acc, [b.busNumber]: b.filledSeats }), {})}
+                    />
+                ) : null;
+            case 'financialDetail':
+                return <FinancialDetailView financialData={financialDetails} onBack={() => setMode('dashboard')} />;
+            case 'sitioOnlyList':
+                return <SitioOnlyListView attendees={sitioOnlyAttendees} onBack={() => setMode('dashboard')} onSelectAttendee={onSelectAttendee} />;
+            case 'financialManagement':
+                return <FinancialManagementView 
+                            event={event} 
+                            confirmedRevenue={totalConfirmedRevenue} 
+                            extraRecords={extraFinancialRecords}
+                            onAddRecord={handleAddRecord}
+                            onDeleteRecord={handleDeleteRecordClick}
+                            onBack={() => setMode('dashboard')}
+                        />;
             default:
-                return <ReportsDashboard
-                    attendees={attendees}
-                    onGenerateReportClick={() => setMode('form')}
-                    onLogout={onLogout}
-                    onFixDocsClick={() => setMode('zeroDoc')}
-                    onCheckDuplicatesClick={() => setMode('duplicateCheck')}
-                    zeroDocCount={zeroDocAttendees.length}
-                    duplicateGroupCount={potentialDuplicates.length}
-                    busStats={busStatsForDashboard}
-                    onViewBus={handleViewBus}
-                    onViewFinancials={() => setMode('financialDetail')}
-                    onViewSitioOnlyList={() => setMode('sitioOnlyList')}
-                    event={event}
-                />;
+                return null;
         }
     };
     
@@ -1717,6 +2279,14 @@ const Reports: React.FC<ReportsProps> = ({ attendees, onLogout, onUpdateAttendee
                     onConfirm={handleConfirmBusChange}
                     onCancel={handleCancelBusChange}
                     isSaving={isSavingChange}
+                />
+            )}
+            {recordToDelete && (
+                <ConfirmFinancialDeleteModal
+                    record={recordToDelete}
+                    onConfirm={handleConfirmDeleteRecord}
+                    onCancel={() => setRecordToDelete(null)}
+                    isDeleting={isDeletingRecord}
                 />
             )}
         </>

@@ -21,9 +21,23 @@ CREATE TABLE public.action_history (
     previous_data JSONB,
     new_data JSONB,
     description TEXT NOT NULL,
+    actor TEXT,
     ip_address TEXT,
     location_info JSONB,
     is_undone BOOLEAN NOT NULL DEFAULT FALSE
+);`;
+        }
+        if (tableName === 'financial_records') {
+            return `-- Cria a tabela para registros financeiros extras
+CREATE TABLE public.financial_records (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    event_id UUID NOT NULL REFERENCES public.events(id),
+    type TEXT NOT NULL,
+    description TEXT NOT NULL,
+    amount NUMERIC NOT NULL,
+    date TIMESTAMPTZ NOT NULL,
+    is_deleted BOOLEAN DEFAULT FALSE
 );`;
         }
         return `-- Comando para criar a tabela '${tableName}' não definido.`;
@@ -40,6 +54,12 @@ ADD COLUMN is_deleted BOOLEAN DEFAULT FALSE;`;
 ALTER TABLE public.event_registrations
 ADD COLUMN wont_attend BOOLEAN DEFAULT FALSE;`;
     };
+    
+    const addActorSql = (): string => {
+        return `-- Adiciona a coluna 'actor' à tabela 'action_history' para registrar quem fez a ação
+ALTER TABLE public.action_history
+ADD COLUMN actor TEXT;`;
+    };
 
     missingItems.forEach(item => {
         if (item.startsWith('table:')) {
@@ -47,6 +67,8 @@ ADD COLUMN wont_attend BOOLEAN DEFAULT FALSE;`;
             commands.push(createTableSql(tableName));
         } else if (item === 'column:wont_attend:event_registrations') {
             commands.push(addWontAttendSql());
+        } else if (item === 'column:actor:action_history') {
+            commands.push(addActorSql());
         } else {
             // Assume it's a table name missing a column
             commands.push(addColumnSql(item));
@@ -71,7 +93,7 @@ const DatabaseMigration: React.FC<DatabaseMigrationProps> = ({ missingIn }) => {
     
     const missingTables = missingIn.filter(i => i.startsWith('table:')).map(i => i.split(':')[1]);
     const missingColumnsInTables = missingIn.filter(i => !i.startsWith('table:') && !i.startsWith('column:'));
-    const specificColumnMissing = missingIn.some(i => i.startsWith('column:wont_attend'));
+    const specificColumnMissing = missingIn.some(i => i.startsWith('column:'));
 
     return (
         <div className="bg-zinc-100 flex flex-col items-center justify-center min-h-screen p-4 font-sans text-zinc-800">
@@ -92,7 +114,7 @@ const DatabaseMigration: React.FC<DatabaseMigrationProps> = ({ missingIn }) => {
                 <ul className="list-disc list-inside mb-4 text-zinc-600 space-y-1">
                     {missingTables.length > 0 && <li>Tabela(s) faltando: <strong>{missingTables.join(', ')}</strong></li>}
                     {missingColumnsInTables.length > 0 && <li>Coluna <code>is_deleted</code> faltando em: <strong>{missingColumnsInTables.join(', ')}</strong></li>}
-                    {specificColumnMissing && <li>Coluna <code>wont_attend</code> faltando em: <strong>event_registrations</strong></li>}
+                    {specificColumnMissing && <li>Colunas específicas faltando (ex: <code>actor</code>, <code>wont_attend</code>)</li>}
                 </ul>
 
                 <p className="mb-4 text-zinc-600">

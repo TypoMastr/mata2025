@@ -29,6 +29,7 @@ const AppContent: React.FC = () => {
     const { events, isLoading: isLoadingEvents, addEvent, updateEvent, deleteEvent } = useEvents();
     const { people, isLoading: isLoadingPeople, addPerson, updatePerson, deletePerson } = usePeople();
     const historyHook = useHistory();
+    // Fix: Initialize selectedEventId with null directly, not by referencing itself.
     const [selectedEventId, setSelectedEventId] = useState<string | null>(null);
 
     const { 
@@ -36,7 +37,7 @@ const AppContent: React.FC = () => {
         isLoading: isLoadingRegistrations, 
         addRegistration, 
         updateRegistration, 
-        deleteRegistration,
+        deleteRegistration, 
         refresh: refreshRegistrations 
     } = useRegistrations(selectedEventId);
     
@@ -100,6 +101,7 @@ const AppContent: React.FC = () => {
 
     const handleLogout = useCallback(() => {
         sessionStorage.removeItem('isAuthenticated');
+        sessionStorage.removeItem('currentUser'); // Clear the selected user
         setIsAuthenticated(false);
         setView('list'); 
     }, []);
@@ -213,7 +215,14 @@ const AppContent: React.FC = () => {
             case 'payment':
                 return selectedRegistration && <RegisterPaymentForm attendee={selectedRegistration} onRegisterPayment={handleRegisterPayment} onCancel={() => setView('detail')} onDeletePayment={handleDeletePaymentRequest} event={selectedEvent} />;
              case 'reports':
-                return <Reports attendees={registrations} onLogout={handleLogout} onUpdateAttendee={handleUpdateRegistration} onSelectAttendee={handleSelectRegistration} event={selectedEvent} />;
+                return <Reports 
+                            attendees={registrations} 
+                            onLogout={handleLogout} 
+                            onUpdateAttendee={handleUpdateRegistration} 
+                            onSelectAttendee={handleSelectRegistration} 
+                            event={selectedEvent} 
+                            onAction={() => historyHook.fetchLatestHistory()}
+                        />;
              case 'info':
                 return <InfoPage onLogout={handleLogout} event={selectedEvent} />;
              case 'management':
@@ -248,15 +257,14 @@ const AppContent: React.FC = () => {
         // Layout structure updated for iOS PWA scrolling:
         // md:w-full ensures full width utilization.
         // md:h-[calc(100dvh-4rem)] uses dvh to better handle tablet/mobile browser bars.
-        <div className="bg-zinc-50 font-sans h-full flex flex-col md:flex-row md:h-[calc(100dvh-4rem)] md:max-w-7xl md:w-full md:mx-auto md:my-8 md:rounded-2xl md:shadow-2xl md:overflow-hidden">
+        <div className="font-sans h-full flex flex-col md:flex-row md:h-[calc(100dvh-4rem)] md:max-w-7xl md:w-full md:mx-auto md:my-8 md:rounded-2xl md:shadow-2xl md:overflow-hidden">
              <SideNav currentView={view} setView={setView} />
             
             <div className="flex-grow flex flex-col h-full overflow-hidden relative">
                 {/* Main content scrolls independently */}
                 {/* overflow-y-scroll enforces a vertical scrollbar always, preventing horizontal layout shifts when content height toggles */}
-                {/* Adjusted pb-4 for mobile to prevent large white space */}
-                {/* Dynamic bottom padding: pb-4 for lists (to prevent cutoff), pb-0 for forms (to prevent whitespace below sticky footer) */}
-                <main key={view + selectedEventId} className={`flex-grow overflow-y-scroll overscroll-contain pb-4 ${view === 'list' ? 'md:pb-20' : 'md:pb-0'}`}>
+                {/* Increased pb-32 to pb-40 to prevent bottom content from being hidden behind the floating nav on mobile */}
+                <main key={view + selectedEventId} className="flex-grow overflow-y-scroll overscroll-contain pb-40 md:pb-6">
                     {renderContent()}
                 </main>
                 
@@ -296,7 +304,7 @@ const AppInitializer: React.FC = () => {
 
     if (isVerifying) {
         return (
-            <div className="flex justify-center items-center min-h-screen bg-zinc-50">
+            <div className="flex justify-center items-center min-h-screen">
                 <p className="text-zinc-600 font-semibold animate-pulse">Verificando banco de dados...</p>
             </div>
         );

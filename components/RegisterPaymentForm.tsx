@@ -1,5 +1,5 @@
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import type { Attendee, PartialPaymentDetails, Payment } from '../types';
 import { PaymentStatus, PaymentType, PackageType } from '../types';
 import { useToast } from '../contexts/ToastContext';
@@ -123,7 +123,6 @@ const PartialPaymentEditor: React.FC<PartialPaymentEditorProps> = ({ title, amou
                         </label>
                         {details.receiptUrl && <span className="text-xs text-zinc-500 mt-1">Comprovante anexado.</span>}
                     </div>
-                     {/* Fix: Restored the missing opening parenthesis for the onClick arrow function */}
                      <button
                         type="button"
                         onClick={() => {
@@ -151,6 +150,44 @@ const RegisterPaymentForm: React.FC<RegisterPaymentFormProps> = ({ attendee, onR
 
     const [paymentState, setPaymentState] = useState<Payment>(attendee.payment);
     const [isSubmitting, setIsSubmitting] = useState(false);
+
+    // Refs for auto-scrolling
+    const sitePaymentRef = useRef<HTMLDivElement>(null);
+    const busPaymentRef = useRef<HTMLDivElement>(null);
+    const singlePaymentRef = useRef<HTMLFormElement>(null);
+
+    // Helper to scroll
+    const scrollToElement = (ref: React.RefObject<HTMLElement>) => {
+        setTimeout(() => {
+            if (ref.current) {
+                ref.current.scrollIntoView({ 
+                    behavior: 'smooth', 
+                    block: 'nearest' 
+                });
+            }
+        }, 150); // Small delay to allow React to render the expanded DOM
+    };
+
+    // Effects to trigger scroll when sections expand
+    useEffect(() => {
+        if (paymentState.sitePaymentDetails?.isPaid) {
+            scrollToElement(sitePaymentRef);
+        }
+    }, [paymentState.sitePaymentDetails?.isPaid]);
+
+    useEffect(() => {
+        if (paymentState.busPaymentDetails?.isPaid) {
+            scrollToElement(busPaymentRef);
+        }
+    }, [paymentState.busPaymentDetails?.isPaid]);
+
+    useEffect(() => {
+        // For single payment, if it's NOT exempt, the form is visible/expanded
+        if (!isExempt) {
+            scrollToElement(singlePaymentRef);
+        }
+    }, [isExempt]);
+
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -190,6 +227,7 @@ const RegisterPaymentForm: React.FC<RegisterPaymentFormProps> = ({ attendee, onR
 
             await onRegisterPayment(updatedAttendee);
         } catch (error) {
+        } finally {
             setIsSubmitting(false);
         }
     };
@@ -277,18 +315,22 @@ const RegisterPaymentForm: React.FC<RegisterPaymentFormProps> = ({ attendee, onR
             <main className="p-4 pb-44">
                 {isMultiPayment ? (
                     <form onSubmit={handleSubmit} className="space-y-4">
-                        <PartialPaymentEditor
-                            title="Pagamento Sítio"
-                            amount={event?.site_price ?? 70}
-                            details={paymentState.sitePaymentDetails || { isPaid: false, receiptUrl: null }}
-                            onUpdate={(field, value) => setPaymentState(p => ({...p, sitePaymentDetails: { ...(p.sitePaymentDetails || { isPaid: false, receiptUrl: null }), [field]: value }}))}
-                        />
-                         <PartialPaymentEditor
-                            title="Pagamento Ônibus"
-                            amount={event?.bus_price ?? 50}
-                            details={paymentState.busPaymentDetails || { isPaid: false, receiptUrl: null }}
-                            onUpdate={(field, value) => setPaymentState(p => ({...p, busPaymentDetails: { ...(p.busPaymentDetails || { isPaid: false, receiptUrl: null }), [field]: value }}))}
-                        />
+                        <div ref={sitePaymentRef}>
+                            <PartialPaymentEditor
+                                title="Pagamento Sítio"
+                                amount={event?.site_price ?? 70}
+                                details={paymentState.sitePaymentDetails || { isPaid: false, receiptUrl: null }}
+                                onUpdate={(field, value) => setPaymentState(p => ({...p, sitePaymentDetails: { ...(p.sitePaymentDetails || { isPaid: false, receiptUrl: null }), [field]: value }}))}
+                            />
+                        </div>
+                        <div ref={busPaymentRef}>
+                            <PartialPaymentEditor
+                                title="Pagamento Ônibus"
+                                amount={event?.bus_price ?? 50}
+                                details={paymentState.busPaymentDetails || { isPaid: false, receiptUrl: null }}
+                                onUpdate={(field, value) => setPaymentState(p => ({...p, busPaymentDetails: { ...(p.busPaymentDetails || { isPaid: false, receiptUrl: null }), [field]: value }}))}
+                            />
+                        </div>
                          <div className="flex flex-col md:flex-row gap-4 pt-2">
                             <button type="button" onClick={onCancel} className="w-full bg-zinc-200 text-zinc-800 font-bold py-3 px-4 rounded-full hover:bg-zinc-300 transition-colors">Cancelar</button>
                             <button type="submit" disabled={isSubmitting} className="w-full bg-green-500 text-white font-bold py-3 px-4 rounded-full flex items-center justify-center gap-2 hover:bg-green-600 shadow-sm disabled:bg-green-400">
@@ -311,7 +353,7 @@ const RegisterPaymentForm: React.FC<RegisterPaymentFormProps> = ({ attendee, onR
                                 </button>
                             </div>
                         ) : (
-                            <form onSubmit={handleSinglePaymentSubmit} className="bg-white p-4 rounded-xl border border-zinc-200 shadow-sm space-y-4">
+                            <form ref={singlePaymentRef} onSubmit={handleSinglePaymentSubmit} className="bg-white p-4 rounded-xl border border-zinc-200 shadow-sm space-y-4">
                                  <div>
                                     <label className="block text-sm font-medium text-zinc-700">Data do Pagamento</label>
                                     <input

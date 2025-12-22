@@ -192,7 +192,6 @@ const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
                                         }}
                                         className={`w-full bg-zinc-50 text-zinc-900 px-4 py-4 rounded-xl border-2 ${error ? 'border-red-500 focus:border-red-500' : 'border-zinc-100 focus:border-green-500'} focus:outline-none focus:ring-0 transition-colors text-lg tracking-widest placeholder-zinc-300 text-center`}
                                         placeholder="••••"
-                                        inputMode="numeric"
                                         autoFocus
                                     />
                                 </div>

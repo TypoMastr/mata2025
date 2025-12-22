@@ -29,7 +29,6 @@ const AppContent: React.FC = () => {
     const { events, isLoading: isLoadingEvents, addEvent, updateEvent, deleteEvent } = useEvents();
     const { people, isLoading: isLoadingPeople, addPerson, updatePerson, deletePerson } = usePeople();
     const historyHook = useHistory();
-    // Fix: Initialize selectedEventId with null directly, not by referencing itself.
     const [selectedEventId, setSelectedEventId] = useState<string | null>(null);
 
     const { 
@@ -67,7 +66,6 @@ const AppContent: React.FC = () => {
         historyHook.fetchLatestHistory();
     }, []);
 
-    // Background refresh when switching to list view
     useEffect(() => {
         if (view === 'list') {
             refreshRegistrations({ silent: true });
@@ -101,7 +99,7 @@ const AppContent: React.FC = () => {
 
     const handleLogout = useCallback(() => {
         sessionStorage.removeItem('isAuthenticated');
-        sessionStorage.removeItem('currentUser'); // Clear the selected user
+        sessionStorage.removeItem('currentUser');
         setIsAuthenticated(false);
         setView('list'); 
     }, []);
@@ -254,27 +252,19 @@ const AppContent: React.FC = () => {
     if (!isAuthenticated) return <Login onLoginSuccess={handleLoginSuccess} />;
 
     return (
-        // Layout structure updated for iOS PWA scrolling:
-        // md:w-full ensures full width utilization.
-        // md:h-[calc(100dvh-4rem)] uses dvh to better handle tablet/mobile browser bars.
-        <div className="font-sans h-full flex flex-col md:flex-row md:h-[calc(100dvh-4rem)] md:max-w-7xl md:w-full md:mx-auto md:my-8 md:rounded-2xl md:shadow-2xl md:overflow-hidden">
+        <div className="font-sans h-dvh flex flex-col md:flex-row md:h-[calc(100dvh-4rem)] md:max-w-7xl md:w-full md:mx-auto md:my-8 md:rounded-2xl md:shadow-2xl md:overflow-hidden bg-zinc-50 md:bg-white">
              <SideNav currentView={view} setView={setView} />
             
             <div className="flex-grow flex flex-col h-full overflow-hidden relative">
-                {/* Main content scrolls independently */}
-                {/* overflow-y-scroll enforces a vertical scrollbar always, preventing horizontal layout shifts when content height toggles */}
-                {/* Increased pb-32 to pb-40 to prevent bottom content from being hidden behind the floating nav on mobile */}
-                <main key={view + selectedEventId} className="flex-grow overflow-y-scroll overscroll-contain pb-40 md:pb-6">
+                <main key={view + selectedEventId} className="flex-grow overflow-y-scroll overscroll-contain pb-48 md:pb-6 px-0">
                     {renderContent()}
                 </main>
                 
-                {/* Bottom Nav is fixed at the bottom of the flex container, not fixed to window */}
                 <div className="md:hidden flex-shrink-0 z-50">
                      <BottomNav currentView={view} setView={setView} />
                 </div>
             </div>
 
-            {/* Modals sit on top of everything */}
             {registrationToDelete && <ConfirmDelete attendee={registrationToDelete} onConfirm={handleConfirmDelete} onCancel={handleCancelDelete} />}
             {registrationPaymentToDelete && <ConfirmDeletePayment attendee={registrationPaymentToDelete} onConfirm={handleConfirmDeletePayment} onCancel={handleCancelDeletePayment} />}
         </div>

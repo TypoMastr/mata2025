@@ -8,8 +8,8 @@ interface RegisterPaymentFormProps {
     attendee: Attendee;
     onRegisterPayment: (attendee: Attendee) => Promise<void>;
     onCancel: () => void;
-    onDeletePayment: (attendee: Attendee) => void; // Used only for single-payment packages
-    event: any; // Added prop for price access
+    onDeletePayment: (attendee: Attendee) => void;
+    event: any;
 }
 
 const SpinnerIcon: React.FC = () => (
@@ -58,7 +58,7 @@ const PartialPaymentEditor: React.FC<PartialPaymentEditorProps> = ({ title, amou
                             onChange={(e) => {
                                 onUpdate('isExempt', e.target.checked);
                                 if (e.target.checked) {
-                                    onUpdate('isPaid', false); // Unset paid if exempt
+                                    onUpdate('isPaid', false);
                                     onUpdate('date', undefined);
                                     onUpdate('type', undefined);
                                     onUpdate('receiptUrl', null);
@@ -123,6 +123,7 @@ const PartialPaymentEditor: React.FC<PartialPaymentEditorProps> = ({ title, amou
                         </label>
                         {details.receiptUrl && <span className="text-xs text-zinc-500 mt-1">Comprovante anexado.</span>}
                     </div>
+                     {/* Fix: Restored the missing opening parenthesis for the onClick arrow function */}
                      <button
                         type="button"
                         onClick={() => {
@@ -166,7 +167,6 @@ const RegisterPaymentForm: React.FC<RegisterPaymentFormProps> = ({ attendee, onR
                 const siteOk = sitePaid || siteExempt;
                 const busOk = busPaid || busExempt;
 
-                // Recalculate amount based on exemptions
                 const sitePrice = event?.site_price ?? 70;
                 const busPrice = event?.bus_price ?? 50;
                 let newAmount = 0;
@@ -176,7 +176,6 @@ const RegisterPaymentForm: React.FC<RegisterPaymentFormProps> = ({ attendee, onR
                 updatedAttendee.payment.amount = newAmount;
 
                 if (siteOk && busOk) {
-                    // If everything is exempt, use ISENTO status, otherwise if settled (paid or mixed), use PAGO.
                     if (siteExempt && busExempt) {
                         updatedAttendee.payment.status = PaymentStatus.ISENTO;
                     } else {
@@ -191,7 +190,6 @@ const RegisterPaymentForm: React.FC<RegisterPaymentFormProps> = ({ attendee, onR
 
             await onRegisterPayment(updatedAttendee);
         } catch (error) {
-            // Error toast is handled by the calling component (App.tsx)
             setIsSubmitting(false);
         }
     };
@@ -220,25 +218,18 @@ const RegisterPaymentForm: React.FC<RegisterPaymentFormProps> = ({ attendee, onR
             };
             await onRegisterPayment(updatedAttendee);
         } catch (error) {
-            // Error toast is handled by the calling component (App.tsx)
         } finally {
             setIsSubmitting(false);
         }
     };
     
-    // Single payment form state
     const [paymentDate, setPaymentDate] = useState(
         attendee.payment.date ? new Date(attendee.payment.date).toISOString().split('T')[0] : new Date().toISOString().split('T')[0]
     );
     const [dateNotInformed, setDateNotInformed] = useState(isPaid && !attendee.payment.date);
     const [paymentType, setPaymentType] = useState<PaymentType>(attendee.payment.type || PaymentType.PIX_CONTA);
     const [receipt, setReceipt] = useState<string | null>(attendee.payment.receiptUrl);
-     const formattedDisplayDate = useMemo(() => {
-        if (!paymentDate) return null;
-        const [year, month, day] = paymentDate.split('-').map(Number);
-        const date = new Date(Date.UTC(year, month - 1, day));
-        return new Intl.DateTimeFormat('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric', timeZone: 'UTC' }).format(date);
-    }, [paymentDate]);
+
     const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
         if (file) {
@@ -265,7 +256,6 @@ const RegisterPaymentForm: React.FC<RegisterPaymentFormProps> = ({ attendee, onR
             };
             await onRegisterPayment(updatedAttendee);
         } catch (error) {
-            // Error is handled by App.tsx, which shows a toast
         } finally {
             setIsSubmitting(false);
         }
@@ -280,12 +270,11 @@ const RegisterPaymentForm: React.FC<RegisterPaymentFormProps> = ({ attendee, onR
                 </button>
                 <div className="flex flex-col">
                     <h1 className="text-xl md:text-2xl font-bold text-zinc-800">Gerenciar Pagamento</h1>
-                    {/* FIX: Access name from the nested person object. */}
                     <p className="text-sm text-zinc-500 -mt-1">{attendee.person.name}</p>
                 </div>
             </header>
             
-            <main className="p-4">
+            <main className="p-4 pb-44">
                 {isMultiPayment ? (
                     <form onSubmit={handleSubmit} className="space-y-4">
                         <PartialPaymentEditor

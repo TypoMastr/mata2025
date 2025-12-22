@@ -1,5 +1,5 @@
 
-// Note: The static import of GoogleGenAI has been removed to prevent a load-time crash.
+import { GoogleGenAI } from "@google/genai";
 import type { Attendee, Event } from '../types';
 import { PackageType, PaymentStatus } from "../types";
 
@@ -11,18 +11,10 @@ interface BusInfo {
 
 export const generateReport = async (attendees: Attendee[], buses: BusInfo[], event: Event | null): Promise<string> => {
     try {
-        // Dynamically import the Google AI library only when this function is called.
-        const { GoogleGenAI } = await import('@google/genai');
-        
-        // Safety check for process.env in browser environments
-        const apiKey = (typeof process !== 'undefined' && process.env) ? process.env.API_KEY : undefined;
-        
-        if (!apiKey) {
-             throw new Error('API Key must be set (process.env.API_KEY)');
-        }
-
-        const ai = new GoogleGenAI({ apiKey });
-        const model = 'gemini-2.5-flash';
+        // Initialize Gemini with the required direct usage of process.env.API_KEY.
+        const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+        // Use the recommended model for basic text processing tasks.
+        const model = 'gemini-3-flash-preview';
         
         const eventName = event?.name || "o evento atual";
 
@@ -56,11 +48,12 @@ export const generateReport = async (attendees: Attendee[], buses: BusInfo[], ev
             model: model,
             contents: prompt,
         });
+        // Accessing the text property directly as per the latest GenerateContentResponse structure.
         return response.text || "Sem resposta do modelo.";
     } catch (error) {
         console.error("Error generating report with Gemini API:", error);
         if (error instanceof Error && error.message.includes('API Key')) {
-            return "Erro de Configuração: A chave da API do Google AI não foi detectada neste ambiente. No Vercel/Local ela é carregada via .env, mas aqui pode estar ausente.";
+            return "Erro de Configuração: A chave da API do Google AI não foi detectada neste ambiente. Verifique as configurações de ambiente.";
         }
         return "Ocorreu um erro ao gerar o relatório. Por favor, tente novamente mais tarde.";
     }

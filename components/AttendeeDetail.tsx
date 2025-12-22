@@ -103,16 +103,6 @@ interface ConfirmAttendanceToggleModalProps {
 
 const ConfirmAttendanceToggleModal: React.FC<ConfirmAttendanceToggleModalProps> = ({ isOpen, onClose, onConfirm, currentWontAttend, personName, isSaving }) => {
     if (!isOpen) return null;
-
-    const willAttend = !currentWontAttend; // If currently wontAttend is true, we are changing to false (Will Attend)
-    
-    // If currently wontAttend is TRUE, it means they are marked as NOT GOING.
-    // Clicking the toggle means we are marking them as GOING (wontAttend = false).
-    
-    // If currently wontAttend is FALSE (default), it means they ARE GOING.
-    // Clicking the toggle means we are marking them as NOT GOING (wontAttend = true).
-
-    // Current State: wontAttend = false (Vai). User clicks -> New State: wontAttend = true (Não Vai).
     const changingToWontAttend = !currentWontAttend;
 
     return (
@@ -157,7 +147,6 @@ const AttendeeDetail: React.FC<AttendeeDetailProps> = ({ attendee, onBack, onEdi
     const [selectedBus, setSelectedBus] = useState<string>(attendee.busNumber?.toString() || 'null');
     const [isSavingBus, setIsSavingBus] = useState(false);
     
-    // Confirmation Modal State
     const [showAttendanceConfirmation, setShowAttendanceConfirmation] = useState(false);
     const [isUpdatingAttendance, setIsUpdatingAttendance] = useState(false);
 
@@ -237,10 +226,8 @@ const AttendeeDetail: React.FC<AttendeeDetailProps> = ({ attendee, onBack, onEdi
         if (isSavingBus) return;
         const newBusNumber = selectedBus === 'null' ? null : Number(selectedBus);
 
-        // Client-side validation to prevent assigning to a full bus
         if (newBusNumber !== null) {
             const currentBusCount = busAssignments[newBusNumber] || 0;
-            // The bus is full, and we are trying to move a *new* person into it.
             if (currentBusCount >= 50 && attendee.busNumber !== newBusNumber) {
                 addToast(`O Ônibus ${newBusNumber} já está lotado.`, 'error');
                 return;
@@ -264,7 +251,6 @@ const AttendeeDetail: React.FC<AttendeeDetailProps> = ({ attendee, onBack, onEdi
     };
     
     const initiateToggleAttendance = (e: React.ChangeEvent<HTMLInputElement>) => {
-        // Prevent immediate change, show modal instead
         e.preventDefault();
         setShowAttendanceConfirmation(true);
     };
@@ -287,7 +273,6 @@ const AttendeeDetail: React.FC<AttendeeDetailProps> = ({ attendee, onBack, onEdi
         }
     };
 
-    // FIX: Access documentType from the nested person object.
     const showInvalidDocAsNotInformed = attendee.packageType === PackageType.SITIO_ONLY && attendee.person.documentType === DocumentType.OUTRO;
 
 
@@ -300,16 +285,14 @@ const AttendeeDetail: React.FC<AttendeeDetailProps> = ({ attendee, onBack, onEdi
                 <h1 className="text-xl md:text-2xl font-bold text-zinc-800">Detalhes da Inscrição</h1>
             </header>
             
-            <div className="p-4">
+            <div className="p-4 pb-48">
                 <div className="md:grid md:grid-cols-2 md:gap-6 space-y-6 md:space-y-0">
                     
                     <div className="bg-white p-4 rounded-xl border border-zinc-200 shadow-sm space-y-4 opacity-0 animate-fadeInUp" style={getAnimationStyle(100)}>
                         <DetailRow label="Nome">
                             <div className="flex items-center justify-between">
-                                {/* FIX: Access name from the nested person object. */}
                                 <p className="font-semibold text-zinc-800">{attendee.person.name}</p>
                                 <button
-                                    // FIX: Access name from the nested person object.
                                     onClick={() => handleCopyToClipboard(attendee.person.name, 'Nome')}
                                     className="p-1.5 text-zinc-400 rounded-full hover:bg-zinc-100 hover:text-zinc-600 transition-colors"
                                     aria-label="Copiar nome"
@@ -323,7 +306,6 @@ const AttendeeDetail: React.FC<AttendeeDetailProps> = ({ attendee, onBack, onEdi
                                 {showInvalidDocAsNotInformed ? (
                                     <p className="font-semibold text-zinc-500 italic">Não informado</p>
                                 ) : (
-                                    // FIX: Access document and documentType from the nested person object.
                                     <p className="font-semibold text-zinc-800">{`${attendee.person.document} (${attendee.person.documentType})`}</p>
                                 )}
                                 <button
@@ -331,7 +313,6 @@ const AttendeeDetail: React.FC<AttendeeDetailProps> = ({ attendee, onBack, onEdi
                                         if (showInvalidDocAsNotInformed) {
                                             addToast('Documento não informado.', 'info');
                                         } else {
-                                            // FIX: Access document from the nested person object.
                                             handleCopyToClipboard(attendee.person.document, 'Documento');
                                         }
                                     }}
@@ -345,10 +326,8 @@ const AttendeeDetail: React.FC<AttendeeDetailProps> = ({ attendee, onBack, onEdi
                         <DetailRow label="Telefone">
                             <div className="flex flex-col items-start gap-2">
                                 <div className="flex items-center justify-between w-full">
-                                    {/* FIX: Access phone from the nested person object. */}
                                     <p className="font-semibold text-zinc-800">{attendee.person.phone}</p>
                                     <button
-                                        // FIX: Access phone from the nested person object.
                                         onClick={() => handleCopyToClipboard(attendee.person.phone, 'Telefone')}
                                         className="p-1.5 text-zinc-400 rounded-full hover:bg-zinc-100 hover:text-zinc-600 transition-colors"
                                         aria-label="Copiar telefone"
@@ -356,16 +335,13 @@ const AttendeeDetail: React.FC<AttendeeDetailProps> = ({ attendee, onBack, onEdi
                                         <CopyIcon />
                                     </button>
                                 </div>
-                                {/* FIX: Access phone from the nested person object. */}
                                 {attendee.person.phone && (
                                     <a
-                                        // FIX: Access phone from the nested person object.
                                         href={getWhatsAppUrl(attendee.person.phone)}
                                         target="_blank"
                                         rel="noopener noreferrer"
                                         onClick={(e) => e.stopPropagation()}
                                         className="px-3 py-1 text-xs font-semibold text-white bg-green-500 rounded-full hover:bg-green-600 transition-colors shadow-sm"
-                                        // FIX: Access name from the nested person object.
                                         aria-label={`Abrir conversa com ${attendee.person.name} no WhatsApp`}
                                     >
                                         <span>Abrir no WhatsApp</span>
@@ -434,7 +410,6 @@ const AttendeeDetail: React.FC<AttendeeDetailProps> = ({ attendee, onBack, onEdi
                                             {Array.from({ length: totalBuses }, (_, i) => i + 1).map(busNum => {
                                                 const count = busAssignments[busNum] || 0;
                                                 const isFull = count >= 50;
-                                                // An attendee can remain in their current bus even if it's full.
                                                 const isCurrentBus = attendee.busNumber === busNum;
                                                 const isDisabled = isFull && !isCurrentBus;
 
@@ -505,7 +480,6 @@ const AttendeeDetail: React.FC<AttendeeDetailProps> = ({ attendee, onBack, onEdi
                         )}
                     </div>
 
-                    {/* Attendance Status Card - Mobile Optimized */}
                     <div className="bg-white p-4 rounded-xl border border-zinc-200 shadow-sm space-y-3 opacity-0 animate-fadeInUp md:col-span-2" style={getAnimationStyle(325)}>
                         <h2 className="text-lg font-bold text-zinc-800">Controle de Presença</h2>
                         

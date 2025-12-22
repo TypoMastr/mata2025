@@ -422,7 +422,7 @@ const InteractiveReportPreview: React.FC<InteractiveReportPreviewProps> = ({ dat
         return `
             <!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8"><title>Relatório Financeiro</title>
             <style>
-                body { font-family: -apple-system, BlinkMacMacFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; margin: 1.5rem; color: #333; }
+                body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; margin: 1.5rem; color: #333; }
                 h1 { color: #10B981; border-bottom: 2px solid #10B981; padding-bottom: 0.5rem; text-align: center; }
                 h2 { font-size: 1.5rem; margin-top: 1.5rem; margin-bottom: 0.5rem; color: #333; text-align: center; }
                 h3 { font-size: 1.2rem; margin-top: 1rem; margin-bottom: 0.5rem; color: #333; }
@@ -1740,7 +1740,7 @@ const ReportsDashboard: React.FC<{
                 )}
 
                 {/* Primary Stats - Tighter Gap */}
-                <h3 className="text-xs font-bold text-zinc-500 uppercase tracking-wider pl-1 opacity-0 animate-fadeInUp" style={{ animationDelay: '100ms' }}>Visão Geral</h3>
+                <h3 className="text-xs font-bold text-zinc-500 uppercase tracking-wider pl-1 opacity-0 animate-fadeInUp" style={{ animationDelay: '100ms', animationFillMode: 'forwards' }}>Visão Geral</h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                     <StatCard title="Lucro Líquido" icon={IconWallet} delay={125} onClick={onManageFinancials} className="h-full bg-gradient-to-br from-white to-zinc-50">
                         <div className="flex justify-between items-baseline mb-2">
@@ -1812,7 +1812,7 @@ const ReportsDashboard: React.FC<{
                 </div>
 
                 {/* Logistics - Updated to use 2 columns on mobile */}
-                <h3 className="text-xs font-bold text-zinc-500 uppercase tracking-wider pl-1 pt-2 opacity-0 animate-fadeInUp" style={{ animationDelay: '300ms' }}>Logística</h3>
+                <h3 className="text-xs font-bold text-zinc-500 uppercase tracking-wider pl-1 pt-2 opacity-0 animate-fadeInUp" style={{ animationDelay: '300ms', animationFillMode: 'forwards' }}>Logística</h3>
                 <div className="grid grid-cols-2 lg:grid-cols-3 gap-3">
                     {busStats.map((bus, index) => (
                         <StatCard key={bus.busNumber} onClick={() => onViewBus(bus.busNumber)} title={`Ônibus ${bus.busNumber}`} icon={IconBus} delay={350 + index * 50}>

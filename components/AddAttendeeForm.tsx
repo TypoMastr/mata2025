@@ -13,7 +13,6 @@ const SpinnerIcon: React.FC<{ white?: boolean }> = ({ white = true }) => (
     </svg>
 );
 
-// Utility to handle paste with error handling
 const PasteButton: React.FC<{ onPaste: (text: string) => void }> = ({ onPaste }) => {
     const { addToast } = useToast();
 
@@ -51,13 +50,13 @@ const PasteButton: React.FC<{ onPaste: (text: string) => void }> = ({ onPaste })
 };
 
 const FormField: React.FC<{ label: string; id: string; error?: string; children: React.ReactNode; onPaste?: (text: string) => void; className?: string }> = ({ label, id, error, children, onPaste, className = '' }) => (
-    <div className={className}>
-        <label htmlFor={id} className="block text-sm font-medium text-zinc-700">{label}</label>
-        <div className="mt-1 relative">
+    <div className={`w-full ${className}`}>
+        <label htmlFor={id} className="block text-sm font-bold text-zinc-600 mb-1">{label}</label>
+        <div className="relative">
             {children}
             {onPaste && <PasteButton onPaste={onPaste} />}
         </div>
-        {error && <p className="mt-1 text-xs text-red-600 animate-fadeIn">{error}</p>}
+        {error && <p className="mt-1 text-xs text-red-600 animate-fadeIn font-medium">{error}</p>}
     </div>
 );
 
@@ -69,23 +68,22 @@ interface PartialPaymentFieldsProps {
 
 const PartialPaymentFields: React.FC<PartialPaymentFieldsProps> = ({ idPrefix, details, onUpdate }) => {
     return (
-        <div className="space-y-2">
-            <div className="space-y-3 md:space-y-0 md:grid md:grid-cols-2 md:gap-3 pl-3 md:pl-4 border-l-2 border-green-300 animate-fadeIn">
+        <div className="space-y-3 p-3 bg-zinc-50 rounded-xl border border-zinc-100 animate-fadeIn">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <FormField label="Data do Pagamento" id={`${idPrefix}-date`}>
                     <input
                         type="date"
                         id={`${idPrefix}-date`}
                         value={details.date}
                         onChange={(e) => onUpdate({ date: e.target.value })}
-                        className="block w-full max-w-full min-w-0 px-2 py-1.5 bg-white border border-zinc-300 rounded-md shadow-sm sm:text-sm focus:outline-none focus:ring-green-500 focus:border-green-500 disabled:bg-zinc-100"
+                        className="block w-full px-3 py-2 bg-white border border-zinc-300 rounded-lg shadow-sm sm:text-sm focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent disabled:bg-zinc-100 disabled:text-zinc-400"
                         required={!details.dateNotInformed}
                         disabled={details.dateNotInformed}
                         autoComplete="off"
-                        style={{ maxWidth: '100%' }}
                     />
-                     <label className="flex items-center space-x-2 mt-1.5 cursor-pointer w-fit">
+                     <label className="flex items-center space-x-2 mt-2 cursor-pointer w-fit">
                         <input type="checkbox" checked={details.dateNotInformed} onChange={(e) => onUpdate({ dateNotInformed: e.target.checked })} className="h-4 w-4 rounded border-zinc-300 text-green-600 focus:ring-green-500" />
-                        <span className="text-xs text-zinc-700">Data não informada</span>
+                        <span className="text-xs text-zinc-500 font-semibold">Data não informada</span>
                     </label>
                 </FormField>
                 <FormField label="Tipo de Pagamento" id={`${idPrefix}-type`}>
@@ -93,7 +91,7 @@ const PartialPaymentFields: React.FC<PartialPaymentFieldsProps> = ({ idPrefix, d
                         id={`${idPrefix}-type`}
                         value={details.type || ''}
                         onChange={(e) => onUpdate({ type: e.target.value as PaymentType })}
-                        className="block w-full px-2 py-1.5 bg-white border border-zinc-300 rounded-md shadow-sm sm:text-sm focus:outline-none focus:ring-green-500 focus:border-green-500"
+                        className="block w-full px-3 py-2 bg-white border border-zinc-300 rounded-lg shadow-sm sm:text-sm focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent"
                         required
                         autoComplete="off"
                     >
@@ -186,7 +184,6 @@ const AddAttendeeForm: React.FC<AddAttendeeFormProps> = ({ onAddAttendee, onUpda
     const [errors, setErrors] = useState<Record<string, string>>({});
     const [isSubmitting, setIsSubmitting] = useState(false);
     
-    // State for person search
     const [personSearchQuery, setPersonSearchQuery] = useState('');
     const [personSearchResults, setPersonSearchResults] = useState<Person[]>([]);
     const [isSearching, setIsSearching] = useState(false);
@@ -200,7 +197,6 @@ const AddAttendeeForm: React.FC<AddAttendeeFormProps> = ({ onAddAttendee, onUpda
         }
     }, [attendeeToEdit, isEditMode]);
 
-    // Debounced search for people
     useEffect(() => {
         if (personSearchQuery.length < 3 || isPersonSelected) {
             setPersonSearchResults([]);
@@ -211,7 +207,6 @@ const AddAttendeeForm: React.FC<AddAttendeeFormProps> = ({ onAddAttendee, onUpda
             setIsSearching(true);
             try {
                 const results = await api.searchPeople(personSearchQuery);
-                // Filter out people already registered for the current event
                 const registeredPersonIds = new Set(registrations.map(r => r.person.id));
                 const availableResults = results.filter(p => !registeredPersonIds.has(p.id));
                 setPersonSearchResults(availableResults);
@@ -249,7 +244,6 @@ const AddAttendeeForm: React.FC<AddAttendeeFormProps> = ({ onAddAttendee, onUpda
     }, [formData.packageType, formData.sitePayment.isExempt, formData.busPayment.isExempt, formData.paymentIsExempt, isEditMode, event]);
 
     const handleSelectPerson = (person: Person) => {
-        // Immediate check for duplicates when selecting a person
         const duplicate = registrations.find(r => r.person.id === person.id);
         if (duplicate) {
             addToast(`"${person.name}" já está inscrito neste evento.`, 'error');
@@ -297,10 +291,8 @@ const AddAttendeeForm: React.FC<AddAttendeeFormProps> = ({ onAddAttendee, onUpda
 
         if (!formData.phone.trim() || formData.phone.replace(/\D/g, '').length < 10) newErrors.phone = 'Telefone inválido.';
         
-        // Check for duplicate person ID selection
         if (isPersonSelected && formData.personId) {
              const duplicate = registrations.find(r => r.person.id === formData.personId);
-             // Ignore the duplicate if it is the same record we are currently editing
              const isSelf = isEditMode && attendeeToEdit && duplicate?.id === attendeeToEdit.id;
              
              if (duplicate && !isSelf) {
@@ -308,7 +300,6 @@ const AddAttendeeForm: React.FC<AddAttendeeFormProps> = ({ onAddAttendee, onUpda
              }
         }
 
-        // Only check for duplicates by text if it's a new person being registered
         if (!isPersonSelected) {
             const normalizedName = normalizeString(formData.name);
             const normalizedDocument = formData.document.replace(/[^\d]/g, '');
@@ -340,8 +331,6 @@ const AddAttendeeForm: React.FC<AddAttendeeFormProps> = ({ onAddAttendee, onUpda
 
         let finalValue: string | boolean = isCheckbox ? checked : value;
 
-        // FIX: Do NOT uppercase name here to avoid cursor jumping. It is uppercased via CSS and onSubmit.
-        
         if (name === 'phone') {
             finalValue = formatPhoneNumber(value);
         } else if (name === 'document') {
@@ -377,7 +366,7 @@ const AddAttendeeForm: React.FC<AddAttendeeFormProps> = ({ onAddAttendee, onUpda
 
         setIsSubmitting(true);
         try {
-            const finalName = formData.name.trim().toUpperCase(); // Uppercase applied on submit
+            const finalName = formData.name.trim().toUpperCase();
             
             if (isEditMode && onUpdateAttendee && attendeeToEdit) {
                 const { type } = getDocumentType(formData.document);
@@ -431,43 +420,50 @@ const AddAttendeeForm: React.FC<AddAttendeeFormProps> = ({ onAddAttendee, onUpda
         : formData.paymentIsExempt;
 
     return (
-        <div className="animate-fadeIn w-full h-full flex flex-col">
-             <header className="sticky top-0 md:static bg-white md:bg-transparent z-10 p-3 md:pt-4 border-b border-zinc-200 flex items-center gap-4">
-                <button onClick={onCancel} className="text-zinc-500 hover:text-zinc-800 p-1 rounded-full hover:bg-zinc-100">
-                    <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>
+        <div className="animate-fadeIn w-full h-full flex flex-col bg-zinc-50">
+             <header className="sticky top-0 bg-white/90 backdrop-blur-md z-30 px-4 py-4 border-b border-zinc-200 flex items-center gap-4 shadow-sm">
+                <button onClick={onCancel} className="text-zinc-500 hover:text-zinc-800 p-2 rounded-full hover:bg-zinc-100 transition-colors">
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" /></svg>
                 </button>
-                <h1 className="text-xl md:text-2xl font-bold text-zinc-800">{isEditMode ? 'Editar Inscrição' : 'Nova Inscrição'}</h1>
+                <h1 className="text-xl font-black text-zinc-900 tracking-tight">{isEditMode ? 'Editar Inscrição' : 'Nova Inscrição'}</h1>
             </header>
-            <form onSubmit={handleSubmit} className="p-3 flex flex-col flex-grow">
-                <div className="grid grid-cols-1 md:grid-cols-12 xl:grid-cols-3 gap-4 items-start flex-grow content-start">
+
+            <form onSubmit={handleSubmit} className="flex-grow flex flex-col relative">
+                <div className="p-4 space-y-6 pb-48 md:pb-12 max-w-5xl mx-auto w-full overflow-x-hidden">
                     
-                    {/* Left Column Wrapper (Personal & Package) */}
-                    <div className="md:col-span-7 xl:col-span-2 space-y-3 xl:space-y-0 xl:grid xl:grid-cols-2 xl:gap-4">
-                        {/* Personal Data Card */}
-                        <div className="bg-white p-3 rounded-xl border border-zinc-200 shadow-sm space-y-3 h-full">
-                            <h2 className="text-lg font-bold text-zinc-800">Dados Pessoais</h2>
+                    {/* Responsive Grid System */}
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
+                        
+                        {/* Section: Dados Pessoais */}
+                        <div className="bg-white p-5 rounded-[2rem] border border-zinc-200 shadow-sm space-y-4 opacity-0 animate-fadeInUp" style={{ animationFillMode: 'forwards' }}>
+                            <div className="flex items-center gap-2 mb-2">
+                                <div className="p-2 bg-green-50 text-green-600 rounded-xl">
+                                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clipRule="evenodd" /></svg>
+                                </div>
+                                <h2 className="text-lg font-black text-zinc-800 tracking-tight">Dados do Participante</h2>
+                            </div>
                             
                             {!isEditMode && (
                                 <div className="relative">
-                                    <FormField label="1. Buscar Participante Existente" id="personSearch">
+                                    <FormField label="Buscar na Base" id="personSearch">
                                         <input
                                             type="search"
                                             id="personSearch"
                                             value={personSearchQuery}
                                             onChange={handleSearchChange}
-                                            placeholder="Digite um nome para buscar..."
-                                            className="block w-full px-3 py-2 bg-white border border-zinc-300 rounded-md shadow-sm sm:text-sm focus:outline-none focus:ring-green-500 focus:border-green-500"
+                                            placeholder="Nome do participante..."
+                                            className="block w-full px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl shadow-sm text-sm focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all"
                                             autoComplete="off"
                                         />
                                     </FormField>
-                                    {isSearching && <div className="absolute right-3 top-9"><SpinnerIcon white={false} /></div>}
+                                    {isSearching && <div className="absolute right-3 top-10"><SpinnerIcon white={false} /></div>}
                                     {personSearchResults.length > 0 && (
-                                        <div className="absolute z-10 w-full mt-1 bg-white border border-zinc-300 rounded-md shadow-lg max-h-60 overflow-auto">
+                                        <div className="absolute z-40 w-full mt-2 bg-white border border-zinc-200 rounded-2xl shadow-xl max-h-60 overflow-y-auto animate-popIn">
                                             <ul className="py-1">
                                                 {personSearchResults.map(person => (
-                                                    <li key={person.id} onClick={() => handleSelectPerson(person)} className="px-3 py-2 text-sm text-zinc-700 hover:bg-zinc-100 cursor-pointer">
-                                                        <p className="font-semibold">{person.name}</p>
-                                                        <p className="text-xs text-zinc-500">{person.document} &bull; {person.phone}</p>
+                                                    <li key={person.id} onClick={() => handleSelectPerson(person)} className="px-4 py-3 text-sm text-zinc-700 hover:bg-zinc-50 cursor-pointer border-b border-zinc-50 last:border-0 transition-colors">
+                                                        <p className="font-bold text-zinc-900">{person.name}</p>
+                                                        <p className="text-xs text-zinc-500 font-medium">{person.document} &bull; {person.phone}</p>
                                                     </li>
                                                 ))}
                                             </ul>
@@ -477,24 +473,22 @@ const AddAttendeeForm: React.FC<AddAttendeeFormProps> = ({ onAddAttendee, onUpda
                             )}
                             
                             {isPersonSelected && !isEditMode && (
-                                <div className="bg-green-50 border-l-4 border-green-500 p-3 rounded-r-lg animate-fadeIn">
-                                    <div className="flex justify-between items-center">
-                                        <div>
-                                            <p className="font-bold text-green-800">{formData.name}</p>
-                                            <p className="text-sm text-green-700">{formData.document}</p>
-                                            <p className="text-sm text-green-700 mt-1">{formData.phone}</p>
+                                <div className="bg-emerald-50 border-2 border-emerald-100 p-4 rounded-2xl animate-popIn flex justify-between items-center group">
+                                    <div className="min-w-0">
+                                        <p className="font-black text-emerald-900 truncate uppercase tracking-tight">{formData.name}</p>
+                                        <div className="flex flex-wrap gap-x-3 gap-y-1 mt-1">
+                                            <span className="text-xs font-bold text-emerald-700/70">{formData.document || 'Sem doc'}</span>
+                                            <span className="text-xs font-bold text-emerald-700/70">{formData.phone}</span>
                                         </div>
-                                        <button type="button" onClick={handleClearPersonSelection} className="text-sm font-semibold text-zinc-600 hover:text-zinc-800">
-                                            Alterar
-                                        </button>
                                     </div>
+                                    <button type="button" onClick={handleClearPersonSelection} className="ml-4 p-2 bg-white text-emerald-600 rounded-xl shadow-sm hover:shadow-md active:scale-95 transition-all">
+                                        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" /></svg>
+                                    </button>
                                 </div>
                             )}
 
-                            <div className={isPersonSelected ? 'hidden' : 'space-y-3'}>
-                                <p className="text-sm text-zinc-500 text-center border-b pb-3">
-                                    {isEditMode ? 'Edite os dados abaixo:' : 'Ou cadastre uma nova pessoa:'}
-                                </p>
+                            <div className={isPersonSelected ? 'hidden' : 'space-y-4'}>
+                                {!isEditMode && <div className="h-px bg-zinc-100 w-full my-4" />}
                                 <FormField label="Nome Completo" id="name" error={errors.name} onPaste={(text) => handlePaste('name', text)}>
                                     <input 
                                         type="text" 
@@ -502,196 +496,213 @@ const AddAttendeeForm: React.FC<AddAttendeeFormProps> = ({ onAddAttendee, onUpda
                                         name="name" 
                                         value={formData.name} 
                                         onChange={handleInputChange} 
-                                        className="block w-full px-3 py-2 bg-white border border-zinc-300 rounded-md shadow-sm sm:text-sm focus:outline-none focus:ring-green-500 focus:border-green-500 uppercase pr-8" 
+                                        className="block w-full px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl shadow-sm text-sm focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent uppercase transition-all" 
                                         required 
                                         autoComplete="off" 
                                         disabled={isPersonSelected} 
+                                        placeholder="EX: MARIA DA SILVA"
                                     />
                                 </FormField>
-                                <div className="space-y-3">
-                                    <FormField label={`Documento (CPF ou RG)${formData.packageType === PackageType.SITIO_BUS ? '' : ' - Opcional'}`} id="document" error={errors.document} onPaste={(text) => handlePaste('document', text)}>
-                                        <input type="tel" id="document" name="document" value={formData.document} onChange={handleInputChange} className="block w-full px-3 py-2 bg-white border border-zinc-300 rounded-md shadow-sm sm:text-sm focus:outline-none focus:ring-green-500 focus:border-green-500 pr-8" required={formData.packageType === PackageType.SITIO_BUS} autoComplete="off" disabled={isPersonSelected} />
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                    <FormField label={`Doc (CPF/RG)${formData.packageType === PackageType.SITIO_BUS ? '' : ' - Op'}`} id="document" error={errors.document} onPaste={(text) => handlePaste('document', text)}>
+                                        <input type="tel" id="document" name="document" value={formData.document} onChange={handleInputChange} className="block w-full px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl shadow-sm text-sm focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all" required={formData.packageType === PackageType.SITIO_BUS} autoComplete="off" disabled={isPersonSelected} placeholder="000.000.000-00" />
                                     </FormField>
-                                    <FormField label="Telefone (com DDD)" id="phone" error={errors.phone} onPaste={(text) => handlePaste('phone', text)}>
-                                        <input type="tel" id="phone" name="phone" value={formData.phone} onChange={handleInputChange} placeholder="(21) 99999-9999" className="block w-full px-3 py-2 bg-white border border-zinc-300 rounded-md shadow-sm sm:text-sm focus:outline-none focus:ring-green-500 focus:border-green-500 pr-8" required autoComplete="off" disabled={isPersonSelected} />
+                                    <FormField label="Celular (WhatsApp)" id="phone" error={errors.phone} onPaste={(text) => handlePaste('phone', text)}>
+                                        <input type="tel" id="phone" name="phone" value={formData.phone} onChange={handleInputChange} placeholder="(21) 99999-9999" className="block w-full px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl shadow-sm text-sm focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all" required autoComplete="off" disabled={isPersonSelected} />
                                     </FormField>
                                 </div>
                             </div>
-
-                            {isEditMode && (
-                                <div className="space-y-3">
-                                    <FormField label="Nome Completo" id="name" error={errors.name} onPaste={(text) => handlePaste('name', text)}>
-                                        <input type="text" id="name" name="name" value={formData.name} onChange={handleInputChange} className="block w-full px-3 py-2 bg-white border border-zinc-300 rounded-md shadow-sm sm:text-sm uppercase pr-8" required autoComplete="off" />
-                                    </FormField>
-                                    <div className="space-y-3">
-                                        <FormField label={`Documento (CPF ou RG)${formData.packageType === PackageType.SITIO_BUS ? '' : ' - Opcional'}`} id="document" error={errors.document} onPaste={(text) => handlePaste('document', text)}>
-                                            <input type="tel" id="document" name="document" value={formData.document} onChange={handleInputChange} className="block w-full px-3 py-2 bg-white border border-zinc-300 rounded-md shadow-sm sm:text-sm pr-8" required={formData.packageType === PackageType.SITIO_BUS} autoComplete="off" />
-                                        </FormField>
-                                        <FormField label="Telefone (com DDD)" id="phone" error={errors.phone} onPaste={(text) => handlePaste('phone', text)}>
-                                            <input type="tel" id="phone" name="phone" value={formData.phone} onChange={handleInputChange} placeholder="(21) 99999-9999" className="block w-full px-3 py-2 bg-white border border-zinc-300 rounded-md shadow-sm sm:text-sm pr-8" required autoComplete="off" />
-                                        </FormField>
-                                    </div>
-                                </div>
-                            )}
                         </div>
 
-                        {/* Package and Notes Card */}
-                        <div className="bg-white p-3 rounded-xl border border-zinc-200 shadow-sm space-y-3 h-full">
-                            <h2 className="text-lg font-bold text-zinc-800">Pacote e Observações</h2>
-                            <FormField label="Pacote" id="packageType" error={errors.packageType}>
-                                <select id="packageType" name="packageType" value={formData.packageType} onChange={handleInputChange} className="block w-full px-3 py-2 bg-white border border-zinc-300 rounded-md shadow-sm sm:text-sm focus:outline-none focus:ring-green-500 focus:border-green-500">
+                        {/* Section: Pacote e Obs */}
+                        <div className="bg-white p-5 rounded-[2rem] border border-zinc-200 shadow-sm space-y-4 opacity-0 animate-fadeInUp" style={{ animationFillMode: 'forwards', animationDelay: '100ms' }}>
+                            <div className="flex items-center gap-2 mb-2">
+                                <div className="p-2 bg-blue-50 text-blue-600 rounded-xl">
+                                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path d="M11 3a1 1 0 10-2 0v1a1 1 0 102 0V3zM15.657 5.757a1 1 0 00-1.414-1.414l-.707.707a1 1 0 001.414 1.414l.707-.707zM18 10a1 1 0 01-1 1h-1a1 1 0 110-2h1a1 1 0 011 1zM5.05 6.464A1 1 0 106.464 5.05l-.707-.707a1 1 0 00-1.414 1.414l.707.707zM5 10a1 1 0 01-1 1H3a1 1 0 110-2h1a1 1 0 011 1zM8 16v-1a1 1 0 10-2 0v1a1 1 0 102 0zM13 16v-1a1 1 0 10-2 0v1a1 1 0 102 0zM16.464 14.95a1 1 0 11-1.414 1.414l-.707-.707a1 1 0 011.414-1.414l.707.707zM6.464 14.95a1 1 0 111.414 1.414l-.707.707a1 1 0 01-1.414-1.414l.707-.707z" /></svg>
+                                </div>
+                                <h2 className="text-lg font-black text-zinc-800 tracking-tight">Evento e Logística</h2>
+                            </div>
+                            
+                            <FormField label="Pacote Escolhido" id="packageType" error={errors.packageType}>
+                                <select id="packageType" name="packageType" value={formData.packageType} onChange={handleInputChange} className="block w-full px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl shadow-sm text-sm focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all">
                                     <option value={PackageType.SITIO_ONLY}>Apenas Sítio - R$ {sitePriceText}</option>
                                     <option value={PackageType.SITIO_BUS}>Sítio + Ônibus - R$ {totalBusPriceText}</option>
                                 </select>
                             </FormField>
-                            <FormField label="Observações" id="notes" error={errors.notes} className="flex-grow">
-                                <textarea id="notes" name="notes" value={formData.notes} onChange={handleInputChange} rows={3} className="block w-full px-3 py-2 bg-white border border-zinc-300 rounded-md shadow-sm sm:text-sm focus:outline-none focus:ring-green-500 focus:border-green-500" placeholder="Alergias, restrições alimentares, etc."></textarea>
+                            
+                            <FormField label="Observações (Alergias, etc)" id="notes" error={errors.notes}>
+                                <textarea id="notes" name="notes" value={formData.notes} onChange={handleInputChange} rows={3} className="block w-full px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl shadow-sm text-sm focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all resize-none" placeholder="Ex: Alérgico a camarão, restrição de mobilidade..."></textarea>
                             </FormField>
                         </div>
-                    </div>
 
-                    {/* Right Column Wrapper: Exemption & Payment */}
-                    <div className="md:col-span-5 xl:col-span-1 space-y-3 mt-3 md:mt-0">
-                        {!isEditMode && (
-                            <div className="bg-white p-3 rounded-xl border border-zinc-200 shadow-sm space-y-3">
-                                <h2 className="text-lg font-bold text-zinc-800">Definição de Isenção</h2>
-                                <p className="text-xs text-zinc-500">Marque abaixo caso o inscrito seja isento de alguma taxa.</p>
-                                
-                                {isBusPackage ? (
-                                    <div className="space-y-2">
-                                        <label className="flex items-center space-x-2 cursor-pointer bg-zinc-50 p-2 rounded-lg border border-zinc-100 hover:bg-zinc-100">
-                                            <input 
-                                                type="checkbox" 
-                                                checked={formData.sitePayment.isExempt} 
-                                                onChange={(e) => {
-                                                    const isExempt = e.target.checked;
-                                                    setFormData(fd => ({
-                                                        ...fd,
-                                                        sitePayment: { ...fd.sitePayment, isExempt, isPaid: isExempt ? false : fd.sitePayment.isPaid }
-                                                    }));
-                                                }} 
-                                                className="h-5 w-5 rounded border-zinc-300 text-indigo-600 focus:ring-indigo-500"
-                                            />
-                                            <span className="text-sm font-bold text-zinc-700">Isento da Taxa do Sítio</span>
-                                        </label>
-                                        <label className="flex items-center space-x-2 cursor-pointer bg-zinc-50 p-2 rounded-lg border border-zinc-100 hover:bg-zinc-100">
-                                            <input 
-                                                type="checkbox" 
-                                                checked={formData.busPayment.isExempt} 
-                                                onChange={(e) => {
-                                                    const isExempt = e.target.checked;
-                                                    setFormData(fd => ({
-                                                        ...fd,
-                                                        busPayment: { ...fd.busPayment, isExempt, isPaid: isExempt ? false : fd.busPayment.isPaid }
-                                                    }));
-                                                }} 
-                                                className="h-5 w-5 rounded border-zinc-300 text-indigo-600 focus:ring-indigo-500"
-                                            />
-                                            <span className="text-sm font-bold text-zinc-700">Isento da Taxa do Ônibus</span>
-                                        </label>
+                        {/* Section: Financeiro e Isenção */}
+                        <div className="lg:col-span-2 grid grid-cols-1 md:grid-cols-2 gap-6">
+                            
+                            {/* Card: Definição de Isenção */}
+                            {!isEditMode && (
+                                <div className="bg-white p-5 rounded-[2rem] border border-zinc-200 shadow-sm space-y-4 opacity-0 animate-fadeInUp" style={{ animationFillMode: 'forwards', animationDelay: '200ms' }}>
+                                    <div className="flex items-center gap-2 mb-2">
+                                        <div className="p-2 bg-indigo-50 text-indigo-600 rounded-xl">
+                                            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" /></svg>
+                                        </div>
+                                        <h2 className="text-lg font-black text-zinc-800 tracking-tight">Isenção de Taxa</h2>
                                     </div>
-                                ) : (
-                                    <label className="flex items-center space-x-2 cursor-pointer bg-zinc-50 p-2 rounded-lg border border-zinc-100 hover:bg-zinc-100">
-                                        <input 
-                                            type="checkbox" 
-                                            name="paymentIsExempt" 
-                                            checked={formData.paymentIsExempt} 
-                                            onChange={(e) => setFormData(prev => ({ ...prev, paymentIsExempt: e.target.checked, paymentIsPaid: e.target.checked ? false : true }))} 
-                                            className="h-5 w-5 rounded border-zinc-300 text-indigo-600 focus:ring-indigo-500"
-                                        />
-                                        <span className="text-sm font-bold text-zinc-700">Isento de Pagamento</span>
-                                    </label>
-                                )}
-                                
-                                {(isBusPackage && formData.sitePayment.isExempt && formData.busPayment.isExempt) || (!isBusPackage && formData.paymentIsExempt) ? (
-                                    <div className="p-2 bg-indigo-50 text-indigo-800 text-sm font-semibold rounded-lg text-center">
-                                        Inscrito totalmente isento. Nenhum pagamento necessário.
-                                    </div>
-                                ) : null}
-                            </div>
-                        )}
-
-                        {!isEditMode && !isFullyExempt && (
-                            <div className="bg-white p-3 rounded-xl border border-zinc-200 shadow-sm space-y-3">
-                                <label className="flex items-center space-x-2 cursor-pointer w-fit">
-                                    <input type="checkbox" name="registerPaymentNow" checked={formData.registerPaymentNow} onChange={handleInputChange} className="h-4 w-4 rounded border-zinc-300 text-green-600 focus:ring-green-500"/>
-                                    <span className="text-lg text-zinc-800 font-bold">Registrar Pagamento Agora?</span>
-                                </label>
-
-                                {formData.registerPaymentNow && (
-                                    <div className="pt-3 border-t border-zinc-200 animate-fadeIn">
-                                        {isBusPackage ? (
-                                            <div className="space-y-3">
-                                                {!formData.sitePayment.isExempt && (
-                                                    <div>
-                                                        <h3 className="font-bold text-zinc-700 mb-1.5">Pagamento Sítio (R$ {sitePriceText})</h3>
-                                                        <label className="flex items-center space-x-2 mb-2 cursor-pointer w-fit">
-                                                            <input 
-                                                                type="checkbox" 
-                                                                checked={formData.sitePayment.isPaid} 
-                                                                onChange={(e) => setFormData(fd => ({ ...fd, sitePayment: { ...fd.sitePayment, isPaid: e.target.checked } }))} 
-                                                                className="h-4 w-4 rounded border-zinc-300 text-green-600 focus:ring-green-500"
-                                                            />
-                                                            <span className="text-sm text-zinc-700 font-medium">Pagamento realizado?</span>
-                                                        </label>
-                                                        {formData.sitePayment.isPaid && (
-                                                            <PartialPaymentFields idPrefix="site" details={formData.sitePayment} onUpdate={(updates) => setFormData(fd => ({ ...fd, sitePayment: { ...fd.sitePayment, ...updates } }))} />
-                                                        )}
-                                                    </div>
-                                                )}
-                                                
-                                                {!formData.busPayment.isExempt && (
-                                                    <div>
-                                                        <h3 className="font-bold text-zinc-700 mb-1.5">Pagamento Ônibus (R$ {(event?.bus_price ?? 50).toFixed(2).replace('.',',')})</h3>
-                                                        <label className="flex items-center space-x-2 mb-2 cursor-pointer w-fit">
-                                                            <input 
-                                                                type="checkbox" 
-                                                                checked={formData.busPayment.isPaid} 
-                                                                onChange={(e) => setFormData(fd => ({ ...fd, busPayment: { ...fd.busPayment, isPaid: e.target.checked } }))} 
-                                                                className="h-4 w-4 rounded border-zinc-300 text-green-600 focus:ring-green-500"
-                                                            />
-                                                            <span className="text-sm text-zinc-700 font-medium">Pagamento realizado?</span>
-                                                        </label>
-                                                        {formData.busPayment.isPaid && (
-                                                            <PartialPaymentFields idPrefix="bus" details={formData.busPayment} onUpdate={(updates) => setFormData(fd => ({ ...fd, busPayment: { ...fd.busPayment, ...updates } }))} />
-                                                        )}
-                                                    </div>
-                                                )}
-                                            </div>
-                                        ) : (
-                                            <div>
-                                                <h3 className="font-bold text-zinc-700 mb-1.5">Pagamento (R$ {sitePriceText})</h3>
-                                                <PartialPaymentFields 
-                                                    idPrefix="single" 
-                                                    details={{ 
-                                                        isPaid: formData.paymentIsPaid ?? true, 
-                                                        isExempt: false, 
-                                                        date: formData.paymentDate, 
-                                                        dateNotInformed: formData.paymentDateNotInformed, 
-                                                        type: formData.paymentType 
+                                    
+                                    {isBusPackage ? (
+                                        <div className="space-y-3">
+                                            <label className="flex items-center justify-between p-4 bg-zinc-50 rounded-2xl border border-zinc-100 cursor-pointer active:scale-[0.99] transition-all">
+                                                <span className="text-sm font-bold text-zinc-700">Taxa do Sítio</span>
+                                                <input 
+                                                    type="checkbox" 
+                                                    checked={formData.sitePayment.isExempt} 
+                                                    onChange={(e) => {
+                                                        const isExempt = e.target.checked;
+                                                        setFormData(fd => ({
+                                                            ...fd,
+                                                            sitePayment: { ...fd.sitePayment, isExempt, isPaid: isExempt ? false : fd.sitePayment.isPaid }
+                                                        }));
                                                     }} 
-                                                    onUpdate={(updates) => setFormData(fd => ({
-                                                        ...fd, 
-                                                        paymentDate: updates.date !== undefined ? updates.date : fd.paymentDate, 
-                                                        paymentDateNotInformed: updates.dateNotInformed !== undefined ? updates.dateNotInformed : fd.paymentDateNotInformed, 
-                                                        paymentType: updates.type !== undefined ? updates.type : fd.paymentType,
-                                                    }))} 
+                                                    className="h-6 w-6 rounded-lg border-zinc-300 text-indigo-600 focus:ring-indigo-500"
                                                 />
+                                            </label>
+                                            <label className="flex items-center justify-between p-4 bg-zinc-50 rounded-2xl border border-zinc-100 cursor-pointer active:scale-[0.99] transition-all">
+                                                <span className="text-sm font-bold text-zinc-700">Taxa do Ônibus</span>
+                                                <input 
+                                                    type="checkbox" 
+                                                    checked={formData.busPayment.isExempt} 
+                                                    onChange={(e) => {
+                                                        const isExempt = e.target.checked;
+                                                        setFormData(fd => ({
+                                                            ...fd,
+                                                            busPayment: { ...fd.busPayment, isExempt, isPaid: isExempt ? false : fd.busPayment.isPaid }
+                                                        }));
+                                                    }} 
+                                                    className="h-6 w-6 rounded-lg border-zinc-300 text-indigo-600 focus:ring-indigo-500"
+                                                />
+                                            </label>
+                                        </div>
+                                    ) : (
+                                        <label className="flex items-center justify-between p-4 bg-zinc-50 rounded-2xl border border-zinc-100 cursor-pointer active:scale-[0.99] transition-all">
+                                            <span className="text-sm font-bold text-zinc-700">Isento de Pagamento</span>
+                                            <input 
+                                                type="checkbox" 
+                                                name="paymentIsExempt" 
+                                                checked={formData.paymentIsExempt} 
+                                                onChange={(e) => setFormData(prev => ({ ...prev, paymentIsExempt: e.target.checked, paymentIsPaid: e.target.checked ? false : true }))} 
+                                                className="h-6 w-6 rounded-lg border-zinc-300 text-indigo-600 focus:ring-indigo-500"
+                                            />
+                                        </label>
+                                    )}
+                                    
+                                    {isFullyExempt && (
+                                        <div className="p-3 bg-indigo-100 text-indigo-900 text-xs font-black rounded-xl text-center uppercase tracking-widest animate-popIn">
+                                            Totalmente Isento
+                                        </div>
+                                    )}
+                                </div>
+                            )}
+
+                            {/* Card: Registrar Pagamento */}
+                            {!isEditMode && !isFullyExempt && (
+                                <div className="bg-white p-5 rounded-[2rem] border border-zinc-200 shadow-sm space-y-4 opacity-0 animate-fadeInUp" style={{ animationFillMode: 'forwards', animationDelay: '300ms' }}>
+                                    <div className="flex items-center justify-between">
+                                        <div className="flex items-center gap-2">
+                                            <div className="p-2 bg-emerald-50 text-emerald-600 rounded-xl">
+                                                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path d="M4 4a2 2 0 00-2 2v1h16V6a2 2 0 00-2-2H4z" /><path fillRule="evenodd" d="M18 9H2v5a2 2 0 002 2h12a2 2 0 002-2V9zM4 13a1 1 0 011-1h1a1 1 0 110 2H5a1 1 0 01-1-1zm5-1a1 1 0 100 2h1a1 1 0 100-2H9z" clipRule="evenodd" /></svg>
                                             </div>
-                                        )}
+                                            <h2 className="text-lg font-black text-zinc-800 tracking-tight">Pagamento</h2>
+                                        </div>
+                                        <label className="relative inline-flex items-center cursor-pointer">
+                                            <input type="checkbox" name="registerPaymentNow" checked={formData.registerPaymentNow} onChange={handleInputChange} className="sr-only peer"/>
+                                            <div className="w-11 h-6 bg-zinc-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-zinc-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-emerald-500"></div>
+                                        </label>
                                     </div>
-                                )}
-                            </div>
-                        )}
+
+                                    {formData.registerPaymentNow ? (
+                                        <div className="space-y-6 pt-2">
+                                            {isBusPackage ? (
+                                                <div className="space-y-6">
+                                                    {!formData.sitePayment.isExempt && (
+                                                        <div className="space-y-3">
+                                                            <div className="flex justify-between items-center px-1">
+                                                                <h3 className="font-black text-xs text-zinc-400 uppercase tracking-widest">Taxa do Sítio (R$ {sitePriceText})</h3>
+                                                                <label className="flex items-center gap-2 cursor-pointer group">
+                                                                    <span className="text-xs font-bold text-zinc-500 group-hover:text-emerald-600 transition-colors">Está pago?</span>
+                                                                    <input 
+                                                                        type="checkbox" 
+                                                                        checked={formData.sitePayment.isPaid} 
+                                                                        onChange={(e) => setFormData(fd => ({ ...fd, sitePayment: { ...fd.sitePayment, isPaid: e.target.checked } }))} 
+                                                                        className="h-5 w-5 rounded border-zinc-300 text-emerald-600 focus:ring-emerald-500"
+                                                                    />
+                                                                </label>
+                                                            </div>
+                                                            {formData.sitePayment.isPaid && (
+                                                                <PartialPaymentFields idPrefix="site" details={formData.sitePayment} onUpdate={(updates) => setFormData(fd => ({ ...fd, sitePayment: { ...fd.sitePayment, ...updates } }))} />
+                                                            )}
+                                                        </div>
+                                                    )}
+                                                    
+                                                    {!formData.busPayment.isExempt && (
+                                                        <div className="space-y-3">
+                                                            <div className="flex justify-between items-center px-1">
+                                                                <h3 className="font-black text-xs text-zinc-400 uppercase tracking-widest">Passagem Ônibus (R$ {(event?.bus_price ?? 50).toFixed(2).replace('.',',')})</h3>
+                                                                <label className="flex items-center gap-2 cursor-pointer group">
+                                                                    <span className="text-xs font-bold text-zinc-500 group-hover:text-emerald-600 transition-colors">Está pago?</span>
+                                                                    <input 
+                                                                        type="checkbox" 
+                                                                        checked={formData.busPayment.isPaid} 
+                                                                        onChange={(e) => setFormData(fd => ({ ...fd, busPayment: { ...fd.busPayment, isPaid: e.target.checked } }))} 
+                                                                        className="h-5 w-5 rounded border-zinc-300 text-emerald-600 focus:ring-emerald-500"
+                                                                    />
+                                                                </label>
+                                                            </div>
+                                                            {formData.busPayment.isPaid && (
+                                                                <PartialPaymentFields idPrefix="bus" details={formData.busPayment} onUpdate={(updates) => setFormData(fd => ({ ...fd, busPayment: { ...fd.busPayment, ...updates } }))} />
+                                                            )}
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            ) : (
+                                                <div className="space-y-3">
+                                                    <h3 className="font-black text-xs text-zinc-400 uppercase tracking-widest px-1">Detalhamento (R$ {sitePriceText})</h3>
+                                                    <PartialPaymentFields 
+                                                        idPrefix="single" 
+                                                        details={{ 
+                                                            isPaid: formData.paymentIsPaid ?? true, 
+                                                            isExempt: false, 
+                                                            date: formData.paymentDate, 
+                                                            dateNotInformed: formData.paymentDateNotInformed, 
+                                                            type: formData.paymentType 
+                                                        }} 
+                                                        onUpdate={(updates) => setFormData(fd => ({
+                                                            ...fd, 
+                                                            paymentDate: updates.date !== undefined ? updates.date : fd.paymentDate, 
+                                                            paymentDateNotInformed: updates.dateNotInformed !== undefined ? updates.dateNotInformed : fd.paymentDateNotInformed, 
+                                                            paymentType: updates.type !== undefined ? updates.type : fd.paymentType,
+                                                        }))} 
+                                                    />
+                                                </div>
+                                            )}
+                                        </div>
+                                    ) : (
+                                        <p className="text-sm text-zinc-400 font-medium italic text-center py-4 bg-zinc-50 rounded-2xl border border-dashed border-zinc-200">
+                                            Aguardando confirmação de pagamento...
+                                        </p>
+                                    )}
+                                </div>
+                            )}
+                        </div>
                     </div>
                 </div>
                 
-                {/* Footer Actions - Sticky at bottom of form on Desktop, Static on Mobile */}
-                <div className="mt-auto pt-3 border-t border-zinc-200 md:sticky md:bottom-0 bg-zinc-50 z-10 -mx-3 px-4 py-3 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)] flex justify-center items-center">
-                    <div className="flex flex-col md:flex-row gap-4 w-full md:w-auto">
-                        <button type="button" onClick={onCancel} className="w-full md:w-32 bg-zinc-200 text-zinc-800 font-bold py-3 px-4 rounded-full hover:bg-zinc-300 transition-colors">Cancelar</button>
-                        <button type="submit" disabled={isSubmitting || (!isPersonSelected && !formData.name)} className="w-full md:w-48 bg-green-500 text-white font-bold py-3 px-4 rounded-full flex items-center justify-center gap-2 hover:bg-green-600 shadow-sm disabled:bg-green-400 disabled:cursor-not-allowed">
-                            {isSubmitting ? <><SpinnerIcon /> Salvando...</> : (isEditMode ? 'Salvar Alterações' : 'Salvar Inscrição')}
+                {/* Fixed Footer - Adjusted for BottomNav and Safe Areas */}
+                <div className="fixed bottom-0 left-0 right-0 z-40 bg-white/90 backdrop-blur-md border-t border-zinc-200 px-4 py-4 pb-[calc(1.5rem+env(safe-area-inset-bottom)+70px)] md:pb-6 shadow-[0_-8px_30px_rgba(0,0,0,0.12)]">
+                    <div className="max-w-md mx-auto flex gap-3">
+                        <button type="button" onClick={onCancel} className="flex-1 bg-zinc-100 text-zinc-600 font-black py-4 px-6 rounded-2xl hover:bg-zinc-200 transition-all uppercase tracking-widest text-xs active:scale-[0.98]">
+                            Cancelar
+                        </button>
+                        <button type="submit" disabled={isSubmitting || (!isPersonSelected && !formData.name)} className="flex-[2] bg-emerald-500 text-white font-black py-4 px-6 rounded-2xl flex items-center justify-center gap-2 hover:bg-emerald-600 shadow-lg shadow-emerald-200 transition-all uppercase tracking-widest text-xs active:scale-[0.98] disabled:bg-zinc-300 disabled:shadow-none disabled:cursor-not-allowed">
+                            {isSubmitting ? <><SpinnerIcon /> Salvando...</> : (isEditMode ? 'Confirmar' : 'Salvar')}
                         </button>
                     </div>
                 </div>

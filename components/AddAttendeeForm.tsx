@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import type { Attendee, AttendeeFormData, PartialPaymentFormDetails, Event, Person } from '../types';
 import { PackageType, PaymentType } from '../types';
 import { formatPhoneNumber, formatDocument, getDocumentType, normalizeString } from '../utils/formatters';
@@ -189,6 +189,23 @@ const AddAttendeeForm: React.FC<AddAttendeeFormProps> = ({ onAddAttendee, onUpda
     const [isSearching, setIsSearching] = useState(false);
     const [isPersonSelected, setIsPersonSelected] = useState(false);
 
+    // Refs for auto-scrolling
+    const manualEntryRef = useRef<HTMLDivElement>(null);
+    const paymentSectionRef = useRef<HTMLDivElement>(null);
+    const sitePaymentRef = useRef<HTMLDivElement>(null);
+    const busPaymentRef = useRef<HTMLDivElement>(null);
+
+    // Helper function to scroll to a ref
+    const scrollToElement = (ref: React.RefObject<HTMLDivElement | null>) => {
+        setTimeout(() => {
+            if (ref.current) {
+                ref.current.scrollIntoView({ 
+                    behavior: 'smooth', 
+                    block: 'nearest' 
+                });
+            }
+        }, 150); // Delay to allow animation/render to complete
+    };
 
     useEffect(() => {
         setFormData(getInitialFormData(attendeeToEdit));
@@ -196,6 +213,31 @@ const AddAttendeeForm: React.FC<AddAttendeeFormProps> = ({ onAddAttendee, onUpda
              setIsPersonSelected(true);
         }
     }, [attendeeToEdit, isEditMode]);
+
+    // Auto-scroll logic for various triggers
+    useEffect(() => {
+        if (!isPersonSelected && !isEditMode && personSearchQuery.length > 0) {
+            scrollToElement(manualEntryRef);
+        }
+    }, [isPersonSelected, isEditMode]);
+
+    useEffect(() => {
+        if (formData.registerPaymentNow) {
+            scrollToElement(paymentSectionRef);
+        }
+    }, [formData.registerPaymentNow]);
+
+    useEffect(() => {
+        if (formData.registerPaymentNow && formData.sitePayment.isPaid) {
+            scrollToElement(sitePaymentRef);
+        }
+    }, [formData.sitePayment.isPaid]);
+
+    useEffect(() => {
+        if (formData.registerPaymentNow && formData.busPayment.isPaid) {
+            scrollToElement(busPaymentRef);
+        }
+    }, [formData.busPayment.isPaid]);
 
     useEffect(() => {
         if (personSearchQuery.length < 3 || isPersonSelected) {
@@ -429,7 +471,8 @@ const AddAttendeeForm: React.FC<AddAttendeeFormProps> = ({ onAddAttendee, onUpda
             </header>
 
             <form onSubmit={handleSubmit} className="flex-grow flex flex-col relative">
-                <div className="p-4 space-y-6 pb-48 md:pb-12 max-w-5xl mx-auto w-full overflow-x-hidden">
+                {/* Increased bottom padding further (pb-80) to ensure content can always be scrolled fully above footer */}
+                <div className="p-4 space-y-6 pb-80 md:pb-24 max-w-5xl mx-auto w-full overflow-x-hidden">
                     
                     {/* Responsive Grid System */}
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
@@ -487,7 +530,7 @@ const AddAttendeeForm: React.FC<AddAttendeeFormProps> = ({ onAddAttendee, onUpda
                                 </div>
                             )}
 
-                            <div className={isPersonSelected ? 'hidden' : 'space-y-4'}>
+                            <div ref={manualEntryRef} className={isPersonSelected ? 'hidden' : 'space-y-4'}>
                                 {!isEditMode && <div className="h-px bg-zinc-100 w-full my-4" />}
                                 <FormField label="Nome Completo" id="name" error={errors.name} onPaste={(text) => handlePaste('name', text)}>
                                     <input 
@@ -604,7 +647,7 @@ const AddAttendeeForm: React.FC<AddAttendeeFormProps> = ({ onAddAttendee, onUpda
 
                             {/* Card: Registrar Pagamento */}
                             {!isEditMode && !isFullyExempt && (
-                                <div className="bg-white p-5 rounded-[2rem] border border-zinc-200 shadow-sm space-y-4 opacity-0 animate-fadeInUp" style={{ animationFillMode: 'forwards', animationDelay: '300ms' }}>
+                                <div ref={paymentSectionRef} className="bg-white p-5 rounded-[2rem] border border-zinc-200 shadow-sm space-y-4 opacity-0 animate-fadeInUp" style={{ animationFillMode: 'forwards', animationDelay: '300ms' }}>
                                     <div className="flex items-center justify-between">
                                         <div className="flex items-center gap-2">
                                             <div className="p-2 bg-emerald-50 text-emerald-600 rounded-xl">
@@ -623,7 +666,7 @@ const AddAttendeeForm: React.FC<AddAttendeeFormProps> = ({ onAddAttendee, onUpda
                                             {isBusPackage ? (
                                                 <div className="space-y-6">
                                                     {!formData.sitePayment.isExempt && (
-                                                        <div className="space-y-3">
+                                                        <div ref={sitePaymentRef} className="space-y-3">
                                                             <div className="flex justify-between items-center px-1">
                                                                 <h3 className="font-black text-xs text-zinc-400 uppercase tracking-widest">Taxa do Sítio (R$ {sitePriceText})</h3>
                                                                 <label className="flex items-center gap-2 cursor-pointer group">
@@ -643,7 +686,7 @@ const AddAttendeeForm: React.FC<AddAttendeeFormProps> = ({ onAddAttendee, onUpda
                                                     )}
                                                     
                                                     {!formData.busPayment.isExempt && (
-                                                        <div className="space-y-3">
+                                                        <div ref={busPaymentRef} className="space-y-3">
                                                             <div className="flex justify-between items-center px-1">
                                                                 <h3 className="font-black text-xs text-zinc-400 uppercase tracking-widest">Passagem Ônibus (R$ {(event?.bus_price ?? 50).toFixed(2).replace('.',',')})</h3>
                                                                 <label className="flex items-center gap-2 cursor-pointer group">

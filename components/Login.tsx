@@ -106,7 +106,9 @@ const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
             <div className="flex flex-col items-center justify-center min-h-screen p-4 font-sans fixed inset-0 z-50">
                 <div className="text-center animate-fadeIn bg-white p-8 rounded-3xl shadow-xl border border-zinc-200">
                     <div className="mx-auto bg-green-100 text-green-600 w-20 h-20 rounded-full flex items-center justify-center mb-6 animate-pulse">
-                         <svg xmlns="http://www.w3.org/2000/svg" className="h-10 w-10" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M7.864 4.243A7.5 7.5 0 0119.5 12c0 2.252-.903 4.34-2.378 5.855A7.5 7.5 0 019.622 4.145m1.503 1.498a5.25 5.25 0 00-6.236 6.236l-3.5 3.5a.75.75 0 001.06 1.06l3.5-3.5a5.25 5.25 0 006.236-6.236-1.503-1.503z" /></svg>
+                         <svg xmlns="http://www.w3.org/2000/svg" className="h-10 w-10" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M12 11a1 1 0 011 1v4a1 1 0 11-2 0v-4a1 1 0 011-1Z" />
+                                        <path strokeLinecap="round" strokeLinejoin="round" d="M7 12a5 5 0 0110 0v1a1 1 0 11-2 0v-1a3 3 0 10-6 0v3a1 1 0 11-2 0v-3Z" />
+                                        <path strokeLinecap="round" strokeLinejoin="round" d="M4 12a8 8 0 0116 0v2a1 1 0 11-2 0v-2a6 6 0 10-12 0v4a1 1 0 11-2 0v-4Z" /></svg>
                     </div>
                     <h1 className="text-xl font-bold text-zinc-800">Autenticação Biométrica</h1>
                     <p className="text-zinc-500 mt-2">Confirme sua identidade...</p>
@@ -233,7 +235,9 @@ const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
                                         onClick={handleBiometricLogin}
                                         className="w-full bg-white border border-zinc-200 text-zinc-700 font-semibold py-4 rounded-xl hover:bg-zinc-50 active:scale-95 transition-all flex items-center justify-center gap-2"
                                     >
-                                        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M7.864 4.243A7.5 7.5 0 0119.5 12c0 2.252-.903 4.34-2.378 5.855A7.5 7.5 0 019.622 4.145m1.503 1.498a5.25 5.25 0 00-6.236 6.236l-3.5 3.5a.75.75 0 001.06 1.06l3.5-3.5a5.25 5.25 0 006.236-6.236-1.503-1.503z" /></svg>
+                                        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M12 11a1 1 0 011 1v4a1 1 0 11-2 0v-4a1 1 0 011-1Z" />
+                                        <path strokeLinecap="round" strokeLinejoin="round" d="M7 12a5 5 0 0110 0v1a1 1 0 11-2 0v-1a3 3 0 10-6 0v3a1 1 0 11-2 0v-3Z" />
+                                        <path strokeLinecap="round" strokeLinejoin="round" d="M4 12a8 8 0 0116 0v2a1 1 0 11-2 0v-2a6 6 0 10-12 0v4a1 1 0 11-2 0v-4Z" /></svg>
                                         Usar Biometria
                                     </button>
                                 )}

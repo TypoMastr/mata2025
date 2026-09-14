@@ -23,7 +23,7 @@ export const generateReport = async (attendees: Attendee[], buses: BusInfo[], ev
         const pendingCount = totalAttendees - paidCount;
         const totalRevenue = attendees.filter(a => a.payment.status === PaymentStatus.PAGO).reduce((sum, a) => sum + a.payment.amount, 0);
         const pendingRevenue = attendees.filter(a => a.payment.status === PaymentStatus.PENDENTE).reduce((sum, a) => sum + a.payment.amount, 0);
-        const busAttendeesCount = attendees.filter(a => a.packageType === PackageType.SITIO_BUS).length;
+        const busAttendeesCount = attendees.filter(a => a.packageType === PackageType.SITIO_BUS || a.packageType === PackageType.SITIO_BUS_DISCOUNT).length;
 
         const busDataForPrompt = buses.length > 0
             ? buses.map(bus => ` - Ônibus ${bus.busNumber}: ${bus.filledSeats} de ${bus.capacity} vagas preenchidas.`).join('\n')

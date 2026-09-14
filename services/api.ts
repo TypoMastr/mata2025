@@ -355,7 +355,7 @@ export const fetchRegistrations = async (eventId: string): Promise<Registration[
     return data.map(fromSupabase);
 };
 
-export const createRegistration = async (regData: {personId: string, eventId: string, packageType: PackageType, payment: Payment, notes?: string}): Promise<Registration> => {
+export const createRegistration = async (regData: {personId: string, eventId: string, packageType: PackageType, payment: Payment, notes?: string, busNumber?: number | null}): Promise<Registration> => {
     // 1. Check if registration already exists (active or soft-deleted)
     // Note: maybeSingle() finds rows that are visible. If RLS hides soft-deleted rows, this might return null.
     const { data: existing } = await supabase
@@ -381,6 +381,7 @@ export const createRegistration = async (regData: {personId: string, eventId: st
         payment_status: regData.payment.status,
         payment_details: paymentDetails,
         notes: regData.notes,
+        bus_number: regData.busNumber ?? null,
         is_deleted: false,
         wont_attend: false, // Default
         registration_date: new Date().toISOString(),

@@ -7,7 +7,7 @@ interface LoginProps {
 }
 
 // Sorted Alphabetically
-const USER_OPTIONS = ["Carlos Mauricio", "Fernando Haddad", "Leodeth", "Leonardo"];
+const USER_OPTIONS = ["Adriana", "Bruna", "Carlos Mauricio", "Fernando Haddad", "Katharina", "Leodeth", "Leonardo"];
 
 const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
     // FIX: Initialize selectedUser with useState<string | null>(null)

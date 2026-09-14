@@ -241,7 +241,7 @@ const InfoPage: React.FC<{ onLogout: () => void; event: Event | null }> = ({ onL
                         </div>
 
                         <InfoItem label="Prazo de Pagamento">
-                            Pagamento até <Highlight className="text-blue-600">{new Date(event.payment_deadline).toLocaleDateString('pt-BR', {day: '2-digit', month: 'long'})}</Highlight>.
+                            Pagamento até <Highlight className="text-blue-600">{new Date(event.payment_deadline).toLocaleDateString('pt-BR', {day: '2-digit', month: 'long', timeZone: 'UTC'})}</Highlight>.
                         </InfoItem>
                         <p className="text-xs text-zinc-400 mt-2 font-medium">Crianças até 6 anos no colo não pagam passagem.</p>
                     </InfoCard>

@@ -32,6 +32,21 @@
         flex-direction: column;
         isolation: isolate;
       }
+
+      /* Login needs to scroll on short mobile/PWA viewports. */
+      html.login-page,
+      body.login-page {
+        height: auto;
+        min-height: 100%;
+        overflow-x: hidden;
+        overflow-y: auto;
+        -webkit-overflow-scrolling: touch;
+      }
+
+      #root.login-page {
+        height: auto;
+        min-height: 100dvh;
+      }
       
       /* FIX 2: Improve Touch Responsiveness & Remove Input Lag */
       *, *::before, *::after {

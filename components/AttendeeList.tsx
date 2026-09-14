@@ -152,12 +152,12 @@ const StatusBadge: React.FC<{ attendee: Attendee }> = ({ attendee }) => {
             statusClasses = 'bg-zinc-100 text-zinc-800';
     }
     
-    const isPartiallyPaid = (attendee.(packageType === PackageType.SITIO_BUS || packageType === PackageType.SITIO_BUS_DISCOUNT) || attendee.(packageType === PackageType.SITIO_BUS || packageType === PackageType.SITIO_BUS_DISCOUNT)_DISCOUNT) &&
+    const isPartiallyPaid = (attendee.packageType === PackageType.SITIO_BUS || attendee.packageType === PackageType.SITIO_BUS_DISCOUNT) &&
                             status === PaymentStatus.PENDENTE &&
                             (sitePaymentDetails?.isPaid || busPaymentDetails?.isPaid);
     
     // Only show partial exempt if the user is NOT fully exempt
-    const isPartialExempt = (attendee.(packageType === PackageType.SITIO_BUS || packageType === PackageType.SITIO_BUS_DISCOUNT) || attendee.(packageType === PackageType.SITIO_BUS || packageType === PackageType.SITIO_BUS_DISCOUNT)_DISCOUNT) &&
+    const isPartialExempt = (attendee.packageType === PackageType.SITIO_BUS || attendee.packageType === PackageType.SITIO_BUS_DISCOUNT) &&
                             status !== PaymentStatus.ISENTO &&
                             (sitePaymentDetails?.isExempt || busPaymentDetails?.isExempt);
 

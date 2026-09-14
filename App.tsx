@@ -72,7 +72,7 @@ const AppContent: React.FC = () => {
         }
     }, [view, refreshRegistrations]);
 
-    const busAttendeesCount = useMemo(() => registrations.filter(a => a.packageType === PackageType.SITIO_BUS).length, [registrations]);
+    const busAttendeesCount = useMemo(() => registrations.filter(a => a.packageType === PackageType.SITIO_BUS || a.packageType === PackageType.SITIO_BUS_DISCOUNT).length, [registrations]);
     const totalBuses = useMemo(() => {
         const BUS_CAPACITY = 50;
         return Math.ceil(busAttendeesCount / BUS_CAPACITY) || (busAttendeesCount > 0 ? 1 : 0);

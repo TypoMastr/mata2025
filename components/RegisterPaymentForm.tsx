@@ -146,7 +146,7 @@ const RegisterPaymentForm: React.FC<RegisterPaymentFormProps> = ({ attendee, onR
     const { addToast } = useToast();
     const isPaid = attendee.payment.status === PaymentStatus.PAGO;
     const isExempt = attendee.payment.status === PaymentStatus.ISENTO;
-    const isMultiPayment = attendee.packageType === PackageType.SITIO_BUS;
+    const isMultiPayment = attendee.packageType === PackageType.SITIO_BUS || attendee.packageType === PackageType.SITIO_BUS_DISCOUNT;
 
     const [paymentState, setPaymentState] = useState<Payment>(attendee.payment);
     const [isSubmitting, setIsSubmitting] = useState(false);
@@ -205,7 +205,7 @@ const RegisterPaymentForm: React.FC<RegisterPaymentFormProps> = ({ attendee, onR
                 const busOk = busPaid || busExempt;
 
                 const sitePrice = event?.site_price ?? 70;
-                const busPrice = event?.bus_price ?? 50;
+                const busPrice = attendee.packageType === PackageType.SITIO_BUS_DISCOUNT ? (event?.bus_discount_price ?? event?.bus_price ?? 50) : (event?.bus_price ?? 50);
                 let newAmount = 0;
                 if (!siteExempt) newAmount += sitePrice;
                 if (!busExempt) newAmount += busPrice;
@@ -238,7 +238,7 @@ const RegisterPaymentForm: React.FC<RegisterPaymentFormProps> = ({ attendee, onR
             const isCurrentlyExempt = attendee.payment.status === PaymentStatus.ISENTO;
             const newStatus = isCurrentlyExempt ? PaymentStatus.PENDENTE : PaymentStatus.ISENTO;
             const newAmount = isCurrentlyExempt
-                ? (attendee.packageType === PackageType.SITIO_BUS ? ((event?.site_price ?? 70) + (event?.bus_price ?? 50)) : (event?.site_price ?? 70))
+                ? (attendee.packageType === PackageType.SITIO_BUS ? ((event?.site_price ?? 70) + (attendee.packageType === PackageType.SITIO_BUS_DISCOUNT ? (event?.bus_discount_price ?? event?.bus_price ?? 50) : (event?.bus_price ?? 50))) : (event?.site_price ?? 70))
                 : 0;
 
             const updatedAttendee: Attendee = {
@@ -326,7 +326,7 @@ const RegisterPaymentForm: React.FC<RegisterPaymentFormProps> = ({ attendee, onR
                         <div ref={busPaymentRef}>
                             <PartialPaymentEditor
                                 title="Pagamento Ônibus"
-                                amount={event?.bus_price ?? 50}
+                                amount={attendee.packageType === PackageType.SITIO_BUS_DISCOUNT ? (event?.bus_discount_price ?? event?.bus_price ?? 50) : (event?.bus_price ?? 50)}
                                 details={paymentState.busPaymentDetails || { isPaid: false, receiptUrl: null }}
                                 onUpdate={(field, value) => setPaymentState(p => ({...p, busPaymentDetails: { ...(p.busPaymentDetails || { isPaid: false, receiptUrl: null }), [field]: value }}))}
                             />

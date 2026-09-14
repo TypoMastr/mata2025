@@ -238,7 +238,7 @@ const RegisterPaymentForm: React.FC<RegisterPaymentFormProps> = ({ attendee, onR
             const isCurrentlyExempt = attendee.payment.status === PaymentStatus.ISENTO;
             const newStatus = isCurrentlyExempt ? PaymentStatus.PENDENTE : PaymentStatus.ISENTO;
             const newAmount = isCurrentlyExempt
-                ? (attendee.packageType === PackageType.SITIO_BUS ? ((event?.site_price ?? 70) + (attendee.packageType === PackageType.SITIO_BUS_DISCOUNT ? (event?.bus_discount_price ?? event?.bus_price ?? 50) : (event?.bus_price ?? 50))) : (event?.site_price ?? 70))
+                ? ((attendee.packageType === PackageType.SITIO_BUS || attendee.packageType === PackageType.SITIO_BUS_DISCOUNT) ? ((event?.site_price ?? 70) + (attendee.packageType === PackageType.SITIO_BUS_DISCOUNT ? (event?.bus_discount_price ?? event?.bus_price ?? 50) : (event?.bus_price ?? 50))) : (event?.site_price ?? 70))
                 : 0;
 
             const updatedAttendee: Attendee = {

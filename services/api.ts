@@ -69,7 +69,7 @@ const fromSupabase = (record: any): Registration => {
         id: personRecord.id, name: personRecord.name, document: personRecord.document,
         documentType: personRecord.document_type, phone: personRecord.phone,
     };
-    const isMultiPayment = record.package_type === PackageType.SITIO_BUS;
+    const isMultiPayment = (record.package_type === PackageType.SITIO_BUS || record.package_type === PackageType.SITIO_BUS_DISCOUNT);
     const paymentDetails = record.payment_details || {};
     const payment: Payment = {
         amount: record.payment_amount, status: record.payment_status, date: paymentDetails.date,
@@ -107,7 +107,7 @@ const registrationToSupabase = (registration: Partial<Registration>): any => {
         record.payment_amount = registration.payment.amount;
         record.payment_status = registration.payment.status;
         const paymentDetails: { [key: string]: any } = {};
-        if (registration.packageType === PackageType.SITIO_BUS) {
+        if ((registration.packageType === PackageType.SITIO_BUS || registration.packageType === PackageType.SITIO_BUS_DISCOUNT)) {
             // FIX: Consider "Paid" if it is explicitly paid OR if it is exempt.
             const siteOk = !!registration.payment.sitePaymentDetails?.isPaid || !!registration.payment.sitePaymentDetails?.isExempt;
             const busOk = !!registration.payment.busPaymentDetails?.isPaid || !!registration.payment.busPaymentDetails?.isExempt;
@@ -140,7 +140,7 @@ const personToSupabase = (person: Partial<Person>): any => ({
 
 const eventToSupabase = (event: Partial<Event>): any => ({
     name: event.name, event_date: event.event_date, location: event.location, activity_time: event.activity_time,
-    site_price: event.site_price, bus_price: event.bus_price, pix_key: event.pix_key,
+    site_price: event.site_price, bus_price: event.bus_price, bus_discount_price: event.bus_discount_price, pix_key: event.pix_key,
     bus_departure_time: event.bus_departure_time, bus_return_time: event.bus_return_time,
     payment_deadline: event.payment_deadline, is_deleted: event.is_deleted, is_archived: event.is_archived,
 });
@@ -218,7 +218,7 @@ const generateActionDescription = async (action_type: string, previous_data: any
                 if (before.payment.status !== after.payment.status && after.payment.status === PaymentStatus.ISENTO) return `Inscrição de ${personName} marcada como ISENTA.`;
                 if (before.payment.status === PaymentStatus.ISENTO && after.payment.status !== PaymentStatus.ISENTO) return `Isenção da inscrição de ${personName} removida.`;
 
-                if (after.packageType === PackageType.SITIO_BUS) {
+                if ((after.packageType === PackageType.SITIO_BUS || after.packageType === PackageType.SITIO_BUS_DISCOUNT)) {
                     const beforeSitePaid = before.payment.sitePaymentDetails?.isPaid;
                     const afterSitePaid = after.payment.sitePaymentDetails?.isPaid;
                     if (!beforeSitePaid && afterSitePaid) changes.push(`Pagamento do Sítio (R$ ${(event?.site_price ?? 70).toFixed(2).replace('.', ',')}) de ${personName} registrado.`);
@@ -226,7 +226,7 @@ const generateActionDescription = async (action_type: string, previous_data: any
                     
                     const beforeBusPaid = before.payment.busPaymentDetails?.isPaid;
                     const afterBusPaid = after.payment.busPaymentDetails?.isPaid;
-                    if (!beforeBusPaid && afterBusPaid) changes.push(`Pagamento do Ônibus (R$ ${(event?.bus_price ?? 50).toFixed(2).replace('.', ',')}) de ${personName} registrado.`);
+                    if (!beforeBusPaid && afterBusPaid) changes.push(`Pagamento do Ônibus (R$ ${((after.packageType === PackageType.SITIO_BUS_DISCOUNT ? (event?.bus_discount_price ?? event?.bus_price ?? 50) : (event?.bus_price ?? 50))).toFixed(2).replace('.', ',')}) de ${personName} registrado.`);
                     if (beforeBusPaid && !afterBusPaid) changes.push(`Pagamento do Ônibus de ${personName} removido.`);
                 } else {
                     if (before.payment.status === PaymentStatus.PENDENTE && after.payment.status === PaymentStatus.PAGO) changes.push(`Pagamento de R$ ${after.payment.amount.toFixed(2).replace('.', ',')} referente à inscrição de ${personName} foi registrado.`);
@@ -298,6 +298,15 @@ export const verifySchema = async (): Promise<{ success: boolean, missingIn: str
         }
     }
     
+    // Check for the second bus price in events
+    const { error: busDiscountPriceError } = await supabase
+        .from('events')
+        .select('bus_discount_price')
+        .limit(1);
+    if (busDiscountPriceError && busDiscountPriceError.message.includes('does not exist')) {
+        missingIn.push('column:bus_discount_price:events');
+    }
+
     // Special check for wont_attend in event_registrations
     const { error: wontAttendError } = await supabase
         .from('event_registrations')
@@ -357,7 +366,7 @@ export const createRegistration = async (regData: {personId: string, eventId: st
         .maybeSingle();
 
     const paymentDetails: any = {};
-    if (regData.packageType === PackageType.SITIO_BUS) {
+    if ((regData.packageType === PackageType.SITIO_BUS || regData.packageType === PackageType.SITIO_BUS_DISCOUNT)) {
         paymentDetails.site = regData.payment.sitePaymentDetails || { isPaid: false, receiptUrl: null };
         paymentDetails.bus = regData.payment.busPaymentDetails || { isPaid: false, receiptUrl: null };
     } else {

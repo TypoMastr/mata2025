@@ -2,6 +2,7 @@
 export enum PackageType {
     SITIO_ONLY = 'Apenas Sítio',
     SITIO_BUS = 'Sítio + Ônibus',
+    SITIO_BUS_DISCOUNT = 'Sítio + Ônibus c/ desconto',
 }
 
 export enum PaymentStatus {
@@ -146,6 +147,7 @@ export interface Event {
     activity_time: string;
     site_price: number;
     bus_price: number;
+    bus_discount_price: number;
     pix_key: string;
     bus_departure_time: string;
     bus_return_time: string;

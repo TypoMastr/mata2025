@@ -30,6 +30,7 @@ const EventForm: React.FC<EventFormProps> = ({ event, onSave, onClose }) => {
         activity_time: event?.activity_time || '',
         site_price: event?.site_price || 70,
         bus_price: event?.bus_price || 50,
+        bus_discount_price: event?.bus_discount_price || event?.bus_price || 40,
         pix_key: event?.pix_key || '',
         bus_departure_time: event?.bus_departure_time || '',
         bus_return_time: event?.bus_return_time || '',
@@ -97,8 +98,11 @@ const EventForm: React.FC<EventFormProps> = ({ event, onSave, onClose }) => {
                         <FormField label="Valor Apenas Sítio (R$)" id="site_price">
                             <input type="number" step="0.01" name="site_price" id="site_price" value={formData.site_price} onChange={handleChange} required className="block w-full px-3 py-2 bg-white border border-zinc-300 rounded-md shadow-sm sm:text-sm" />
                         </FormField>
-                        <FormField label="Valor Ônibus (R$)" id="bus_price">
+                        <FormField label="Valor Ônibus comum (R$)" id="bus_price">
                             <input type="number" step="0.01" name="bus_price" id="bus_price" value={formData.bus_price} onChange={handleChange} required className="block w-full px-3 py-2 bg-white border border-zinc-300 rounded-md shadow-sm sm:text-sm" />
+                        </FormField>
+                        <FormField label="Valor Ônibus com desconto (R$)" id="bus_discount_price">
+                            <input type="number" step="0.01" name="bus_discount_price" id="bus_discount_price" value={formData.bus_discount_price} onChange={handleChange} required className="block w-full px-3 py-2 bg-white border border-zinc-300 rounded-md shadow-sm sm:text-sm" />
                         </FormField>
                     </div>
                      <FormField label="Chave PIX" id="pix_key">

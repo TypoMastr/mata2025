@@ -72,7 +72,7 @@ const AppContent: React.FC = () => {
         }
     }, [view, refreshRegistrations]);
 
-    const busAttendeesCount = useMemo(() => registrations.filter(a => a.packageType === PackageType.SITIO_BUS).length, [registrations]);
+    const busAttendeesCount = useMemo(() => registrations.filter(a => a.packageType === PackageType.SITIO_BUS || a.packageType === PackageType.SITIO_BUS_DISCOUNT).length, [registrations]);
     const totalBuses = useMemo(() => {
         const BUS_CAPACITY = 50;
         return Math.ceil(busAttendeesCount / BUS_CAPACITY) || (busAttendeesCount > 0 ? 1 : 0);
@@ -205,7 +205,7 @@ const AppContent: React.FC = () => {
 
         switch (view) {
             case 'detail':
-                return selectedRegistration && <AttendeeDetail attendee={selectedRegistration} onBack={handleCancel} onEdit={handleEdit} onDelete={handleDeleteRequest} onManagePayment={handleShowPaymentForm} onUpdateAttendee={handleUpdateRegistration} totalBuses={totalBuses} busAssignments={busAssignments} />;
+                return selectedRegistration && <AttendeeDetail attendee={selectedRegistration} onBack={handleCancel} onEdit={handleEdit} onDelete={handleDeleteRequest} onManagePayment={handleShowPaymentForm} onUpdateAttendee={handleUpdateRegistration} totalBuses={totalBuses} busAssignments={busAssignments} event={selectedEvent} />;
             case 'form':
                 return <AddAttendeeForm onAddAttendee={handleSaveRegistration} onCancel={handleCancel} registrations={registrations} event={selectedEvent} />;
             case 'editForm':

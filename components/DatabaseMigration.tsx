@@ -49,6 +49,12 @@ ALTER TABLE public.${tableName}
 ADD COLUMN is_deleted BOOLEAN DEFAULT FALSE;`;
     };
     
+    const addBusDiscountPriceSql = (): string => {
+        return `-- Adiciona o valor promocional do ônibus à tabela 'events'
+ALTER TABLE public.events
+ADD COLUMN bus_discount_price NUMERIC NOT NULL DEFAULT 40;`;
+    };
+
     const addWontAttendSql = (): string => {
         return `-- Adiciona a coluna 'wont_attend' à tabela 'event_registrations' para marcar quem pagou mas não irá
 ALTER TABLE public.event_registrations
@@ -65,6 +71,8 @@ ADD COLUMN actor TEXT;`;
         if (item.startsWith('table:')) {
             const tableName = item.split(':')[1];
             commands.push(createTableSql(tableName));
+        } else if (item === 'column:bus_discount_price:events') {
+            commands.push(addBusDiscountPriceSql());
         } else if (item === 'column:wont_attend:event_registrations') {
             commands.push(addWontAttendSql());
         } else if (item === 'column:actor:action_history') {

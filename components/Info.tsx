@@ -213,9 +213,18 @@ const InfoPage: React.FC<{ onLogout: () => void; event: Event | null }> = ({ onL
                         delay={200}
                         headerColor="bg-blue-50 text-blue-600"
                     >
-                        <div className="flex justify-between items-center bg-zinc-50 p-4 rounded-2xl border border-zinc-100 mb-5">
-                            <span className="font-semibold text-zinc-700">Passagem (Ida e Volta)</span>
-                            <span className="text-2xl font-black text-blue-600 tracking-tight">R$ {event.bus_price.toFixed(2)}</span>
+                        <div className="bg-zinc-50 p-4 rounded-2xl border border-zinc-100 mb-5">
+                            <p className="font-semibold text-zinc-700 mb-3">Passagem (Ida e Volta)</p>
+                            <div className="grid grid-cols-2 gap-3">
+                                <div className="bg-white p-3 rounded-xl border border-blue-100 text-center">
+                                    <p className="text-xs font-bold text-zinc-500 uppercase tracking-wide">Comum</p>
+                                    <p className="text-lg font-black text-blue-600 mt-1">R$ {event.bus_price.toFixed(2)}</p>
+                                </div>
+                                <div className="bg-white p-3 rounded-xl border border-blue-100 text-center">
+                                    <p className="text-xs font-bold text-zinc-500 uppercase tracking-wide">Com desconto</p>
+                                    <p className="text-lg font-black text-blue-600 mt-1">R$ {(event.bus_discount_price ?? event.bus_price).toFixed(2)}</p>
+                                </div>
+                            </div>
                         </div>
                         
                         <div className="grid grid-cols-2 gap-4 mb-4">

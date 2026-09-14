@@ -65,7 +65,7 @@ export const useRegistrations = (eventId: string | null) => {
         }
 
         // Step 2: Prepare Payment Details
-        const isBusPackage = formData.packageType === PackageType.SITIO_BUS;
+        const isBusPackage = formData.packageType !== PackageType.SITIO_ONLY;
         const paymentDetails: Payment = {
             amount: parseFloat(formData.paymentAmount),
             status: PaymentStatus.PENDENTE,

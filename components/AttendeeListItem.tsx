@@ -27,15 +27,15 @@ const AttendeeListItem: React.FC<AttendeeListItemProps> = ({ attendee, onSelect 
             statusClasses = 'bg-zinc-100 text-zinc-800';
     }
 
-    const isPartiallyPaid = attendee.packageType === PackageType.SITIO_BUS &&
+    const isPartiallyPaid = (attendee.packageType === PackageType.SITIO_BUS || attendee.packageType === PackageType.SITIO_BUS_DISCOUNT) &&
                             status === PaymentStatus.PENDENTE &&
                             (sitePaymentDetails?.isPaid || busPaymentDetails?.isPaid);
 
-    const isPartialExempt = attendee.packageType === PackageType.SITIO_BUS &&
+    const isPartialExempt = (attendee.packageType === PackageType.SITIO_BUS || attendee.packageType === PackageType.SITIO_BUS_DISCOUNT) &&
                             status !== PaymentStatus.ISENTO &&
                             (sitePaymentDetails?.isExempt || busPaymentDetails?.isExempt);
 
-    const packageIcon = attendee.packageType === PackageType.SITIO_BUS 
+    const packageIcon = (attendee.packageType === PackageType.SITIO_BUS || attendee.packageType === PackageType.SITIO_BUS_DISCOUNT) 
         ? <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1.5 text-zinc-400 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path d="M9 17a2 2 0 11-4 0 2 2 0 014 0zM19 17a2 2 0 11-4 0 2 2 0 014 0z" /><path strokeLinecap="round" strokeLinejoin="round" d="M13 16V6a1 1 0 00-1-1H4a1 1 0 00-1 1v10l2 2h8l2-2zM5 11h6" /></svg>
         : <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1.5 text-zinc-400 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" /></svg>;
 

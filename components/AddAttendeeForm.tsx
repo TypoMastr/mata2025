@@ -126,7 +126,7 @@ const getInitialPartialPayment = (): PartialPaymentFormDetails => ({
 
 const getInitialFormData = (attendee?: Attendee | null): AttendeeFormData => {
     if (attendee) {
-        const isBus = attendee.packageType === PackageType.SITIO_BUS;
+        const isBus = (attendee.packageType === PackageType.SITIO_BUS || attendee.packageType === PackageType.SITIO_BUS_DISCOUNT);
         return {
             personId: attendee.person.id,
             name: attendee.person.name,
@@ -271,10 +271,10 @@ const AddAttendeeForm: React.FC<AddAttendeeFormProps> = ({ onAddAttendee, onUpda
     useEffect(() => {
         if (!isEditMode) {
             const sitePrice = event?.site_price ?? 70;
-            const busPrice = event?.bus_price ?? 50;
+            const busPrice = formData.packageType === PackageType.SITIO_BUS_DISCOUNT ? (event?.bus_discount_price ?? event?.bus_price ?? 50) : (event?.bus_price ?? 50);
             
             let amount = 0;
-            if (formData.packageType === PackageType.SITIO_BUS) {
+            if ((formData.packageType === PackageType.SITIO_BUS || formData.packageType === PackageType.SITIO_BUS_DISCOUNT)) {
                 if (!formData.sitePayment.isExempt) amount += sitePrice;
                 if (!formData.busPayment.isExempt) amount += busPrice;
             } else {
@@ -321,7 +321,7 @@ const AddAttendeeForm: React.FC<AddAttendeeFormProps> = ({ onAddAttendee, onUpda
         const newErrors: Record<string, string> = {};
         if (!formData.name.trim()) newErrors.name = 'Nome é obrigatório.';
         
-        const isBusPackage = formData.packageType === PackageType.SITIO_BUS;
+        const isBusPackage = formData.packageType !== PackageType.SITIO_ONLY;
 
         if (isBusPackage) {
             if (!formData.document.trim()) {
@@ -453,9 +453,10 @@ const AddAttendeeForm: React.FC<AddAttendeeFormProps> = ({ onAddAttendee, onUpda
         }
     };
 
-    const isBusPackage = formData.packageType === PackageType.SITIO_BUS;
+    const isBusPackage = (formData.packageType === PackageType.SITIO_BUS || formData.packageType === PackageType.SITIO_BUS_DISCOUNT);
     const sitePriceText = (event?.site_price ?? 70).toFixed(2).replace('.', ',');
-    const totalBusPriceText = ((event?.site_price ?? 70) + (event?.bus_price ?? 50)).toFixed(2).replace('.', ',');
+    const busPrice = formData.packageType === PackageType.SITIO_BUS_DISCOUNT ? (event?.bus_discount_price ?? event?.bus_price ?? 50) : (event?.bus_price ?? 50);
+    const totalBusPriceText = ((event?.site_price ?? 70) + busPrice).toFixed(2).replace('.', ',');
 
     const isFullyExempt = isBusPackage 
         ? (formData.sitePayment.isExempt && formData.busPayment.isExempt)
@@ -547,8 +548,8 @@ const AddAttendeeForm: React.FC<AddAttendeeFormProps> = ({ onAddAttendee, onUpda
                                     />
                                 </FormField>
                                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                                    <FormField label={`Doc (CPF/RG)${formData.packageType === PackageType.SITIO_BUS ? '' : ' - Op'}`} id="document" error={errors.document} onPaste={(text) => handlePaste('document', text)}>
-                                        <input type="tel" id="document" name="document" value={formData.document} onChange={handleInputChange} className="block w-full px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl shadow-sm text-sm focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all" required={formData.packageType === PackageType.SITIO_BUS} autoComplete="off" disabled={isPersonSelected} placeholder="000.000.000-00" />
+                                    <FormField label={`Doc (CPF/RG)${(formData.packageType === PackageType.SITIO_BUS || formData.packageType === PackageType.SITIO_BUS_DISCOUNT) ? '' : ' - Op'}`} id="document" error={errors.document} onPaste={(text) => handlePaste('document', text)}>
+                                        <input type="tel" id="document" name="document" value={formData.document} onChange={handleInputChange} className="block w-full px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl shadow-sm text-sm focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all" required={(formData.packageType === PackageType.SITIO_BUS || formData.packageType === PackageType.SITIO_BUS_DISCOUNT)} autoComplete="off" disabled={isPersonSelected} placeholder="000.000.000-00" />
                                     </FormField>
                                     <FormField label="Celular (WhatsApp)" id="phone" error={errors.phone} onPaste={(text) => handlePaste('phone', text)}>
                                         <input type="tel" id="phone" name="phone" value={formData.phone} onChange={handleInputChange} placeholder="(21) 99999-9999" className="block w-full px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl shadow-sm text-sm focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all" required autoComplete="off" disabled={isPersonSelected} />
@@ -569,7 +570,8 @@ const AddAttendeeForm: React.FC<AddAttendeeFormProps> = ({ onAddAttendee, onUpda
                             <FormField label="Pacote Escolhido" id="packageType" error={errors.packageType}>
                                 <select id="packageType" name="packageType" value={formData.packageType} onChange={handleInputChange} className="block w-full px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl shadow-sm text-sm focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all">
                                     <option value={PackageType.SITIO_ONLY}>Apenas Sítio - R$ {sitePriceText}</option>
-                                    <option value={PackageType.SITIO_BUS}>Sítio + Ônibus - R$ {totalBusPriceText}</option>
+                                    <option value={PackageType.SITIO_BUS}>Sítio + Ônibus - R$ {((event?.site_price ?? 70) + (event?.bus_price ?? 50)).toFixed(2).replace('.', ',')}</option>
+                                    <option value={PackageType.SITIO_BUS_DISCOUNT}>Sítio + Ônibus c/ desconto - R$ {((event?.site_price ?? 70) + (event?.bus_discount_price ?? event?.bus_price ?? 50)).toFixed(2).replace('.', ',')}</option>
                                 </select>
                             </FormField>
                             
@@ -688,7 +690,7 @@ const AddAttendeeForm: React.FC<AddAttendeeFormProps> = ({ onAddAttendee, onUpda
                                                     {!formData.busPayment.isExempt && (
                                                         <div ref={busPaymentRef} className="space-y-3">
                                                             <div className="flex justify-between items-center px-1">
-                                                                <h3 className="font-black text-xs text-zinc-400 uppercase tracking-widest">Passagem Ônibus (R$ {(event?.bus_price ?? 50).toFixed(2).replace('.',',')})</h3>
+                                                                <h3 className="font-black text-xs text-zinc-400 uppercase tracking-widest">Passagem Ônibus (R$ {busPrice.toFixed(2).replace('.',',')})</h3>
                                                                 <label className="flex items-center gap-2 cursor-pointer group">
                                                                     <span className="text-xs font-bold text-zinc-500 group-hover:text-emerald-600 transition-colors">Está pago?</span>
                                                                     <input 

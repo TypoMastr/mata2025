@@ -247,6 +247,7 @@ const InteractiveReportForm: React.FC<InteractiveReportFormProps> = ({ onGenerat
                                         <option value="all">Todos</option>
                                         <option value={PackageType.SITIO_ONLY}>Apenas Sítio</option>
                                         <option value={PackageType.SITIO_BUS}>Sítio + Ônibus</option>
+                            <option value={PackageType.SITIO_BUS_DISCOUNT}>Sítio + Ônibus c/ desconto</option>
                                     </select>
                                 </div>
                             </div>
@@ -303,8 +304,6 @@ const InteractiveReportPreview: React.FC<InteractiveReportPreviewProps> = ({ dat
 
     const financialBreakdown = useMemo(() => {
         const sitePrice = event?.site_price ?? 70;
-        const busPrice = event?.bus_price ?? 50;
-
         let totalSiteRevenue = 0;
         let totalBusRevenue = 0;
 
@@ -313,7 +312,8 @@ const InteractiveReportPreview: React.FC<InteractiveReportPreviewProps> = ({ dat
             if (a.payment.status === PaymentStatus.PAGO || a.payment.sitePaymentDetails?.isPaid) {
                 if (a.packageType === PackageType.SITIO_ONLY && !a.payment.sitePaymentDetails?.isExempt) {
                     totalSiteRevenue += sitePrice;
-                } else if (a.packageType === PackageType.SITIO_BUS) {
+                } else if ((a.packageType === PackageType.SITIO_BUS || a.packageType === PackageType.SITIO_BUS_DISCOUNT)) {
+                    const busPrice = a.packageType === PackageType.SITIO_BUS_DISCOUNT ? (event?.bus_discount_price ?? event?.bus_price ?? 50) : (event?.bus_price ?? 50);
                     if (a.payment.sitePaymentDetails?.isPaid && !a.payment.sitePaymentDetails?.isExempt) {
                         totalSiteRevenue += sitePrice;
                     }
@@ -1572,7 +1572,7 @@ const ReportsDashboard: React.FC<{
         }, {} as Record<PaymentType, { count: number; total: number }>);
         
         allPaidOrPartiallyPaid.forEach(attendee => {
-            if (attendee.packageType === PackageType.SITIO_BUS) {
+            if ((attendee.packageType === PackageType.SITIO_BUS || attendee.packageType === PackageType.SITIO_BUS_DISCOUNT)) {
                 if (attendee.payment.sitePaymentDetails?.isPaid && attendee.payment.sitePaymentDetails.type) {
                     const type = attendee.payment.sitePaymentDetails.type;
                     calculatedPaymentStats[type].count += 1;
@@ -1607,8 +1607,6 @@ const ReportsDashboard: React.FC<{
         // --- STRICT FINANCIAL CALCULATION ---
         // Iterate ALL attendees to get correct money values, regardless of attendance
         const sitePrice = event?.site_price ?? 70;
-        const busPrice = event?.bus_price ?? 50;
-
         let calculatedTotalRevenue = 0;
         let calculatedTotalPossibleRevenue = 0;
 
@@ -1627,7 +1625,8 @@ const ReportsDashboard: React.FC<{
                 if (isGeneralPaid) {
                     calculatedTotalRevenue += sitePrice;
                 }
-            } else if (a.packageType === PackageType.SITIO_BUS) {
+            } else if ((a.packageType === PackageType.SITIO_BUS || a.packageType === PackageType.SITIO_BUS_DISCOUNT)) {
+                const busPrice = a.packageType === PackageType.SITIO_BUS_DISCOUNT ? (event?.bus_discount_price ?? event?.bus_price ?? 50) : (event?.bus_price ?? 50);
                 // Check Site Part
                 if (!a.payment.sitePaymentDetails?.isExempt) {
                     // If NOT exempt, it ADDS to potential revenue.
@@ -1938,7 +1937,7 @@ const Reports: React.FC<ReportsProps> = ({ attendees, onLogout, onUpdateAttendee
 
     const zeroDocAttendees = useMemo(() => {
         return attendees.filter(a =>
-            a.packageType === PackageType.SITIO_BUS &&
+            (a.packageType === PackageType.SITIO_BUS || a.packageType === PackageType.SITIO_BUS_DISCOUNT) &&
             !a.wontAttend && // Exclude those not attending
             /^0+$/.test(a.person.document.replace(/[^\d]/g, ''))
         );
@@ -1975,16 +1974,15 @@ const Reports: React.FC<ReportsProps> = ({ attendees, onLogout, onUpdateAttendee
 
     const financialDetails = useMemo(() => {
         const sitePrice = event?.site_price ?? 70;
-        const busPrice = event?.bus_price ?? 50;
-
         let paidSitio = 0, totalSitio = 0, pendingSitio = 0;
         let paidBus = 0, totalBus = 0, pendingBus = 0;
         let countPaidSitio = 0, countTotalSitio = 0, countPendingSitio = 0;
         let countPaidBus = 0, countTotalBus = 0, countPendingBus = 0;
         
         attendees.forEach(a => {
+            const busPrice = a.packageType === PackageType.SITIO_BUS_DISCOUNT ? (event?.bus_discount_price ?? event?.bus_price ?? 50) : (event?.bus_price ?? 50);
             // Site Part
-            if (a.packageType === PackageType.SITIO_ONLY || a.packageType === PackageType.SITIO_BUS) {
+            if (a.packageType === PackageType.SITIO_ONLY || (a.packageType === PackageType.SITIO_BUS || a.packageType === PackageType.SITIO_BUS_DISCOUNT)) {
                 if (!a.payment.sitePaymentDetails?.isExempt) {
                     totalSitio += sitePrice;
                     countTotalSitio++;
@@ -1998,7 +1996,7 @@ const Reports: React.FC<ReportsProps> = ({ attendees, onLogout, onUpdateAttendee
                 }
             }
             // Bus Part
-            if (a.packageType === PackageType.SITIO_BUS) {
+            if ((a.packageType === PackageType.SITIO_BUS || a.packageType === PackageType.SITIO_BUS_DISCOUNT)) {
                 if (!a.payment.busPaymentDetails?.isExempt) {
                     totalBus += busPrice;
                     countTotalBus++;
@@ -2042,10 +2040,10 @@ const Reports: React.FC<ReportsProps> = ({ attendees, onLogout, onUpdateAttendee
         const uniqueBusNumbers = new Set(attendees.map(a => a.busNumber).filter(n => n !== null && n !== undefined)) as Set<number>;
         
         const allBusNumbers = Array.from(uniqueBusNumbers).sort((a, b) => a - b);
-        if (allBusNumbers.length === 0 && attendees.some(a => a.packageType === PackageType.SITIO_BUS && !a.wontAttend)) {
+        if (allBusNumbers.length === 0 && attendees.some(a => (a.packageType === PackageType.SITIO_BUS || a.packageType === PackageType.SITIO_BUS_DISCOUNT) && !a.wontAttend)) {
             // If there are bus attendees but no one assigned, show at least one bus
             allBusNumbers.push(1);
-        } else if (allBusNumbers.length === 0 && attendees.filter(a => a.packageType === PackageType.SITIO_BUS && !a.wontAttend).length === 0) {
+        } else if (allBusNumbers.length === 0 && attendees.filter(a => (a.packageType === PackageType.SITIO_BUS || a.packageType === PackageType.SITIO_BUS_DISCOUNT) && !a.wontAttend).length === 0) {
             // No bus attendees at all, don't show any bus stats
             return [];
         }
@@ -2061,7 +2059,7 @@ const Reports: React.FC<ReportsProps> = ({ attendees, onLogout, onUpdateAttendee
         });
 
         // Ensure at least one bus is shown if there are bus package attendees, even if busNumber is null
-        if (allBusNumbers.length === 0 && attendees.some(a => a.packageType === PackageType.SITIO_BUS && !a.wontAttend)) {
+        if (allBusNumbers.length === 0 && attendees.some(a => (a.packageType === PackageType.SITIO_BUS || a.packageType === PackageType.SITIO_BUS_DISCOUNT) && !a.wontAttend)) {
             stats.push({ busNumber: 1, filledSeats: 0, remainingSeats: BUS_CAPACITY, capacity: BUS_CAPACITY });
         }
 
@@ -2095,10 +2093,10 @@ const Reports: React.FC<ReportsProps> = ({ attendees, onLogout, onUpdateAttendee
             if (attendee.payment.status === PaymentStatus.PAGO) {
                 return sum + attendee.payment.amount;
             }
-            if (attendee.packageType === PackageType.SITIO_BUS && attendee.payment.status === PaymentStatus.PENDENTE) {
+            if ((attendee.packageType === PackageType.SITIO_BUS || attendee.packageType === PackageType.SITIO_BUS_DISCOUNT) && attendee.payment.status === PaymentStatus.PENDENTE) {
                 let partial = 0;
                 const sitePrice = event?.site_price ?? 70;
-                const busPrice = event?.bus_price ?? 50;
+                const busPrice = attendee.packageType === PackageType.SITIO_BUS_DISCOUNT ? (event?.bus_discount_price ?? event?.bus_price ?? 50) : (event?.bus_price ?? 50);
                 
                 if (attendee.payment.sitePaymentDetails?.isPaid) partial += sitePrice;
                 if (attendee.payment.busPaymentDetails?.isPaid) partial += busPrice;

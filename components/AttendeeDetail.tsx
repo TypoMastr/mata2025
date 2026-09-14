@@ -15,6 +15,7 @@ interface AttendeeDetailProps {
     onUpdateAttendee: (attendee: Attendee) => Promise<void>;
     totalBuses: number;
     busAssignments: Record<number, number>;
+    event?: { bus_price?: number; bus_discount_price?: number; site_price?: number } | null;
 }
 
 const SpinnerIcon: React.FC = () => (
@@ -137,7 +138,7 @@ const ConfirmAttendanceToggleModal: React.FC<ConfirmAttendanceToggleModalProps> 
     );
 };
 
-const AttendeeDetail: React.FC<AttendeeDetailProps> = ({ attendee, onBack, onEdit, onDelete, onManagePayment, onUpdateAttendee, totalBuses, busAssignments }) => {
+const AttendeeDetail: React.FC<AttendeeDetailProps> = ({ attendee, onBack, onEdit, onDelete, onManagePayment, onUpdateAttendee, totalBuses, busAssignments, event }) => {
     const { addToast } = useToast();
     const [receiptToView, setReceiptToView] = useState<string | null>(null);
     const [isEditingNotes, setIsEditingNotes] = useState(false);
@@ -186,7 +187,7 @@ const AttendeeDetail: React.FC<AttendeeDetailProps> = ({ attendee, onBack, onEdi
         animationFillMode: 'forwards',
     });
 
-    const isMultiPayment = attendee.packageType === PackageType.SITIO_BUS;
+    const isMultiPayment = attendee.packageType === PackageType.SITIO_BUS || attendee.packageType === PackageType.SITIO_BUS_DISCOUNT;
     const isPartiallyPaid = isMultiPayment &&
                             status === PaymentStatus.PENDENTE &&
                             (attendee.payment.sitePaymentDetails?.isPaid || attendee.payment.busPaymentDetails?.isPaid);
@@ -439,7 +440,7 @@ const AttendeeDetail: React.FC<AttendeeDetailProps> = ({ attendee, onBack, onEdi
                     {isMultiPayment && (
                         <div className="bg-white p-4 rounded-xl border border-zinc-200 shadow-sm space-y-3 opacity-0 animate-fadeInUp md:col-span-2" style={getAnimationStyle(250)}>
                             <PartialPaymentDetail title="Pagamento Sítio" amount={70} details={attendee.payment.sitePaymentDetails} onViewReceipt={setReceiptToView} />
-                            <PartialPaymentDetail title="Pagamento Ônibus" amount={50} details={attendee.payment.busPaymentDetails} onViewReceipt={setReceiptToView} />
+                            <PartialPaymentDetail title="Pagamento Ônibus" amount={attendee.packageType === PackageType.SITIO_BUS_DISCOUNT ? (event?.bus_discount_price ?? event?.bus_price ?? 50) : (event?.bus_price ?? 50)} details={attendee.payment.busPaymentDetails} onViewReceipt={setReceiptToView} />
                         </div>
                     )}
 

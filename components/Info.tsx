@@ -215,7 +215,10 @@ const InfoPage: React.FC<{ onLogout: () => void; event: Event | null }> = ({ onL
                     >
                         <div className="flex justify-between items-center bg-zinc-50 p-4 rounded-2xl border border-zinc-100 mb-5">
                             <span className="font-semibold text-zinc-700">Passagem (Ida e Volta)</span>
-                            <span className="text-2xl font-black text-blue-600 tracking-tight">R$ {event.bus_price.toFixed(2)}</span>
+                            <div className="flex flex-col items-end">
+                                    <span className="text-sm font-bold text-blue-600">Comum: R$ {event.bus_price.toFixed(2)}</span>
+                                    <span className="text-sm font-bold text-blue-600">Com desconto: R$ {(event.bus_discount_price ?? event.bus_price).toFixed(2)}</span>
+                                </div>
                         </div>
                         
                         <div className="grid grid-cols-2 gap-4 mb-4">

@@ -5,6 +5,48 @@ import * as api from '../services/api';
 import { getDocumentType } from '../utils/formatters';
 import { PaymentStatus, PackageType } from '../types';
 
+const BUS_CAPACITY = 50;
+
+const isBusRegistration = (registration: Registration): boolean =>
+    registration.packageType !== PackageType.SITIO_ONLY;
+
+const getNextAvailableBusNumber = (items: Registration[]): number => {
+    const busCounts = items.reduce((counts, registration) => {
+        if (isBusRegistration(registration) && registration.busNumber) {
+            counts[registration.busNumber] = (counts[registration.busNumber] || 0) + 1;
+        }
+        return counts;
+    }, {} as Record<number, number>);
+
+    let busNumber = 1;
+    while ((busCounts[busNumber] || 0) >= BUS_CAPACITY) {
+        busNumber += 1;
+    }
+    return busNumber;
+};
+
+const assignMissingBusNumbers = async (items: Registration[]): Promise<Registration[]> => {
+    const updatedItems = [...items];
+
+    for (let index = 0; index < updatedItems.length; index += 1) {
+        const registration = updatedItems[index];
+        if (
+            isBusRegistration(registration) &&
+            !registration.wontAttend &&
+            registration.busNumber == null
+        ) {
+            const busNumber = getNextAvailableBusNumber(updatedItems);
+            const savedRegistration = await api.updateRegistration({
+                ...registration,
+                busNumber,
+            });
+            updatedItems[index] = savedRegistration;
+        }
+    }
+
+    return updatedItems;
+};
+
 export const useRegistrations = (eventId: string | null) => {
     const [registrations, setRegistrations] = useState<Registration[]>([]);
     const [isLoading, setIsLoading] = useState(true);
@@ -17,7 +59,8 @@ export const useRegistrations = (eventId: string | null) => {
         try {
             // API now handles soft deletes, so no change needed here.
             const data = await api.fetchRegistrations(id);
-            setRegistrations(data);
+            const dataWithBusAssignments = await assignMissingBusNumbers(data);
+            setRegistrations(dataWithBusAssignments);
         } catch (err) {
             console.error("Failed to fetch registrations:", err);
         } finally {
@@ -123,11 +166,13 @@ export const useRegistrations = (eventId: string | null) => {
             }
         }
 
-        // Step 3: Create the Registration
+        // Step 3: Assign a seat and create the Registration
+        const busNumber = isBusPackage ? getNextAvailableBusNumber(registrations) : null;
         const newRegistrationData = {
             personId,
             eventId,
             packageType: formData.packageType,
+            busNumber,
             payment: paymentDetails,
             notes: formData.notes,
         };

@@ -104,7 +104,7 @@ const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
     }
 
     return (
-        <div className="min-h-screen flex flex-col items-center justify-center p-6 relative overflow-hidden">
+        <div className="min-h-screen flex flex-col items-center justify-center p-6 relative overflow-y-auto">
             {/* Background decoration */}
             <div className="absolute top-0 left-0 w-full h-64 bg-gradient-to-b from-green-500/10 to-transparent pointer-events-none" />
             

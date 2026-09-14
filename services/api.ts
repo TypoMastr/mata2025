@@ -226,7 +226,7 @@ const generateActionDescription = async (action_type: string, previous_data: any
                     
                     const beforeBusPaid = before.payment.busPaymentDetails?.isPaid;
                     const afterBusPaid = after.payment.busPaymentDetails?.isPaid;
-                    if (!beforeBusPaid && afterBusPaid) changes.push(`Pagamento do Ônibus (R$ ${(event?.bus_price ?? 50).toFixed(2).replace('.', ',')}) de ${personName} registrado.`);
+                    if (!beforeBusPaid && afterBusPaid) changes.push(`Pagamento do Ônibus (R$ ${((after.packageType === PackageType.SITIO_BUS_DISCOUNT ? (event?.bus_discount_price ?? event?.bus_price ?? 50) : (event?.bus_price ?? 50))).toFixed(2).replace('.', ',')}) de ${personName} registrado.`);
                     if (beforeBusPaid && !afterBusPaid) changes.push(`Pagamento do Ônibus de ${personName} removido.`);
                 } else {
                     if (before.payment.status === PaymentStatus.PENDENTE && after.payment.status === PaymentStatus.PAGO) changes.push(`Pagamento de R$ ${after.payment.amount.toFixed(2).replace('.', ',')} referente à inscrição de ${personName} foi registrado.`);

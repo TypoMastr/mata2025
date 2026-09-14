@@ -10,6 +10,18 @@ interface LoginProps {
 const USER_OPTIONS = ["Adriana", "Bruna", "Carlos Mauricio", "Fernando Haddad", "Katharina", "Leodeth", "Leonardo"];
 
 const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
+    useEffect(() => {
+        document.documentElement.classList.add('login-page');
+        document.body.classList.add('login-page');
+        document.getElementById('root')?.classList.add('login-page');
+
+        return () => {
+            document.documentElement.classList.remove('login-page');
+            document.body.classList.remove('login-page');
+            document.getElementById('root')?.classList.remove('login-page');
+        };
+    }, []);
+
     // FIX: Initialize selectedUser with useState<string | null>(null)
     const [selectedUser, setSelectedUser] = useState<string | null>(null);
     const [password, setPassword] = useState('');
@@ -104,7 +116,7 @@ const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
     }
 
     return (
-        <div className="min-h-screen flex flex-col items-center justify-center p-6 relative overflow-y-auto">
+        <div className="min-h-[100dvh] flex flex-col items-center justify-center p-6 relative overflow-y-auto">
             {/* Background decoration */}
             <div className="absolute top-0 left-0 w-full h-64 bg-gradient-to-b from-green-500/10 to-transparent pointer-events-none" />
             
@@ -171,10 +183,10 @@ const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
                             </h2>
                             <button 
                                 onClick={handleBackToUserSelect}
-                                className="text-sm text-green-600 font-medium mt-1 hover:underline opacity-0 animate-fadeIn flex items-center justify-center gap-1 mx-auto" 
+                                className="mt-4 inline-flex items-center justify-center gap-2 rounded-xl border border-green-200 bg-green-50 px-4 py-2.5 text-sm font-bold text-green-700 shadow-sm hover:bg-green-100 active:scale-95 opacity-0 animate-fadeIn" 
                                 style={getDelay(2)}
                             >
-                                Não é você? Trocar
+                                ← Voltar para seleção de usuário
                             </button>
                         </div>
                         

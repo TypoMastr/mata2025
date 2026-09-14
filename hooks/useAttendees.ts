@@ -12,7 +12,7 @@ const isBusRegistration = (registration: Registration): boolean =>
 
 const getNextAvailableBusNumber = (items: Registration[]): number => {
     const busCounts = items.reduce((counts, registration) => {
-        if (isBusRegistration(registration) && registration.busNumber) {
+        if (isBusRegistration(registration) && !registration.wontAttend && registration.busNumber) {
             counts[registration.busNumber] = (counts[registration.busNumber] || 0) + 1;
         }
         return counts;

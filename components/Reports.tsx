@@ -1581,7 +1581,7 @@ const ReportsDashboard: React.FC<{
                  if (attendee.payment.busPaymentDetails?.isPaid && attendee.payment.busPaymentDetails.type) {
                     const type = attendee.payment.busPaymentDetails.type;
                     calculatedPaymentStats[type].count += 1;
-                    calculatedPaymentStats[type].total += event?.bus_price ?? 50;
+                    calculatedPaymentStats[type].total += attendee.packageType === PackageType.SITIO_BUS_DISCOUNT ? (event?.bus_discount_price ?? event?.bus_price ?? 50) : (event?.bus_price ?? 50);
                 }
             } else { // Single payment package
                 if (attendee.payment.status === PaymentStatus.PAGO && attendee.payment.type) {

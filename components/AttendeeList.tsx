@@ -129,7 +129,7 @@ const FilterBottomSheet: React.FC<{
 };
 
 const PackageIcon: React.FC<{ packageType: PackageType }> = ({ packageType }) => {
-    return packageType === PackageType.SITIO_BUS
+    return (packageType === PackageType.SITIO_BUS || packageType === PackageType.SITIO_BUS_DISCOUNT)
         ? <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-1.5 text-zinc-400 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path d="M9 17a2 2 0 11-4 0 2 2 0 014 0zM19 17a2 2 0 11-4 0 2 2 0 014 0z" /><path strokeLinecap="round" strokeLinejoin="round" d="M13 16V6a1 1 0 00-1-1H4a1 1 0 00-1 1v10l2 2h8l2-2zM5 11h6" /></svg>
         : <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-1.5 text-zinc-400 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" /></svg>;
 }
@@ -152,12 +152,12 @@ const StatusBadge: React.FC<{ attendee: Attendee }> = ({ attendee }) => {
             statusClasses = 'bg-zinc-100 text-zinc-800';
     }
     
-    const isPartiallyPaid = attendee.packageType === PackageType.SITIO_BUS &&
+    const isPartiallyPaid = (attendee.(packageType === PackageType.SITIO_BUS || packageType === PackageType.SITIO_BUS_DISCOUNT) || attendee.(packageType === PackageType.SITIO_BUS || packageType === PackageType.SITIO_BUS_DISCOUNT)_DISCOUNT) &&
                             status === PaymentStatus.PENDENTE &&
                             (sitePaymentDetails?.isPaid || busPaymentDetails?.isPaid);
     
     // Only show partial exempt if the user is NOT fully exempt
-    const isPartialExempt = attendee.packageType === PackageType.SITIO_BUS &&
+    const isPartialExempt = (attendee.(packageType === PackageType.SITIO_BUS || packageType === PackageType.SITIO_BUS_DISCOUNT) || attendee.(packageType === PackageType.SITIO_BUS || packageType === PackageType.SITIO_BUS_DISCOUNT)_DISCOUNT) &&
                             status !== PaymentStatus.ISENTO &&
                             (sitePaymentDetails?.isExempt || busPaymentDetails?.isExempt);
 
@@ -264,6 +264,7 @@ const AttendeeList: React.FC<AttendeeListProps> = ({
         { label: 'Todos', value: 'all' },
         { label: PackageType.SITIO_ONLY, value: PackageType.SITIO_ONLY },
         { label: PackageType.SITIO_BUS, value: PackageType.SITIO_BUS },
+        { label: PackageType.SITIO_BUS_DISCOUNT, value: PackageType.SITIO_BUS_DISCOUNT },
     ];
 
     // Touch Event Handlers for Pull to Refresh
@@ -454,6 +455,7 @@ const AttendeeList: React.FC<AttendeeListProps> = ({
                             <FilterPill label="Todos" isActive={packageFilter === 'all'} onClick={() => onPackageFilterChange('all')} />
                             <FilterPill label={PackageType.SITIO_ONLY} isActive={packageFilter === PackageType.SITIO_ONLY} onClick={() => onPackageFilterChange(PackageType.SITIO_ONLY)} />
                             <FilterPill label={PackageType.SITIO_BUS} isActive={packageFilter === PackageType.SITIO_BUS} onClick={() => onPackageFilterChange(PackageType.SITIO_BUS)} />
+                        <FilterPill label={PackageType.SITIO_BUS_DISCOUNT} isActive={packageFilter === PackageType.SITIO_BUS_DISCOUNT} onClick={() => onPackageFilterChange(PackageType.SITIO_BUS_DISCOUNT)} />
                         </div>
                     </div>
 

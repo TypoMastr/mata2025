@@ -531,7 +531,7 @@ const AddAttendeeForm: React.FC<AddAttendeeFormProps> = ({ onAddAttendee, onUpda
                                 </div>
                             )}
 
-                            {isPersonSelected && !isEditMode && !formData.document.trim() && (
+                            {isPersonSelected && !isEditMode && (
                                 <FormField label="Documento (CPF/RG)" id="selectedPersonDocument" error={errors.document} onPaste={(text) => handlePaste('document', text)}>
                                     <input
                                         type="tel"

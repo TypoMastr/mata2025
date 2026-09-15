@@ -531,6 +531,23 @@ const AddAttendeeForm: React.FC<AddAttendeeFormProps> = ({ onAddAttendee, onUpda
                                 </div>
                             )}
 
+                            {isPersonSelected && !isEditMode && !formData.document.trim() && (
+                                <FormField label="Documento (CPF/RG)" id="selectedPersonDocument" error={errors.document} onPaste={(text) => handlePaste('document', text)}>
+                                    <input
+                                        type="tel"
+                                        id="selectedPersonDocument"
+                                        name="document"
+                                        value={formData.document}
+                                        onChange={handleInputChange}
+                                        className="block w-full px-4 py-3 bg-white border-2 border-amber-200 rounded-xl shadow-sm text-sm focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all"
+                                        required={(formData.packageType === PackageType.SITIO_BUS || formData.packageType === PackageType.SITIO_BUS_DISCOUNT)}
+                                        autoComplete="off"
+                                        placeholder="Informe o CPF ou RG desta pessoa"
+                                    />
+                                    <p className="mt-1 text-xs font-medium text-amber-700">Esta pessoa ainda não possui documento cadastrado.</p>
+                                </FormField>
+                            )}
+
                             <div ref={manualEntryRef} className={isPersonSelected ? 'hidden' : 'space-y-4'}>
                                 {!isEditMode && <div className="h-px bg-zinc-100 w-full my-4" />}
                                 <FormField label="Nome Completo" id="name" error={errors.name} onPaste={(text) => handlePaste('name', text)}>

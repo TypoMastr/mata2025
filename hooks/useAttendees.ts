@@ -107,6 +107,19 @@ export const useRegistrations = (eventId: string | null) => {
             throw new Error("Could not determine person to register.");
         }
 
+        // Existing people registered only for the site may not have a document yet.
+        // Save a newly supplied document before creating the event registration.
+        if (formData.personId && formData.document.trim()) {
+            const { type: documentType } = getDocumentType(formData.document);
+            await api.updatePerson({
+                id: personId,
+                name: formData.name,
+                document: formData.document,
+                documentType,
+                phone: formData.phone,
+            });
+        }
+
         // Step 2: Prepare Payment Details
         const isBusPackage = formData.packageType !== PackageType.SITIO_ONLY;
         const paymentDetails: Payment = {

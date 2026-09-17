@@ -15,7 +15,10 @@ const supabase = createClient(supabaseUrl, supabaseAnonKey);
 const getIpInfo = async (): Promise<{ ip_address: string, location_info: any } | null> => {
     try {
         // Using a CORS-friendly public API to get IP info
-        const response = await fetch('https://ipapi.co/json/');
+        const controller = new AbortController();
+        const timeoutId = window.setTimeout(() => controller.abort(), 5000);
+        const response = await fetch('https://ipapi.co/json/', { signal: controller.signal });
+        window.clearTimeout(timeoutId);
         if (!response.ok) {
             console.warn(`IP API request failed with status: ${response.status}`);
             return null;
@@ -459,8 +462,17 @@ export const updateRegistration = async (registration: Registration): Promise<Re
 
     const beforeRegistration = fromSupabase(beforeData);
     const updatedRegistration = fromSupabase(data);
-    const description = await generateActionDescription('UPDATE_REGISTRATION', beforeRegistration, updatedRegistration);
-    await logAction('UPDATE_REGISTRATION', 'event_registrations', updatedRegistration.id, description, beforeRegistration, updatedRegistration);
+
+    // Saving the registration must not wait for auxiliary history/IP logging.
+    void (async () => {
+        try {
+            const description = await generateActionDescription('UPDATE_REGISTRATION', beforeRegistration, updatedRegistration);
+            await logAction('UPDATE_REGISTRATION', 'event_registrations', updatedRegistration.id, description, beforeRegistration, updatedRegistration);
+        } catch (loggingError) {
+            console.error('Failed to log registration update:', loggingError);
+        }
+    })();
+
     return updatedRegistration;
 };
 

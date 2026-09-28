@@ -548,7 +548,7 @@ const AddAttendeeForm: React.FC<AddAttendeeFormProps> = ({ onAddAttendee, onUpda
                                 </FormField>
                             )}
 
-                            <div ref={manualEntryRef} className={isPersonSelected ? 'hidden' : 'space-y-4'}>
+                            <div ref={manualEntryRef} className={isPersonSelected && !isEditMode ? 'hidden' : 'space-y-4'}>
                                 {!isEditMode && <div className="h-px bg-zinc-100 w-full my-4" />}
                                 <FormField label="Nome Completo" id="name" error={errors.name} onPaste={(text) => handlePaste('name', text)}>
                                     <input 
@@ -560,16 +560,16 @@ const AddAttendeeForm: React.FC<AddAttendeeFormProps> = ({ onAddAttendee, onUpda
                                         className="block w-full px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl shadow-sm text-sm focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent uppercase transition-all" 
                                         required 
                                         autoComplete="off" 
-                                        disabled={isPersonSelected} 
+                                        disabled={isPersonSelected && !isEditMode} 
                                         placeholder="EX: MARIA DA SILVA"
                                     />
                                 </FormField>
                                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                     <FormField label={`Doc (CPF/RG)${(formData.packageType === PackageType.SITIO_BUS || formData.packageType === PackageType.SITIO_BUS_DISCOUNT) ? '' : ' - Op'}`} id="document" error={errors.document} onPaste={(text) => handlePaste('document', text)}>
-                                        <input type="tel" id="document" name="document" value={formData.document} onChange={handleInputChange} className="block w-full px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl shadow-sm text-sm focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all" required={(formData.packageType === PackageType.SITIO_BUS || formData.packageType === PackageType.SITIO_BUS_DISCOUNT)} autoComplete="off" disabled={isPersonSelected} placeholder="000.000.000-00" />
+                                        <input type="tel" id="document" name="document" value={formData.document} onChange={handleInputChange} className="block w-full px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl shadow-sm text-sm focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all" required={(formData.packageType === PackageType.SITIO_BUS || formData.packageType === PackageType.SITIO_BUS_DISCOUNT)} autoComplete="off" disabled={isPersonSelected && !isEditMode} placeholder="000.000.000-00" />
                                     </FormField>
                                     <FormField label="Celular (WhatsApp)" id="phone" error={errors.phone} onPaste={(text) => handlePaste('phone', text)}>
-                                        <input type="tel" id="phone" name="phone" value={formData.phone} onChange={handleInputChange} placeholder="(21) 99999-9999" className="block w-full px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl shadow-sm text-sm focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all" required autoComplete="off" disabled={isPersonSelected} />
+                                        <input type="tel" id="phone" name="phone" value={formData.phone} onChange={handleInputChange} placeholder="(21) 99999-9999" className="block w-full px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl shadow-sm text-sm focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all" required autoComplete="off" disabled={isPersonSelected && !isEditMode} />
                                     </FormField>
                                 </div>
                             </div>

@@ -443,10 +443,13 @@ const AddAttendeeForm: React.FC<AddAttendeeFormProps> = ({ onAddAttendee, onUpda
             }
         } catch (error) {
             console.error(error);
-            if (error instanceof Error && error.message.includes('duplicate key value')) {
-                 addToast('Esta pessoa já está inscrita neste evento.', 'error');
+            const errorMessage = error instanceof Error ? error.message : '';
+            if (errorMessage.includes('event_registrations_person_id_event_id_key')) {
+                addToast('Esta pessoa já está inscrita neste evento.', 'error');
+            } else if (errorMessage.includes('duplicate key value') && isEditMode) {
+                addToast('Este documento já está cadastrado para outra pessoa.', 'error');
             } else {
-                 addToast('Falha ao salvar inscrição.', 'error');
+                addToast('Falha ao salvar inscrição.', 'error');
             }
         } finally {
             setIsSubmitting(false);

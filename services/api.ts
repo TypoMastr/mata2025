@@ -69,8 +69,11 @@ const fromSupabase = (record: any): Registration => {
     if (!record) return record;
     const personRecord = record.people || {};
     const person: Person = {
-        id: personRecord.id, name: personRecord.name, document: personRecord.document,
-        documentType: personRecord.document_type, phone: personRecord.phone,
+        id: personRecord.id,
+        name: personRecord.name,
+        document: personRecord.document || '',
+        documentType: personRecord.document_type,
+        phone: personRecord.phone,
     };
     const isMultiPayment = (record.package_type === PackageType.SITIO_BUS || record.package_type === PackageType.SITIO_BUS_DISCOUNT);
     const paymentDetails = record.payment_details || {};
@@ -138,7 +141,12 @@ const registrationToSupabase = (registration: Partial<Registration>): any => {
 };
 
 const personToSupabase = (person: Partial<Person>): any => ({
-    name: person.name, document: person.document, document_type: person.documentType, phone: person.phone, is_deleted: person.is_deleted,
+    name: person.name,
+    // Empty documents must be NULL so multiple people can remain without a document.
+    document: person.document?.trim() || null,
+    document_type: person.documentType,
+    phone: person.phone,
+    is_deleted: person.is_deleted,
 });
 
 const eventToSupabase = (event: Partial<Event>): any => ({

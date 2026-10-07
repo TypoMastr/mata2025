@@ -1937,7 +1937,7 @@ const Reports: React.FC<ReportsProps> = ({ attendees, onLogout, onUpdateAttendee
 
     const zeroDocAttendees = useMemo(() => {
         return attendees.filter(a =>
-            (a.packageType === PackageType.SITIO_BUS || a.packageType === PackageType.SITIO_BUS_DISCOUNT) &&
+            a.packageType !== PackageType.SITIO_ONLY &&
             !a.wontAttend && // Exclude those not attending
             /^0+$/.test(a.person.document.replace(/[^\d]/g, ''))
         );

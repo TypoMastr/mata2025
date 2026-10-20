@@ -269,7 +269,7 @@ const AddAttendeeForm: React.FC<AddAttendeeFormProps> = ({ onAddAttendee, onUpda
 
 
     useEffect(() => {
-        if (!isEditMode) {
+        {
             const sitePrice = event?.site_price ?? 70;
             const busPrice = formData.packageType === PackageType.SITIO_BUS_DISCOUNT ? (event?.bus_discount_price ?? event?.bus_price ?? 50) : (event?.bus_price ?? 50);
             
@@ -283,7 +283,7 @@ const AddAttendeeForm: React.FC<AddAttendeeFormProps> = ({ onAddAttendee, onUpda
             
             setFormData(fd => ({ ...fd, paymentAmount: amount.toFixed(2) }));
         }
-    }, [formData.packageType, formData.sitePayment.isExempt, formData.busPayment.isExempt, formData.paymentIsExempt, isEditMode, event]);
+    }, [formData.packageType, formData.sitePayment.isExempt, formData.busPayment.isExempt, formData.paymentIsExempt, event]);
 
     const handleSelectPerson = (person: Person) => {
         const duplicate = registrations.find(r => r.person.id === person.id);

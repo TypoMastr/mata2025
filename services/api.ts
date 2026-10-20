@@ -35,33 +35,38 @@ const getIpInfo = async (): Promise<{ ip_address: string, location_info: any } |
 };
 
 
-const logAction = async (
+const logAction = (
     action_type: string,
     table_name: string,
     record_id: string,
     description: string,
     previous_data: any,
     new_data: any
-) => {
-    const ipInfo = await getIpInfo();
-    const currentUser = sessionStorage.getItem('currentUser') || 'Sistema';
+): void => {
+    // History/IP enrichment must never hold up the primary database operation.
+    void (async () => {
+        const ipInfo = await getIpInfo();
+        const currentUser = sessionStorage.getItem('currentUser') || 'Sistema';
 
-    const logEntry = {
-        action_type,
-        table_name,
-        record_id,
-        description,
-        previous_data,
-        new_data,
-        actor: currentUser,
-        ip_address: ipInfo?.ip_address,
-        location_info: ipInfo?.location_info,
-    };
+        const logEntry = {
+            action_type,
+            table_name,
+            record_id,
+            description,
+            previous_data,
+            new_data,
+            actor: currentUser,
+            ip_address: ipInfo?.ip_address,
+            location_info: ipInfo?.location_info,
+        };
 
-    const { error } = await supabase.from('action_history').insert(logEntry);
-    if (error) {
+        const { error } = await supabase.from('action_history').insert(logEntry);
+        if (error) {
+            console.error('Failed to log action:', error);
+        }
+    })().catch(error => {
         console.error('Failed to log action:', error);
-    }
+    });
 };
 
 // --- Data Mapping Helpers ---

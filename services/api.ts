@@ -180,6 +180,8 @@ const getEvent = async (eventId: string): Promise<Event | null> => {
     return data;
 };
 
+export const fetchEvent = async (eventId: string): Promise<Event | null> => getEvent(eventId);
+
 const getEventName = async (eventId: string): Promise<string> => {
     const event = await getEvent(eventId);
     return event?.name || 'Evento desconhecido';

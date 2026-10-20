@@ -1,6 +1,6 @@
 
 import { useState, useEffect, useCallback } from 'react';
-import type { Registration, RegistrationFormData, Payment, Person } from '../types';
+import type { Registration, RegistrationFormData, Payment, Person, Event } from '../types';
 import * as api from '../services/api';
 import { getDocumentType } from '../utils/formatters';
 import { PaymentStatus, PackageType } from '../types';
@@ -47,6 +47,45 @@ const assignMissingBusNumbers = async (items: Registration[]): Promise<Registrat
     return updatedItems;
 };
 
+const getExpectedPaymentAmount = (registration: Registration, event: Event): number => {
+    if (registration.payment.status === PaymentStatus.ISENTO) {
+        return 0;
+    }
+
+    if (registration.packageType === PackageType.SITIO_ONLY) {
+        return event.site_price ?? 70;
+    }
+
+    const busPrice = registration.packageType === PackageType.SITIO_BUS_DISCOUNT
+        ? (event.bus_discount_price ?? event.bus_price ?? 50)
+        : (event.bus_price ?? 50);
+    const siteAmount = registration.payment.sitePaymentDetails?.isExempt ? 0 : (event.site_price ?? 70);
+    const busAmount = registration.payment.busPaymentDetails?.isExempt ? 0 : busPrice;
+
+    return siteAmount + busAmount;
+};
+
+const repairIncorrectPaymentAmounts = async (items: Registration[], event: Event): Promise<Registration[]> => {
+    const updatedItems = [...items];
+
+    for (let index = 0; index < updatedItems.length; index += 1) {
+        const registration = updatedItems[index];
+        const expectedAmount = getExpectedPaymentAmount(registration, event);
+
+        if (Math.abs((registration.payment.amount || 0) - expectedAmount) > 0.01) {
+            updatedItems[index] = await api.updateRegistration({
+                ...registration,
+                payment: {
+                    ...registration.payment,
+                    amount: expectedAmount,
+                },
+            });
+        }
+    }
+
+    return updatedItems;
+};
+
 export const useRegistrations = (eventId: string | null) => {
     const [registrations, setRegistrations] = useState<Registration[]>([]);
     const [isLoading, setIsLoading] = useState(true);
@@ -60,7 +99,11 @@ export const useRegistrations = (eventId: string | null) => {
             // API now handles soft deletes, so no change needed here.
             const data = await api.fetchRegistrations(id);
             const dataWithBusAssignments = await assignMissingBusNumbers(data);
-            setRegistrations(dataWithBusAssignments);
+            const event = await api.fetchEvent(id).catch(() => null);
+            const dataWithCorrectAmounts = event
+                ? await repairIncorrectPaymentAmounts(dataWithBusAssignments, event)
+                : dataWithBusAssignments;
+            setRegistrations(dataWithCorrectAmounts);
         } catch (err) {
             console.error("Failed to fetch registrations:", err);
         } finally {

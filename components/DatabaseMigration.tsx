@@ -81,6 +81,8 @@ ADD COLUMN actor TEXT;`;
             commands.push(addActorSql());
         } else if (item === 'feature:bus_capacity_assignment') {
             commands.push(busCapacityAssignmentSql());
+        } else if (item === 'column:document_provisional:people') {
+            commands.push('-- Marca documentos provisórios\nALTER TABLE public.people ADD COLUMN IF NOT EXISTS document_provisional BOOLEAN NOT NULL DEFAULT FALSE;\nNOTIFY pgrst, \'reload schema\';');
         } else {
             // Assume it's a table name missing a column
             commands.push(addColumnSql(item));

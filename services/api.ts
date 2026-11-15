@@ -74,6 +74,7 @@ const fromSupabase = (record: any): Registration => {
         document: personRecord.document || '',
         documentType: personRecord.document_type,
         phone: personRecord.phone,
+        documentProvisional: !!personRecord.document_provisional,
     };
     const isMultiPayment = (record.package_type === PackageType.SITIO_BUS || record.package_type === PackageType.SITIO_BUS_DISCOUNT);
     const paymentDetails = record.payment_details || {};
@@ -146,6 +147,7 @@ const personToSupabase = (person: Partial<Person>): any => ({
     document: person.document?.trim() || null,
     document_type: person.documentType,
     phone: person.phone,
+    document_provisional: person.documentProvisional ?? false,
     is_deleted: person.is_deleted,
 });
 
@@ -311,6 +313,9 @@ export const verifySchema = async (): Promise<{ success: boolean, missingIn: str
         }
     }
     
+    const { error: provisionalDocError } = await supabase.from('people').select('document_provisional').limit(1);
+    if (provisionalDocError && provisionalDocError.message.includes('does not exist')) missingIn.push('column:document_provisional:people');
+
     // Check for the second bus price in events
     const { error: busDiscountPriceError } = await supabase
         .from('events')
@@ -512,21 +517,22 @@ export const deleteRegistration = async (id: string): Promise<void> => {
 export const fetchAllPeople = async (): Promise<Person[]> => {
     const { data, error } = await supabase.from('people').select('*').eq('is_deleted', false).order('name', { ascending: true });
     if (error) throw new Error(`Failed to fetch people: ${error.message}`);
-    return data;
+    return data.map((p: any) => ({ ...p, documentType: p.document_type, documentProvisional: !!p.document_provisional, document: p.document || '' }));
 };
 
 export const searchPeople = async (query: string): Promise<Person[]> => {
     const { data, error } = await supabase.from('people').select('*').eq('is_deleted', false).ilike('name', `%${query}%`).limit(10);
     if (error) throw new Error(error.message);
-    return data;
+    return data.map((p: any) => ({ ...p, documentType: p.document_type, documentProvisional: !!p.document_provisional, document: p.document || '' }));
 };
 
 export const createPerson = async (personData: Omit<Person, 'id'>): Promise<Person> => {
     const { data, error } = await supabase.from('people').insert(personToSupabase({ ...personData, is_deleted: false })).select().single();
     if (error) throw new Error(error.message);
-    const description = await generateActionDescription('CREATE_PERSON', null, data);
+    const person = { ...data, documentType: data.document_type, documentProvisional: !!data.document_provisional, document: data.document || '' };
+    const description = await generateActionDescription('CREATE_PERSON', null, person);
     await logAction('CREATE_PERSON', 'people', data.id, description, null, data);
-    return data;
+    return person;
 };
 
 export const updatePerson = async (person: Person): Promise<Person> => {
@@ -538,7 +544,7 @@ export const updatePerson = async (person: Person): Promise<Person> => {
     if (error) throw new Error(error.message);
     const description = await generateActionDescription('UPDATE_PERSON', beforeData, data);
     await logAction('UPDATE_PERSON', 'people', data.id, description, beforeData, data);
-    return data;
+    return { ...data, documentType: data.document_type, documentProvisional: !!data.document_provisional, document: data.document || '' };
 };
 
 export const deletePerson = async (personId: string): Promise<void> => {

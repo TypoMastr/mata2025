@@ -227,14 +227,7 @@ const AttendeeDetail: React.FC<AttendeeDetailProps> = ({ attendee, onBack, onEdi
         if (isSavingBus) return;
         const newBusNumber = selectedBus === 'null' ? null : Number(selectedBus);
 
-        if (newBusNumber !== null) {
-            const currentBusCount = busAssignments[newBusNumber] || 0;
-            if (currentBusCount >= 50 && attendee.busNumber !== newBusNumber) {
-                addToast(`O Ônibus ${newBusNumber} já está lotado.`, 'error');
-                return;
-            }
-        }
-        
+        // The database performs the capacity check atomically, avoiding stale client counts.
         setIsSavingBus(true);
         try {
             await onUpdateAttendee({
@@ -245,7 +238,13 @@ const AttendeeDetail: React.FC<AttendeeDetailProps> = ({ attendee, onBack, onEdi
             addToast('Ônibus atualizado com sucesso.', 'success');
         } catch (error) {
             console.error("Failed to save bus assignment:", error);
-            addToast('Falha ao salvar ônibus.', 'error');
+            const message = error instanceof Error ? error.message : String(error);
+            addToast(
+                message.includes('BUS_FULL')
+                    ? `O Ônibus ${newBusNumber} já está lotado.`
+                    : 'Falha ao salvar ônibus.',
+                'error'
+            );
         } finally {
             setIsSavingBus(false);
         }

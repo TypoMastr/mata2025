@@ -330,6 +330,16 @@ export const verifySchema = async (): Promise<{ success: boolean, missingIn: str
         missingIn.push('column:wont_attend:event_registrations');
     }
     
+    // Ensure bus assignment is enforced transactionally by a database trigger.
+    const { error: busAssignmentError } = await supabase.rpc('bus_assignment_migration_check');
+    if (
+        busAssignmentError &&
+        (busAssignmentError.code === 'PGRST202' ||
+            busAssignmentError.message.includes('Could not find the function'))
+    ) {
+        missingIn.push('feature:bus_capacity_assignment');
+    }
+
     // Check for actor in action_history
     const { error: actorError } = await supabase
         .from('action_history')

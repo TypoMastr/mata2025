@@ -118,11 +118,11 @@ const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
     }
 
     return (
-        <div className="min-h-[100dvh] flex flex-col items-center justify-center p-6 relative overflow-y-auto">
+        <div className="login-scroll-container flex flex-col items-center justify-start p-6 relative">
             {/* Background decoration */}
             <div className="absolute top-0 left-0 w-full h-64 bg-gradient-to-b from-green-500/10 to-transparent pointer-events-none" />
             
-            <div className={`w-full max-w-sm mx-auto z-10 transition-opacity duration-300 ease-out ${isExiting ? 'opacity-0' : 'opacity-100'}`}>
+            <div className={`w-full max-w-sm mx-auto my-auto z-10 transition-opacity duration-300 ease-out ${isExiting ? 'opacity-0' : 'opacity-100'}`}>
                 
                 {viewState === 'users' ? (
                     // --- VIEW: USER SELECTION ---

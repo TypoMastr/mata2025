@@ -68,6 +68,7 @@ export interface Person {
     document: string;
     documentType: DocumentType;
     phone: string;
+    documentProvisional?: boolean;
     is_deleted?: boolean;
 }
 
@@ -107,6 +108,7 @@ export interface RegistrationFormData {
     name: string;
     document: string;
     phone: string;
+    documentProvisional?: boolean;
     
     // Registration fields
     packageType: PackageType;

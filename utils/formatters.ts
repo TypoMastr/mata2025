@@ -101,8 +101,20 @@ export const getWhatsAppUrl = (phone: string): string => {
 
 
 export const isLikelyPlaceholderDocument = (value: string): boolean => {
- const digits=(value||'').replace(/\D/g,'');
- return !!digits && (/^(\d)\1{5,}$/.test(digits) || /^(0123456789|1234567890|12345678909)$/.test(digits));
+ const digits = (value || '').replace(/\D/g, '');
+ if (!digits) return false;
+ // Repeated digits such as 11111, 222222, or 000000.
+ if (/^(\d)\1{4,}$/.test(digits)) return true;
+ // Any run of five or more increasing/decreasing digits, e.g. 12345 or 98765.
+ let increasing = 1;
+ let decreasing = 1;
+ for (let i = 1; i < digits.length; i++) {
+  const delta = Number(digits[i]) - Number(digits[i - 1]);
+  increasing = delta === 1 ? increasing + 1 : 1;
+  decreasing = delta === -1 ? decreasing + 1 : 1;
+  if (increasing >= 5 || decreasing >= 5) return true;
+ }
+ return false;
 };
 export const needsDocumentReview = (person: {document?:string|null; documentType?:DocumentType; documentProvisional?:boolean}): boolean => {
  const document=person.document?.trim()||'';

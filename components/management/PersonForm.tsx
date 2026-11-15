@@ -7,6 +7,7 @@ interface PersonFormData {
     name: string;
     document: string;
     phone: string;
+    documentProvisional: boolean;
 }
 
 interface PersonFormProps {
@@ -36,6 +37,7 @@ const PersonForm: React.FC<PersonFormProps> = ({ person, onSave, onClose }) => {
         name: person?.name || '',
         document: person?.document || '',
         phone: person?.phone || '',
+        documentProvisional: person?.documentProvisional ?? false,
     });
     const [errors, setErrors] = useState<Record<string, string>>({});
     const [isSaving, setIsSaving] = useState(false);
@@ -45,6 +47,7 @@ const PersonForm: React.FC<PersonFormProps> = ({ person, onSave, onClose }) => {
             name: person?.name || '',
             document: person?.document || '',
             phone: person?.phone || '',
+            documentProvisional: person?.documentProvisional ?? false,
         });
     }, [person]);
 
@@ -76,6 +79,7 @@ const PersonForm: React.FC<PersonFormProps> = ({ person, onSave, onClose }) => {
                 name: formData.name.trim(),
                 document: formData.document,
                 phone: formData.phone,
+                documentProvisional: formData.documentProvisional,
             });
             // The parent component handles closing the form on success
         } catch (error) {
@@ -101,6 +105,7 @@ const PersonForm: React.FC<PersonFormProps> = ({ person, onSave, onClose }) => {
                     <FormField label="Documento (CPF ou RG)" id="document" error={errors.document}>
                         <input type="tel" name="document" id="document" value={formData.document} onChange={handleChange} className="block w-full px-3 py-2 bg-white border border-zinc-300 rounded-md shadow-sm sm:text-sm" />
                     </FormField>
+                    <label className="flex items-center gap-2 text-sm text-amber-800"><input type="checkbox" checked={formData.documentProvisional} onChange={e => setFormData(prev => ({ ...prev, documentProvisional: e.target.checked }))} />Documento provisório / ainda não confirmado</label>
                     <FormField label="Telefone (com DDD)" id="phone" error={errors.phone}>
                         <input type="tel" name="phone" id="phone" value={formData.phone} onChange={handleChange} required placeholder="(21) 99999-9999" className="block w-full px-3 py-2 bg-white border border-zinc-300 rounded-md shadow-sm sm:text-sm" />
                     </FormField>

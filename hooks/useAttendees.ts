@@ -141,6 +141,7 @@ export const useRegistrations = (eventId: string | null) => {
                  document: formData.document,
                  documentType: documentType,
                  phone: formData.phone,
+                 documentProvisional: formData.documentProvisional ?? false,
              };
              const newPerson = await api.createPerson(newPersonData);
              personId = newPerson.id;
@@ -152,7 +153,7 @@ export const useRegistrations = (eventId: string | null) => {
 
         // Existing people registered only for the site may not have a document yet.
         // Save a newly supplied document before creating the event registration.
-        if (formData.personId && formData.document.trim()) {
+        if (formData.personId && (formData.document.trim() || formData.documentProvisional !== undefined)) {
             const { type: documentType } = getDocumentType(formData.document);
             await api.updatePerson({
                 id: personId,
@@ -160,6 +161,7 @@ export const useRegistrations = (eventId: string | null) => {
                 document: formData.document,
                 documentType,
                 phone: formData.phone,
+                documentProvisional: formData.documentProvisional ?? false,
             });
         }
 

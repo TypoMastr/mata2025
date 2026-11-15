@@ -2,7 +2,7 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import type { Attendee, ReportConfig, ReportField, Event, FinancialRecord } from '../types';
 import { PackageType, PaymentStatus, DocumentType, PaymentType, FinancialRecordType } from '../types';
-import { formatDocument, getDocumentType } from '../utils/formatters';
+import { formatDocument, getDocumentType, needsDocumentReview, getDocumentReviewReason } from '../utils/formatters';
 import { levenshteinDistance } from '../utils/stringSimilarity';
 import { useToast } from '../contexts/ToastContext';
 import { generateReport } from '../services/geminiService';
@@ -896,6 +896,7 @@ const ZeroDocListItem: React.FC<ZeroDocListItemProps> = ({ attendee, onUpdate })
                     ...attendee.person,
                     document: documentValue,
                     documentType: docType,
+                    documentProvisional: false,
                 }
             };
             await onUpdate(updatedAttendee);
@@ -916,7 +917,7 @@ const ZeroDocListItem: React.FC<ZeroDocListItemProps> = ({ attendee, onUpdate })
         <>
             <div className={`bg-white p-3 rounded-xl border border-zinc-200 shadow-sm transition-opacity duration-500 ${status === 'success' ? 'opacity-40' : 'opacity-100'}`}>
                 <div className="flex items-center justify-between gap-3 flex-wrap">
-                    <p className="font-bold text-zinc-800 flex-1 min-w-0">{attendee.person.name}</p>
+                    <div className="flex-1 min-w-0"><p className="font-bold text-zinc-800">{attendee.person.name}</p><p className="text-xs text-amber-700">{getDocumentReviewReason(attendee.person)}</p></div>
                     <div className="flex items-center gap-2">
                         <div className="relative w-40">
                             <input
@@ -975,11 +976,11 @@ const ZeroDocList: React.FC<ZeroDocListProps> = ({ attendees, onBack, onUpdateAt
                 <button onClick={onBack} className="text-zinc-500 hover:text-zinc-800 p-1 rounded-full hover:bg-zinc-100">
                     <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>
                 </button>
-                <h1 className="text-xl md:text-2xl font-bold text-zinc-800">Corrigir Documentos ({attendees.length})</h1>
+                <h1 className="text-xl md:text-2xl font-bold text-zinc-800">Documentos para revisar ({attendees.length})</h1>
             </header>
             <main className="p-4 space-y-3">
                 <div className="bg-yellow-50 border border-yellow-200 text-yellow-800 p-3 rounded-lg text-sm">
-                    <p>A lista abaixo mostra os inscritos que registraram um documento com "000...". Por favor, atualize com o documento correto de cada um.</p>
+                    <p>Lista de passageiros de ônibus com documento ausente, provisório ou suspeito. Corrija ou cadastre o documento antes do embarque. A validação local não confirma autenticidade oficial.</p>
                 </div>
                 {attendees.length > 0 ? (
                     attendees.map((attendee, index) => (
@@ -1689,6 +1690,12 @@ const ReportsDashboard: React.FC<{
             </header>
 
             <div className="p-3 space-y-4 max-w-7xl mx-auto">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    <StatCard onClick={onFixDocsClick} title="Pessoas cadastradas" icon={IconFinance} delay={0} variant="info"><strong className="text-2xl">{attendees.filter(a => !a.wontAttend).length}</strong><p className="text-xs text-zinc-500">inscrições ativas</p></StatCard>
+                    <StatCard onClick={onFixDocsClick} title="Documentos corretos" icon={IconFinance} delay={25} variant="info"><strong className="text-2xl">{attendees.filter(a => !a.wontAttend && a.packageType !== PackageType.SITIO_ONLY && !needsDocumentReview(a.person)).length}</strong><p className="text-xs text-zinc-500">passageiros de ônibus</p></StatCard>
+                    <StatCard onClick={onFixDocsClick} title="Faltando ou suspeitos" icon={IconWarning} delay={50} variant="warning"><strong className="text-2xl">{zeroDocCount}</strong><p className="text-xs text-zinc-500">passageiros de ônibus</p></StatCard>
+                </div>
+                
                 
                 {/* Alerts Section */}
                 {(zeroDocCount > 0 || duplicateGroupCount > 0) && (
@@ -1939,7 +1946,7 @@ const Reports: React.FC<ReportsProps> = ({ attendees, onLogout, onUpdateAttendee
         return attendees.filter(a =>
             a.packageType !== PackageType.SITIO_ONLY &&
             !a.wontAttend && // Exclude those not attending
-            /^0+$/.test(a.person.document.replace(/[^\d]/g, ''))
+            needsDocumentReview(a.person)
         );
     }, [attendees]);
     

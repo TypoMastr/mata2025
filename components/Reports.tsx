@@ -967,11 +967,12 @@ interface ZeroDocListProps {
     attendees: Attendee[];
     title: string;
     description: string;
+    editable: boolean;
     onBack: () => void;
     onUpdateAttendee: (attendee: Attendee) => Promise<void>;
 }
 
-const ZeroDocList: React.FC<ZeroDocListProps> = ({ attendees, title, description, onBack, onUpdateAttendee }) => {
+const ZeroDocList: React.FC<ZeroDocListProps> = ({ attendees, title, description, editable, onBack, onUpdateAttendee }) => {
     return (
         <div className="animate-fadeIn">
             <header className="sticky top-0 md:static bg-white z-10 p-4 md:pt-6 border-b border-zinc-200 flex items-center gap-4">
@@ -987,7 +988,7 @@ const ZeroDocList: React.FC<ZeroDocListProps> = ({ attendees, title, description
                 {attendees.length > 0 ? (
                     attendees.map((attendee, index) => (
                         <div key={attendee.id} className="opacity-0 animate-fadeInUp" style={{ animationDelay: `${index * 50}ms`, animationFillMode: 'forwards' }}>
-                            <ZeroDocListItem attendee={attendee} onUpdate={onUpdateAttendee} />
+                            {editable ? <ZeroDocListItem attendee={attendee} onUpdate={onUpdateAttendee} /> : <div className="bg-white p-3 rounded-xl border border-zinc-200 shadow-sm"><p className="font-bold text-zinc-800">{attendee.person.name}</p><p className="mt-1 text-sm text-zinc-600">Documento: {attendee.person.document || "Não cadastrado"}</p><p className="text-xs text-zinc-500">{attendee.packageType}{attendee.busNumber ? ` · Ônibus ${attendee.busNumber}` : ""}</p></div>}
                         </div>
                     ))
                 ) : (
@@ -1536,7 +1537,9 @@ const ReportsDashboard: React.FC<{
     attendees: Attendee[]; 
     onGenerateReportClick: () => void; 
     onLogout: () => void; 
-    onFixDocsClick: (filter?: 'all' | 'correct' | 'pending') => void; 
+    onViewRegisteredPeople: () => void;
+    onViewCorrectBusDocuments: () => void;
+    onViewPendingBusDocuments: () => void; 
     onCheckDuplicatesClick: () => void; 
     zeroDocCount: number; 
     duplicateGroupCount: number; 
@@ -1551,7 +1554,7 @@ const ReportsDashboard: React.FC<{
     extraIncome: number;
     extraExpenses: number;
     confirmedRevenue: number;
-}> = ({ attendees, onGenerateReportClick, onLogout, onFixDocsClick, onCheckDuplicatesClick, zeroDocCount, duplicateGroupCount, busStats, onViewBus, onViewFinancials, onViewSitioOnlyList, onManageFinancials, onGenerateFinancialReportClick, event, netProfit, extraIncome, extraExpenses, confirmedRevenue }) => {
+}> = ({ attendees, onGenerateReportClick, onLogout, onViewRegisteredPeople, onViewCorrectBusDocuments, onViewPendingBusDocuments, onCheckDuplicatesClick, zeroDocCount, duplicateGroupCount, busStats, onViewBus, onViewFinancials, onViewSitioOnlyList, onManageFinancials, onGenerateFinancialReportClick, event, netProfit, extraIncome, extraExpenses, confirmedRevenue }) => {
     const { totalAttendees, paidCount, pendingCount, isentoCount, totalRevenue, pendingRevenue, totalPossibleRevenue, sitioOnlyCount, paymentStats } = useMemo(() => {
         // We want to count active attendees for logistics, but ALL payments for financials.
         
@@ -1693,9 +1696,9 @@ const ReportsDashboard: React.FC<{
 
             <div className="p-3 space-y-4 max-w-7xl mx-auto">
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                    <StatCard onClick={() => onFixDocsClick('all')} title="Pessoas cadastradas" icon={IconFinance} delay={0} variant="info"><strong className="text-2xl">{attendees.filter(a => !a.wontAttend).length}</strong><p className="text-xs text-zinc-500">inscrições ativas</p></StatCard>
-                    <StatCard onClick={() => onFixDocsClick('correct')} title="Documentos corretos" icon={IconFinance} delay={25} variant="info"><strong className="text-2xl">{attendees.filter(a => !a.wontAttend && a.packageType !== PackageType.SITIO_ONLY && !needsDocumentReview(a.person)).length}</strong><p className="text-xs text-zinc-500">passageiros de ônibus</p></StatCard>
-                    <StatCard onClick={() => onFixDocsClick('pending')} title="Faltando ou suspeitos" icon={IconWarning} delay={50} variant="warning"><strong className="text-2xl">{zeroDocCount}</strong><p className="text-xs text-zinc-500">passageiros de ônibus</p></StatCard>
+                    <StatCard onClick={onViewRegisteredPeople} title="Pessoas cadastradas" icon={IconFinance} delay={0} variant="info"><strong className="text-2xl">{attendees.filter(a => !a.wontAttend).length}</strong><p className="text-xs text-zinc-500">inscrições ativas</p></StatCard>
+                    <StatCard onClick={onViewCorrectBusDocuments} title="Documentos corretos" icon={IconFinance} delay={25} variant="info"><strong className="text-2xl">{attendees.filter(a => !a.wontAttend && a.packageType !== PackageType.SITIO_ONLY && !needsDocumentReview(a.person)).length}</strong><p className="text-xs text-zinc-500">passageiros de ônibus</p></StatCard>
+                    <StatCard onClick={onViewPendingBusDocuments} title="Faltando ou suspeitos" icon={IconWarning} delay={50} variant="warning"><strong className="text-2xl">{zeroDocCount}</strong><p className="text-xs text-zinc-500">passageiros de ônibus</p></StatCard>
                 </div>
                 
                 
@@ -1704,7 +1707,7 @@ const ReportsDashboard: React.FC<{
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                         {zeroDocCount > 0 && (
                             <StatCard 
-                                onClick={onFixDocsClick} 
+                                onClick={onViewPendingBusDocuments} 
                                 title="Ação Necessária" 
                                 icon={IconWarning} 
                                 delay={50} 
@@ -1916,11 +1919,10 @@ interface ReportsProps {
 const Reports: React.FC<ReportsProps> = ({ attendees, onLogout, onUpdateAttendee, onSelectAttendee, event, onAction }) => {
     const { addToast } = useToast();
     // Fix: Add 'financialForm' to the possible states for `mode`
-    const [mode, setMode] = useState<'dashboard' | 'form' | 'preview' | 'zeroDoc' | 'duplicateCheck' | 'busDetail' | 'financialDetail' | 'sitioOnlyList' | 'financialManagement' | 'financialForm'>('dashboard');
+    const [mode, setMode] = useState<'dashboard' | 'form' | 'preview' | 'registeredPeople' | 'correctBusDocs' | 'pendingBusDocs' | 'duplicateCheck' | 'busDetail' | 'financialDetail' | 'sitioOnlyList' | 'financialManagement' | 'financialForm'>('dashboard');
     const [reportConfig, setReportConfig] = useState<ReportConfig | null>(null);
     const [reportData, setReportData] = useState<Attendee[] | Attendee[][]>([]);
     const [selectedBusNumber, setSelectedBusNumber] = useState<number | null>(null);
-    const [documentListFilter, setDocumentListFilter] = useState<'all' | 'correct' | 'pending'>('pending');
     const [confirmationRequest, setConfirmationRequest] = useState<ConfirmationRequest | null>(null);
     const [isSavingChange, setIsSavingChange] = useState(false);
     
@@ -2209,7 +2211,9 @@ const Reports: React.FC<ReportsProps> = ({ attendees, onLogout, onUpdateAttendee
                         attendees={attendees}
                         onGenerateReportClick={() => setMode('form')}
                         onLogout={onLogout}
-                        onFixDocsClick={(filter = 'pending') => { setDocumentListFilter(filter); setMode('zeroDoc'); }}
+                        onViewRegisteredPeople={() => setMode('registeredPeople')}
+                        onViewCorrectBusDocuments={() => setMode('correctBusDocs')}
+                        onViewPendingBusDocuments={() => setMode('pendingBusDocs')}
                         onCheckDuplicatesClick={() => setMode('duplicateCheck')}
                         zeroDocCount={zeroDocAttendees.length}
                         duplicateGroupCount={potentialDuplicates.length}
@@ -2243,19 +2247,12 @@ const Reports: React.FC<ReportsProps> = ({ attendees, onLogout, onUpdateAttendee
                                         attendees={attendees} // Pass all attendees for detailed financial breakdown
                                         extraRecords={extraFinancialRecords} // Pass extra records
                                       />;
-            case 'zeroDoc':
-                const documentList = documentListFilter === 'all'
-                    ? attendees.filter(a => !a.wontAttend).sort((a, b) => a.person.name.localeCompare(b.person.name))
-                    : documentListFilter === 'correct'
-                        ? attendees.filter(a => !a.wontAttend && a.packageType !== PackageType.SITIO_ONLY && !needsDocumentReview(a.person)).sort((a, b) => a.person.name.localeCompare(b.person.name))
-                        : zeroDocAttendees;
-                const documentListTitle = documentListFilter === 'all' ? 'Pessoas cadastradas' : documentListFilter === 'correct' ? 'Documentos corretos — ônibus' : 'Documentos para revisar — ônibus';
-                const documentListDescription = documentListFilter === 'all'
-                    ? 'Todas as inscrições ativas do evento. Pessoas que vão apenas ao sítio podem permanecer sem documento.'
-                    : documentListFilter === 'correct'
-                        ? 'Passageiros de ônibus com documento preenchido e sem suspeitas detectáveis na validação local.'
-                        : 'Passageiros de ônibus com documento ausente, provisório ou suspeito. Corrija ou cadastre antes do embarque. A validação local não confirma autenticidade oficial.';
-                return <ZeroDocList attendees={documentList} title={documentListTitle} description={documentListDescription} onBack={() => setMode('dashboard')} onUpdateAttendee={onUpdateAttendee} />;
+            case 'registeredPeople':
+                return <ZeroDocList attendees={attendees.filter(a => !a.wontAttend).sort((a, b) => a.person.name.localeCompare(b.person.name))} title="Pessoas cadastradas" description="Todas as inscrições ativas do evento. Pessoas que vão apenas ao sítio podem permanecer sem documento." editable={false} onBack={() => setMode('dashboard')} onUpdateAttendee={onUpdateAttendee} />;
+            case 'correctBusDocs':
+                return <ZeroDocList attendees={attendees.filter(a => !a.wontAttend && a.packageType !== PackageType.SITIO_ONLY && !needsDocumentReview(a.person)).sort((a, b) => a.person.name.localeCompare(b.person.name))} title="Documentos corretos — ônibus" description="Passageiros de ônibus com documento preenchido e sem padrões suspeitos detectáveis na validação local." editable={false} onBack={() => setMode('dashboard')} onUpdateAttendee={onUpdateAttendee} />;
+            case 'pendingBusDocs':
+                return <ZeroDocList attendees={zeroDocAttendees} title="Documentos para revisar — ônibus" description="Passageiros de ônibus com documento ausente, provisório ou suspeito. Corrija ou cadastre antes do embarque. A validação local não confirma autenticidade oficial." editable={true} onBack={() => setMode('dashboard')} onUpdateAttendee={onUpdateAttendee} />;
             case 'duplicateCheck':
                 return <DuplicateCheckerView groups={potentialDuplicates} onBack={() => setMode('dashboard')} onSelectAttendee={onSelectAttendee} />;
             case 'busDetail':

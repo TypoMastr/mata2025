@@ -9,6 +9,7 @@ interface PersonFormData {
     name: string;
     document: string;
     phone: string;
+    documentProvisional: boolean;
 }
 
 interface PeopleManagementPageProps {

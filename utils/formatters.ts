@@ -65,11 +65,11 @@ export const validateCPF = (cpf: string): boolean => {
 
 export const getDocumentType = (doc: string): { type: DocumentType, valid: boolean } => {
     const numbers = doc.replace(/[^\d]/g, '');
-    if (numbers.length === 11 && validateCPF(numbers)) {
-        return { type: DocumentType.CPF, valid: true };
+    if (numbers.length === 11) {
+        return { type: DocumentType.CPF, valid: validateCPF(numbers) };
     }
     // Basic RG check, can be improved for specific state formats
-    if (numbers.length > 5 && numbers.length < 12) {
+    if (numbers.length > 5 && numbers.length < 11) {
         return { type: DocumentType.RG, valid: true };
     }
     return { type: DocumentType.OUTRO, valid: false };
@@ -97,4 +97,22 @@ export const getWhatsAppUrl = (phone: string): string => {
     if (digitsOnly.length < 10) return ''; // Basic validation
     
     return `https://wa.me/${countryCode}${digitsOnly}`;
+};
+
+
+export const isLikelyPlaceholderDocument = (value: string): boolean => {
+ const digits=(value||'').replace(/\D/g,'');
+ return !!digits && (/^(\d)\1{5,}$/.test(digits) || /^(0123456789|1234567890|12345678909)$/.test(digits));
+};
+export const needsDocumentReview = (person: {document?:string|null; documentType?:DocumentType; documentProvisional?:boolean}): boolean => {
+ const document=person.document?.trim()||'';
+ if(!document || person.documentProvisional || isLikelyPlaceholderDocument(document)) return true;
+ return person.documentType===DocumentType.CPF && !validateCPF(document);
+};
+export const getDocumentReviewReason = (person: {document?:string|null; documentType?:DocumentType; documentProvisional?:boolean}): string => {
+ const document=person.document?.trim()||'';
+ if(!document) return 'Sem documento'; if(person.documentProvisional) return 'Documento provisório';
+ if(isLikelyPlaceholderDocument(document)) return 'Padrão de preenchimento';
+ if(person.documentType===DocumentType.CPF && !validateCPF(document)) return 'CPF com dígitos verificadores inválidos';
+ return 'Revisar documento';
 };

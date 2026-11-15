@@ -132,6 +132,7 @@ const getInitialFormData = (attendee?: Attendee | null): AttendeeFormData => {
             name: attendee.person.name,
             document: attendee.person.document,
             phone: attendee.person.phone,
+            documentProvisional: attendee.person.documentProvisional ?? false,
             packageType: attendee.packageType,
             notes: attendee.notes || '',
             paymentAmount: attendee.payment.amount.toString(),
@@ -298,6 +299,7 @@ const AddAttendeeForm: React.FC<AddAttendeeFormProps> = ({ onAddAttendee, onUpda
             name: person.name,
             document: person.document,
             phone: person.phone,
+            documentProvisional: person.documentProvisional ?? false,
         }));
         setIsPersonSelected(true);
         setPersonSearchQuery(person.name);
@@ -312,6 +314,7 @@ const AddAttendeeForm: React.FC<AddAttendeeFormProps> = ({ onAddAttendee, onUpda
             name: '',
             document: '',
             phone: '',
+            documentProvisional: false,
         }));
         setIsPersonSelected(false);
         setPersonSearchQuery('');
@@ -321,15 +324,7 @@ const AddAttendeeForm: React.FC<AddAttendeeFormProps> = ({ onAddAttendee, onUpda
         const newErrors: Record<string, string> = {};
         if (!formData.name.trim()) newErrors.name = 'Nome é obrigatório.';
         
-        const isBusPackage = formData.packageType !== PackageType.SITIO_ONLY;
-
-        if (isBusPackage) {
-            if (!formData.document.trim()) {
-                newErrors.document = 'Documento é obrigatório para pacote com ônibus.';
-            } else if (!getDocumentType(formData.document).valid) {
-                newErrors.document = 'Documento inválido.';
-            }
-        }
+        // Documentos pendentes podem ser salvos e aparecem na fila de revisão do relatório.
 
         if (!formData.phone.trim() || formData.phone.replace(/\D/g, '').length < 10) newErrors.phone = 'Telefone inválido.';
         
@@ -420,6 +415,7 @@ const AddAttendeeForm: React.FC<AddAttendeeFormProps> = ({ onAddAttendee, onUpda
                         document: formData.document,
                         documentType: type,
                         phone: formData.phone,
+                        documentProvisional: formData.documentProvisional ?? false,
                     },
                     packageType: formData.packageType,
                     notes: formData.notes.trim(),
@@ -543,11 +539,11 @@ const AddAttendeeForm: React.FC<AddAttendeeFormProps> = ({ onAddAttendee, onUpda
                                         value={formData.document}
                                         onChange={handleInputChange}
                                         className="block w-full px-4 py-3 bg-white border-2 border-amber-200 rounded-xl shadow-sm text-sm focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all"
-                                        required={(formData.packageType === PackageType.SITIO_BUS || formData.packageType === PackageType.SITIO_BUS_DISCOUNT)}
+                                       
                                         autoComplete="off"
                                         placeholder="Informe o CPF ou RG desta pessoa"
                                     />
-                                    <p className="mt-1 text-xs font-medium text-amber-700">Esta pessoa ainda não possui documento cadastrado.</p>
+                                    <p className="mt-1 text-xs font-medium text-amber-700">Esta pessoa ainda não possui documento cadastrado.</p>\n                                    <label className="mt-2 flex items-center gap-2 text-xs text-amber-800"><input type="checkbox" checked={!!formData.documentProvisional} onChange={e => setFormData(prev => ({ ...prev, documentProvisional: e.target.checked }))} />Marcar documento como provisório</label>
                                 </FormField>
                             )}
 
@@ -571,6 +567,7 @@ const AddAttendeeForm: React.FC<AddAttendeeFormProps> = ({ onAddAttendee, onUpda
                                     <FormField label={`Doc (CPF/RG)${(formData.packageType === PackageType.SITIO_BUS || formData.packageType === PackageType.SITIO_BUS_DISCOUNT) ? '' : ' - Op'}`} id="document" error={errors.document} onPaste={(text) => handlePaste('document', text)}>
                                         <input type="tel" id="document" name="document" value={formData.document} onChange={handleInputChange} className="block w-full px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl shadow-sm text-sm focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all" required={(formData.packageType === PackageType.SITIO_BUS || formData.packageType === PackageType.SITIO_BUS_DISCOUNT)} autoComplete="off" disabled={isPersonSelected && !isEditMode} placeholder="000.000.000-00" />
                                     </FormField>
+                                    <label className="col-span-full flex items-center gap-2 text-xs text-amber-800"><input type="checkbox" checked={!!formData.documentProvisional} onChange={e => setFormData(prev => ({ ...prev, documentProvisional: e.target.checked }))} />Marcar documento como provisório / ainda não confirmado</label>
                                     <FormField label="Celular (WhatsApp)" id="phone" error={errors.phone} onPaste={(text) => handlePaste('phone', text)}>
                                         <input type="tel" id="phone" name="phone" value={formData.phone} onChange={handleInputChange} placeholder="(21) 99999-9999" className="block w-full px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl shadow-sm text-sm focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all" required autoComplete="off" disabled={isPersonSelected && !isEditMode} />
                                     </FormField>

@@ -103,7 +103,7 @@ CREATE OR REPLACE FUNCTION public.assign_event_registration_bus()
 RETURNS trigger
 LANGUAGE plpgsql
 SECURITY DEFINER
-SET search_path = public, pg_temp
+SET search_path = pg_catalog, public, pg_temp
 AS $function$
 DECLARE
     candidate_bus INTEGER;

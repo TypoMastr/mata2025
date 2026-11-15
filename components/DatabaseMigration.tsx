@@ -67,6 +67,153 @@ ALTER TABLE public.action_history
 ADD COLUMN actor TEXT;`;
     };
 
+    const busCapacityAssignmentSql = (): string => `-- Redistribui registros ativos atuais em grupos de no máximo 50 pessoas por ônibus.
+ALTER TABLE public.event_registrations
+    ADD COLUMN IF NOT EXISTS is_deleted BOOLEAN DEFAULT FALSE;
+ALTER TABLE public.event_registrations
+    ADD COLUMN IF NOT EXISTS wont_attend BOOLEAN DEFAULT FALSE;
+
+WITH ranked_bus_passengers AS (
+    SELECT
+        id,
+        ((ROW_NUMBER() OVER (
+            PARTITION BY event_id
+            ORDER BY bus_number ASC NULLS LAST, registration_date ASC NULLS LAST, id ASC
+        ) - 1) / 50 + 1)::INTEGER AS assigned_bus_number
+    FROM public.event_registrations
+    WHERE COALESCE(is_deleted, FALSE) = FALSE
+      AND COALESCE(wont_attend, FALSE) = FALSE
+      AND package_type <> 'Apenas Sítio'
+)
+UPDATE public.event_registrations AS registration
+   SET bus_number = ranked_bus_passengers.assigned_bus_number
+  FROM ranked_bus_passengers
+ WHERE registration.id = ranked_bus_passengers.id;
+
+UPDATE public.event_registrations
+   SET bus_number = NULL
+ WHERE COALESCE(is_deleted, FALSE) = FALSE
+   AND (
+       COALESCE(wont_attend, FALSE) = TRUE
+       OR package_type = 'Apenas Sítio'
+   );
+
+-- Atribui a próxima vaga livre dentro de uma transação serializada por evento.
+CREATE OR REPLACE FUNCTION public.assign_event_registration_bus()
+RETURNS trigger
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public, pg_temp
+AS $function$
+DECLARE
+    candidate_bus INTEGER;
+    last_bus INTEGER;
+    bus_occupancy INTEGER;
+BEGIN
+    IF COALESCE(NEW.is_deleted, FALSE) THEN
+        RETURN NEW;
+    END IF;
+
+    IF NEW.package_type = 'Apenas Sítio' OR COALESCE(NEW.wont_attend, FALSE) THEN
+        NEW.bus_number := NULL;
+        RETURN NEW;
+    END IF;
+
+    -- Atualizações comuns (ex.: pagamento) não devem mudar a alocação existente.
+    IF TG_OP = 'UPDATE'
+       AND NEW.is_deleted IS NOT DISTINCT FROM OLD.is_deleted
+       AND NEW.event_id IS NOT DISTINCT FROM OLD.event_id
+       AND NEW.package_type IS NOT DISTINCT FROM OLD.package_type
+       AND NEW.wont_attend IS NOT DISTINCT FROM OLD.wont_attend
+       AND NEW.bus_number IS NOT DISTINCT FROM OLD.bus_number THEN
+        RETURN NEW;
+    END IF;
+
+    -- Uma alteração manual de ônibus é permitida somente se ainda houver vaga.
+    IF TG_OP = 'UPDATE'
+       AND NEW.is_deleted IS NOT DISTINCT FROM OLD.is_deleted
+       AND NEW.event_id IS NOT DISTINCT FROM OLD.event_id
+       AND NEW.package_type IS NOT DISTINCT FROM OLD.package_type
+       AND NEW.wont_attend IS NOT DISTINCT FROM OLD.wont_attend
+       AND NEW.bus_number IS DISTINCT FROM OLD.bus_number THEN
+        IF NEW.bus_number IS NULL THEN
+            RETURN NEW;
+        END IF;
+
+        PERFORM pg_advisory_xact_lock(hashtextextended(NEW.event_id::TEXT, 0));
+        SELECT COUNT(*)::INTEGER
+          INTO bus_occupancy
+          FROM public.event_registrations AS registration
+         WHERE registration.event_id = NEW.event_id
+           AND registration.id IS DISTINCT FROM NEW.id
+           AND COALESCE(registration.is_deleted, FALSE) = FALSE
+           AND COALESCE(registration.wont_attend, FALSE) = FALSE
+           AND registration.package_type <> 'Apenas Sítio'
+           AND registration.bus_number = NEW.bus_number;
+
+        IF bus_occupancy >= 50 THEN
+            RAISE EXCEPTION 'BUS_FULL' USING ERRCODE = '23514';
+        END IF;
+        RETURN NEW;
+    END IF;
+
+    -- Serializa inscrições/restaurações do mesmo evento para não duplicar a última vaga.
+    PERFORM pg_advisory_xact_lock(hashtextextended(NEW.event_id::TEXT, 0));
+
+    SELECT COALESCE(MAX(registration.bus_number), 0)::INTEGER
+      INTO last_bus
+      FROM public.event_registrations AS registration
+     WHERE registration.event_id = NEW.event_id
+       AND registration.id IS DISTINCT FROM NEW.id
+       AND COALESCE(registration.is_deleted, FALSE) = FALSE
+       AND COALESCE(registration.wont_attend, FALSE) = FALSE
+       AND registration.package_type <> 'Apenas Sítio';
+
+    FOR candidate_bus IN 1..(last_bus + 1) LOOP
+        SELECT COUNT(*)::INTEGER
+          INTO bus_occupancy
+          FROM public.event_registrations AS registration
+         WHERE registration.event_id = NEW.event_id
+           AND registration.id IS DISTINCT FROM NEW.id
+           AND COALESCE(registration.is_deleted, FALSE) = FALSE
+           AND COALESCE(registration.wont_attend, FALSE) = FALSE
+           AND registration.package_type <> 'Apenas Sítio'
+           AND registration.bus_number = candidate_bus;
+
+        IF bus_occupancy < 50 THEN
+            NEW.bus_number := candidate_bus;
+            RETURN NEW;
+        END IF;
+    END LOOP;
+
+    RAISE EXCEPTION 'Could not allocate a bus seat' USING ERRCODE = '23514';
+END;
+$function$;
+
+DROP TRIGGER IF EXISTS event_registrations_assign_bus_insert
+    ON public.event_registrations;
+CREATE TRIGGER event_registrations_assign_bus_insert
+BEFORE INSERT ON public.event_registrations
+FOR EACH ROW EXECUTE FUNCTION public.assign_event_registration_bus();
+
+DROP TRIGGER IF EXISTS event_registrations_assign_bus_update
+    ON public.event_registrations;
+CREATE TRIGGER event_registrations_assign_bus_update
+BEFORE UPDATE OF bus_number, is_deleted, event_id, package_type, wont_attend
+ON public.event_registrations
+FOR EACH ROW EXECUTE FUNCTION public.assign_event_registration_bus();
+
+CREATE OR REPLACE FUNCTION public.bus_assignment_migration_check()
+RETURNS BOOLEAN
+LANGUAGE SQL
+IMMUTABLE
+AS $function$
+    SELECT TRUE;
+$function$;
+
+GRANT EXECUTE ON FUNCTION public.bus_assignment_migration_check() TO anon, authenticated;
+NOTIFY pgrst, 'reload schema';`;
+
     missingItems.forEach(item => {
         if (item.startsWith('table:')) {
             const tableName = item.split(':')[1];
@@ -77,6 +224,8 @@ ADD COLUMN actor TEXT;`;
             commands.push(addWontAttendSql());
         } else if (item === 'column:actor:action_history') {
             commands.push(addActorSql());
+        } else if (item === 'feature:bus_capacity_assignment') {
+            commands.push(busCapacityAssignmentSql());
         } else {
             // Assume it's a table name missing a column
             commands.push(addColumnSql(item));
@@ -123,6 +272,9 @@ const DatabaseMigration: React.FC<DatabaseMigrationProps> = ({ missingIn }) => {
                     {missingTables.length > 0 && <li>Tabela(s) faltando: <strong>{missingTables.join(', ')}</strong></li>}
                     {missingColumnsInTables.length > 0 && <li>Coluna <code>is_deleted</code> faltando em: <strong>{missingColumnsInTables.join(', ')}</strong></li>}
                     {specificColumnMissing && <li>Colunas específicas faltando (ex: <code>actor</code>, <code>wont_attend</code>)</li>}
+                    {missingIn.includes('feature:bus_capacity_assignment') && (
+                        <li>Regra automática de lotação dos ônibus (máximo de 50 pessoas) ainda não instalada</li>
+                    )}
                 </ul>
 
                 <p className="mb-4 text-zinc-600">
